@@ -1,0 +1,20 @@
+#:schema https://www.schemastore.org/prek.json
+# Auto-format staged files on commit. Run manually with `prek run --all-files`.
+# prek (https://prek.j178.dev) is installed globally via mise.
+
+# clang-format ships a maintained mirror with an isolated, pinned binary; its
+# default types_or includes `cuda`, so .cu/.cuh are covered. Keep rev in sync
+# with the pinned pipx:clang-format in the root mise.toml.
+[[repos]]
+repo = "https://github.com/pre-commit/mirrors-clang-format"
+rev = "v22.1.8"
+hooks = [{ id = "clang-format" }]
+
+# gersemi has no published hook repo, so run the mise-pinned binary directly.
+# It reads each subproject's .gersemirc; build/ CMake files are gitignored and
+# never staged, so they never reach the hook.
+[[repos]]
+repo = "local"
+hooks = [
+  { id = "gersemi", name = "gersemi (CMake)", entry = "mise exec -- gersemi -i", language = "system", files = '(^|/)CMakeLists\.txt$|\.cmake$', exclude = "/build/" },
+]

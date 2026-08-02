@@ -4,7 +4,7 @@
 #
 # Formatters are pinned: clang-format output drifts between releases, so a
 # floating version would reformat everything on upgrade. The prek hooks
-# (.pre-commit-config.yaml) run these same binaries via `mise exec`. Bump
+# (prek.toml) run these same binaries via `mise exec`. Bump
 # deliberately.
 [tools]
 "pipx:clang-format" = "22.1.8"
