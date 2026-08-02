@@ -1,0 +1,14 @@
+[tools]
+watchexec = "latest"
+
+[env]
+_.file = ".env"
+
+[tasks."dc:run"]
+description = "Exec a command in the running container (usage: mise dc:run -- <cmd>)"
+usage = 'arg "<cmd>" var=#true'
+run = 'eval "cmd=($usage_cmd)"; docker exec -it "$CONTAINER_NAME" "${cmd[@]}"'
+
+[tasks."dc:down"]
+description = "Stop the container"
+run = 'docker stop "$CONTAINER_NAME"'

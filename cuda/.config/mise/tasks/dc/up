@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#MISE description="Build the image, then start or reuse the container"
+#MISE raw=true
+set -euo pipefail
+
+IMAGE=$CONTAINER_NAME
+CONTAINER=$CONTAINER_NAME
+
+docker build --platform linux/amd64 -t "$IMAGE" .
+
+# Recreate the container when it's not running OR when it's running a stale image
+# (e.g. platform/base-image/Dockerfile changed). Reusing on image match alone
+# would keep an outdated container — that's how an old arm64 container survived
+# after the build switched to --platform linux/amd64.
+STATUS=$(docker inspect --format '{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)
+RUNNING_IMG=$(docker inspect --format '{{.Image}}' "$CONTAINER" 2>/dev/null || true)
+CURRENT_IMG=$(docker image inspect --format '{{.Id}}' "$IMAGE")
+
+if [ "$STATUS" != "running" ] || [ "$RUNNING_IMG" != "$CURRENT_IMG" ]; then
+  docker rm -f "$CONTAINER" 2>/dev/null || true
+  docker run -d --name "$CONTAINER" --platform linux/amd64 -v "$(pwd):/app" -w /app "$IMAGE" sleep infinity
+fi

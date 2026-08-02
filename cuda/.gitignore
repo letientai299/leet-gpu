@@ -1,0 +1,6 @@
+build/
+.ai.dump/
+bin/
+cmake-build-*/
+.ccache/
+.env

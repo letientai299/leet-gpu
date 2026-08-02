@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#MISE description="Configure cmake if needed, then build into ./bin"
+set -euo pipefail
+
+# The Mac host has no CUDA toolchain, so on the host we forward the build into
+# the container by running this same script there. /.dockerenv only exists
+# inside a Docker container, so it tells us which side we're on.
+if [ ! -e /.dockerenv ]; then
+  if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
+    echo "container not running; start it with: mise run dc:up" >&2
+    exit 1
+  fi
+  exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/build
+fi
+
+BUILD_DIR=/app/build
+
+# Persist the ccache on the host mount so it survives container recreation.
+export CCACHE_DIR=/app/.ccache
+
+# Ninja can't reuse a build tree configured with a different generator, so drop
+# a stale Make tree left over from before we switched.
+if [ -f "$BUILD_DIR/CMakeCache.txt" ] && ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$BUILD_DIR/CMakeCache.txt"; then
+  rm -rf "$BUILD_DIR"
+fi
+
+if [ ! -f "$BUILD_DIR/CMakeCache.txt" ] || [ /app/CMakeLists.txt -nt "$BUILD_DIR/CMakeCache.txt" ]; then
+  cmake -S /app -B "$BUILD_DIR" -G Ninja -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/app/bin
+fi
+
+cmake --build "$BUILD_DIR" --parallel

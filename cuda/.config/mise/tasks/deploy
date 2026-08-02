@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#MISE description="Rsync bin/hello to a100 and run it on the GPU"
+set -euo pipefail
+
+REMOTE=$SSH_HOST
+REMOTE_BIN=/tmp/${CONTAINER_NAME}-hello
+
+# Reuse one multiplexed SSH connection across the rsync + run round trips and
+# across dev-loop iterations, so the connection/auth handshake is paid once
+# instead of on every deploy. ControlPersist keeps the master warm between edits.
+ssh_opts=(-o ControlMaster=auto -o ControlPath="/tmp/ssh-${CONTAINER_NAME}-%r@%h" -o ControlPersist=1h)
+
+# Prefer a modern rsync (3.2+) over macOS's bundled openrsync at /usr/bin/rsync:
+# with 3.2+ on both ends, -z negotiates zstd (much better/faster than zlib) and
+# still falls back gracefully to an older remote. brew installs it outside the
+# default PATH order, so resolve it explicitly.
+rsync_bin=$(command -v rsync)
+for candidate in /opt/homebrew/bin/rsync /usr/local/bin/rsync; do
+  [ -x "$candidate" ] && { rsync_bin=$candidate; break; }
+done
+
+# rsync sends only the changed blocks of the recompiled binary (delta, against
+# the previous copy at $REMOTE_BIN) and -z compresses them — far less than the
+# ~1 MB a fresh scp pushes every time. --inplace rewrites the changed blocks
+# directly into the remote file instead of building a full temp copy and
+# renaming it, which matters more as the binary grows; --partial keeps a
+# half-sent file around so an interrupted transfer resumes as a delta baseline.
+"$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" bin/hello "$REMOTE:$REMOTE_BIN"
+
+# $REMOTE_BIN is a fixed local literal; expanding it client-side is intended.
+# shellcheck disable=SC2029
+ssh "${ssh_opts[@]}" "$REMOTE" "$REMOTE_BIN"

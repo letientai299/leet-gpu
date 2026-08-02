@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#MISE description="Internal: build, then deploy only when bin/hello changed"
+#MISE hide=true
+set -euo pipefail
+
+mise run build
+
+# build is synchronous and writes bin/hello onto the host mount before it
+# returns, so a content hash is enough to decide whether a deploy is needed.
+new=$(shasum bin/hello | cut -d' ' -f1)
+if [ "$new" = "$(cat bin/.deployed 2>/dev/null || true)" ]; then
+  echo "binary unchanged — skipping deploy"
+else
+  mise run deploy
+  printf '%s' "$new" > bin/.deployed
+fi
