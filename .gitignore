@@ -17,4 +17,5 @@ __pycache__/
 # OS / editor / LSP cruft
 .DS_Store
 *.swp
-.cache/       # clangd index (.cache/clangd)
+# clangd writes its index to .cache/clangd
+.cache/
