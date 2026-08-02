@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# clangd transport shim: nvim's clangd config (lsp/clangd.lua) prefers this
+# executable over the system clangd when it exists at <root>/.nvim/clangd. It
+# runs clangd *inside* the CUDA toolchain container, where the real CUDA 13.3
+# headers and a matching libc live, so diagnostics match `nvcc` instead of the
+# host's missing headers.
+#
+# The container bind-mounts this project at /app, so host and container paths
+# differ. clangd's own --path-mappings translates the LSP file:// URIs between
+# them (framing-safe, unlike a stream rewriter) -- so no proxy is needed. Only
+# the project tree maps; go-to-definition into /usr/local/cuda system headers
+# won't open on the host, but diagnostics/completion resolve fine.
+#
+# Flag policy (--background-index, --clang-tidy, ...) is passed in "$@" by
+# nvim.conf; this script owns only transport.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" # host project root
+
+# CONTAINER_NAME lives in .env (see .env.example). Load it the same way mise
+# does; fall back to the compose/default name.
+if [[ -f "$root/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$root/.env"
+  set +a
+fi
+: "${CONTAINER_NAME:=leet-gpu-cuda}"
+
+# -i (no -t): LSP speaks JSON-RPC over stdio, so we need a pipe, not a TTY.
+# The container mounts $root at /app, so map host paths to /app for clangd.
+exec docker exec -i "$CONTAINER_NAME" \
+  clangd --path-mappings="$root=/app" "$@"

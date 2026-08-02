@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ccache \
     ninja-build \
     cmake \
+    clangd \
     curl \
     ca-certificates \
     gpg \
