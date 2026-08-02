@@ -6,6 +6,8 @@ set -euo pipefail
 # the container by running this same script there. /.dockerenv only exists
 # inside a Docker container, so it tells us which side we're on.
 if [ ! -e /.dockerenv ]; then
+  # Only needed host-side; inside the container this var is intentionally unset.
+  : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
   if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
     echo "container not running; start it with: mise run dc:up" >&2
     exit 1

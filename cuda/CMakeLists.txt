@@ -16,12 +16,17 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_ARCHITECTURES 80-real)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
+# Emit build/compile_commands.json so an IDE/clangd on the host can index the
+# code against the real CUDA headers, even though nvcc only exists in the
+# container. Paths inside are container paths (/app/...); map them in the IDE.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Cache host-side compilation so reconfigures, reverts, and branch switches
 # don't re-run the emulated compiler. No-op when ccache isn't installed.
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
-    set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
 # No CUDA_SEPARABLE_COMPILATION: a single translation unit doesn't need
@@ -33,10 +38,17 @@ add_executable(hello src/hello.cu)
 # dedicated ELF sections that strip leaves intact). Runs only on relink, so it
 # doesn't touch the binary on no-op builds. Turn off with -DSTRIP_DEPLOY=OFF
 # when you need symbols for cuda-gdb on the a100.
-option(STRIP_DEPLOY "Strip symbols from the binary for smaller, faster deploys" ON)
+option(
+  STRIP_DEPLOY
+  "Strip symbols from the binary for smaller, faster deploys"
+  ON
+)
 if(STRIP_DEPLOY AND CMAKE_STRIP)
-    add_custom_command(TARGET hello POST_BUILD
-        COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:hello>"
-        COMMENT "Stripping hello for deploy (disable with -DSTRIP_DEPLOY=OFF)"
-        VERBATIM)
+  add_custom_command(
+    TARGET hello
+    POST_BUILD
+    COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:hello>"
+    COMMENT "Stripping hello for deploy (disable with -DSTRIP_DEPLOY=OFF)"
+    VERBATIM
+  )
 endif()

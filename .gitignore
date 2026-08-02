@@ -1,0 +1,20 @@
+# Shared ignores across all subprojects. Language/build-specific ignores live in
+# each subproject's own .gitignore (e.g. cuda/.gitignore) to keep them isolated.
+
+# Local env + agent scratch
+.env
+.ai.dump/
+
+# Python (Triton/JAX/PyTorch/CuTe DSL subprojects)
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+
+# OS / editor / LSP cruft
+.DS_Store
+*.swp
+.cache/       # clangd index (.cache/clangd)

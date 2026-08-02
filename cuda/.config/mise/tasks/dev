@@ -2,7 +2,7 @@
 #MISE description="Watch sources, rebuild in the container, then deploy+run on GPU host when the binary changes"
 set -euo pipefail
 
-mise run db:up
+mise run dc:up
 
 # One watcher on the sources. We can't watch bin/hello directly: the build
 # writes it from inside the container through the bind mount, and Docker Desktop

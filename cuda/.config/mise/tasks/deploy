@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-#MISE description="Rsync bin/hello to a100 and run it on the GPU"
+#MISE description="Rsync bin/hello to the SSH GPU host and run it"
 set -euo pipefail
+
+# Fail fast with a clear message if .env wasn't loaded, instead of an empty
+# host/name producing a cryptic ssh/rsync error. See .env.example.
+: "${SSH_HOST:?not set — copy .env.example to .env}"
+: "${CONTAINER_NAME:?not set — copy .env.example to .env}"
 
 REMOTE=$SSH_HOST
 REMOTE_BIN=/tmp/${CONTAINER_NAME}-hello

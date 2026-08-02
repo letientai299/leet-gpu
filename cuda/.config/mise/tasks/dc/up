@@ -3,6 +3,9 @@
 #MISE raw=true
 set -euo pipefail
 
+# Fail fast if .env wasn't loaded — an empty name makes docker build/run cryptic.
+: "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+
 IMAGE=$CONTAINER_NAME
 CONTAINER=$CONTAINER_NAME
 
