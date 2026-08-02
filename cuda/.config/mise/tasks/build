@@ -26,7 +26,13 @@ if [ -f "$BUILD_DIR/CMakeCache.txt" ] && ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ni
   rm -rf "$BUILD_DIR"
 fi
 
-if [ ! -f "$BUILD_DIR/CMakeCache.txt" ] || [ /app/CMakeLists.txt -nt "$BUILD_DIR/CMakeCache.txt" ]; then
+# Configure only when the build tree doesn't exist yet. We deliberately do NOT
+# guard on "CMakeLists.txt newer than the cache": a no-op reconfigure doesn't
+# rewrite CMakeCache.txt, so its mtime never catches up and the check stays true
+# forever once CMakeLists.txt is edited — reconfiguring on every build. Instead
+# `cmake --build` drives Ninja, whose generated cmake_check_build_system rule
+# re-runs CMake automatically, and only when a real CMake input actually changed.
+if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
   cmake -S /app -B "$BUILD_DIR" -G Ninja -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/app/bin
 fi
 
