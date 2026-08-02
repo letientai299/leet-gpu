@@ -1,0 +1,11 @@
+# Repo-wide dev tooling, shared across all subprojects and inherited by their
+# mise configs. Per-project build/runtime tools and code style live in each
+# subproject (e.g. cuda/mise.toml, cuda/.clang-format).
+#
+# Formatters are pinned: clang-format output drifts between releases, so a
+# floating version would reformat everything on upgrade. The prek hooks
+# (.pre-commit-config.yaml) run these same binaries via `mise exec`. Bump
+# deliberately.
+[tools]
+"pipx:clang-format" = "22.1.8"
+"pipx:gersemi" = "0.28.0"

@@ -1,0 +1,5 @@
+# C++/CUDA formatting. clang-format applies these to .cu/.cuh as C++.
+BasedOnStyle: LLVM
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never

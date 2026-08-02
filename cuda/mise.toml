@@ -1,5 +1,8 @@
 [tools]
 watchexec = "latest"
+# clang-format/gersemi are declared in the repo-root mise.toml (shared dev
+# tooling) and inherited here; the fmt task and the prek hooks use the same
+# pinned binaries. Per-project style lives in .clang-format / .gersemirc.
 
 [env]
 _.file = ".env"
@@ -12,3 +15,12 @@ run = 'eval "cmd=($usage_cmd)"; docker exec -it "$CONTAINER_NAME" "${cmd[@]}"'
 [tasks."dc:down"]
 description = "Stop the container"
 run = 'docker stop "$CONTAINER_NAME"'
+
+[tasks.fmt]
+description = "Format C++/CUDA (clang-format) and CMake (gersemi)"
+# Only touch sources under src/ and the top-level CMakeLists.txt, never the
+# generated CMake files under the gitignored build/.
+run = '''
+find src -type f \( -name '*.cu' -o -name '*.cuh' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) -exec clang-format -i {} +
+gersemi -i CMakeLists.txt
+'''
