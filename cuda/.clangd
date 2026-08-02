@@ -11,3 +11,11 @@ CompileFlags:
     - --cuda-path=/usr/local/cuda
     - --cuda-gpu-arch=sm_80 # A100, matches CMAKE_CUDA_ARCHITECTURES
     - --no-cuda-version-check
+  # build/compile_commands.json drives nvcc; strip its nvcc-only flags that
+  # clang(d) rejects. --cuda-gpu-arch above stands in for --generate-code.
+  # Trailing * is a clangd glob. Add more here as nvcc flags appear in the build.
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --generate-code*
+    - -Xcompiler*
+    - --options-file*
