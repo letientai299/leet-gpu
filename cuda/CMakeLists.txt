@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(cuda_hello LANGUAGES CXX CUDA)
+project(cuda LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_STANDARD 17)
 # Target NVIDIA A100 (compute capability 8.0 -> sm_80).
@@ -31,7 +31,7 @@ endif()
 
 # No CUDA_SEPARABLE_COMPILATION: a single translation unit doesn't need
 # relocatable device code, and enabling it adds an extra nvcc device-link pass.
-add_executable(hello src/hello.cu)
+add_executable(main src/main.cu)
 
 # Strip host symbols/debug info before deploy: they dominate binary growth as
 # the code grows and aren't needed to run on the GPU (device code lives in
@@ -45,10 +45,10 @@ option(
 )
 if(STRIP_DEPLOY AND CMAKE_STRIP)
   add_custom_command(
-    TARGET hello
+    TARGET main
     POST_BUILD
-    COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:hello>"
-    COMMENT "Stripping hello for deploy (disable with -DSTRIP_DEPLOY=OFF)"
+    COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:main>"
+    COMMENT "Stripping binary for deploy (disable with -DSTRIP_DEPLOY=OFF)"
     VERBATIM
   )
 endif()

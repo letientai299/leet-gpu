@@ -5,20 +5,25 @@ Usage:  python3 tools/lsp_features.py [project_root]   (default: repo root)
 Or:     mise run lsp:check
 
 Drives .nvim/clangd (docker exec + --path-mappings) over stdio, opens
-src/hello.cu, and issues one request per LSP feature, printing FOUND / empty /
+src/main.cu, and issues one request per LSP feature, printing FOUND / empty /
 ERR. No nvim needed -- it validates the server side of this container setup.
 Exit code is non-zero if the client can't even initialize.
 """
+
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import threading
 import time
-import pathlib
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FILE = os.path.join(ROOT, "src", "hello.cu")
+ROOT = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+FILE = os.path.join(ROOT, "src", "main.cu")
 uri = "file://" + FILE
 text = pathlib.Path(FILE).read_text()
 lines = text.splitlines()
@@ -32,14 +37,16 @@ def pos(needle, occurrence=1, offset=0):
             seen += 1
             if seen == occurrence:
                 return {"line": idx, "character": col + offset}
-    raise SystemExit(f"needle not found in hello.cu: {needle!r}")
+    raise SystemExit(f"needle not found in main.cu: {needle!r}")
 
 
 wrapper = os.path.join(ROOT, ".nvim", "clangd")
 if not os.access(wrapper, os.X_OK):
     raise SystemExit(f"missing/again non-executable wrapper: {wrapper}")
 
-p = subprocess.Popen([wrapper], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+p = subprocess.Popen(
+    [wrapper], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+)
 responses, lock = {}, threading.Lock()
 
 
@@ -84,23 +91,65 @@ def request(method, params, wait=5.0):
     return None
 
 
-CAPS = {"textDocument": {k: {} for k in (
-    "hover", "definition", "references", "documentSymbol", "documentHighlight",
-    "signatureHelp", "completion", "formatting", "rename", "foldingRange",
-    "selectionRange", "inlayHint", "codeAction", "typeDefinition", "implementation",
-)}}
-CAPS["textDocument"]["semanticTokens"] = {"requests": {"full": True}, "tokenTypes": [], "tokenModifiers": [], "formats": ["relative"]}
+CAPS = {
+    "textDocument": {
+        k: {}
+        for k in (
+            "hover",
+            "definition",
+            "references",
+            "documentSymbol",
+            "documentHighlight",
+            "signatureHelp",
+            "completion",
+            "formatting",
+            "rename",
+            "foldingRange",
+            "selectionRange",
+            "inlayHint",
+            "codeAction",
+            "typeDefinition",
+            "implementation",
+        )
+    }
+}
+CAPS["textDocument"]["semanticTokens"] = {
+    "requests": {"full": True},
+    "tokenTypes": [],
+    "tokenModifiers": [],
+    "formats": ["relative"],
+}
 
-init = request("initialize", {"processId": None, "rootUri": "file://" + ROOT,
-                              "capabilities": CAPS,
-                              "workspaceFolders": [{"uri": "file://" + ROOT, "name": "cuda"}]})
+init = request(
+    "initialize",
+    {
+        "processId": None,
+        "rootUri": "file://" + ROOT,
+        "capabilities": CAPS,
+        "workspaceFolders": [{"uri": "file://" + ROOT, "name": "cuda"}],
+    },
+)
 if not init or "result" not in init:
-    print("FAILED: clangd did not initialize (is the container running? `mise run dc:up`)")
+    print(
+        "FAILED: clangd did not initialize (is the container running? `mise run dc:up`)"
+    )
     p.terminate()
     sys.exit(1)
 send({"jsonrpc": "2.0", "method": "initialized", "params": {}})
-send({"jsonrpc": "2.0", "method": "textDocument/didOpen",
-      "params": {"textDocument": {"uri": uri, "languageId": "cuda", "version": 1, "text": text}}})
+send(
+    {
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+            "textDocument": {
+                "uri": uri,
+                "languageId": "cuda",
+                "version": 1,
+                "text": text,
+            }
+        },
+    }
+)
 time.sleep(6)
 
 kernel = pos("hello_kernel", 2)
@@ -122,19 +171,65 @@ def verdict(r, ok):
 tests = [
     ("hover", "textDocument/hover", {**td, "position": sync}, nonempty),
     ("definition", "textDocument/definition", {**td, "position": kernel}, nonempty),
-    ("references", "textDocument/references", {**td, "position": kernel_def, "context": {"includeDeclaration": True}}, nonempty),
+    (
+        "references",
+        "textDocument/references",
+        {**td, "position": kernel_def, "context": {"includeDeclaration": True}},
+        nonempty,
+    ),
     ("documentSymbol", "textDocument/documentSymbol", td, nonempty),
-    ("documentHighlight", "textDocument/documentHighlight", {**td, "position": kernel_def}, nonempty),
-    ("signatureHelp", "textDocument/signatureHelp", {**td, "position": printf_open}, lambda r: bool(r and r.get("signatures"))),
-    ("completion", "textDocument/completion", {**td, "position": sync}, lambda r: bool(r and (r.get("items") or r))),
-    ("semanticTokens", "textDocument/semanticTokens/full", td, lambda r: bool(r and r.get("data"))),
-    ("formatting", "textDocument/formatting", {**td, "options": {"tabSize": 4, "insertSpaces": True}}, lambda r: r is not None),
+    (
+        "documentHighlight",
+        "textDocument/documentHighlight",
+        {**td, "position": kernel_def},
+        nonempty,
+    ),
+    (
+        "signatureHelp",
+        "textDocument/signatureHelp",
+        {**td, "position": printf_open},
+        lambda r: bool(r and r.get("signatures")),
+    ),
+    (
+        "completion",
+        "textDocument/completion",
+        {**td, "position": sync},
+        lambda r: bool(r and (r.get("items") or r)),
+    ),
+    (
+        "semanticTokens",
+        "textDocument/semanticTokens/full",
+        td,
+        lambda r: bool(r and r.get("data")),
+    ),
+    (
+        "formatting",
+        "textDocument/formatting",
+        {**td, "options": {"tabSize": 4, "insertSpaces": True}},
+        lambda r: r is not None,
+    ),
     ("foldingRange", "textDocument/foldingRange", td, nonempty),
-    ("inlayHint", "textDocument/inlayHint", {**td, "range": {"start": {"line": 0, "character": 0}, "end": {"line": len(lines), "character": 0}}}, nonempty),
-    ("rename", "textDocument/rename", {**td, "position": kernel_def, "newName": "greet_kernel"}, lambda r: bool(r and r.get("changes"))),
+    (
+        "inlayHint",
+        "textDocument/inlayHint",
+        {
+            **td,
+            "range": {
+                "start": {"line": 0, "character": 0},
+                "end": {"line": len(lines), "character": 0},
+            },
+        },
+        nonempty,
+    ),
+    (
+        "rename",
+        "textDocument/rename",
+        {**td, "position": kernel_def, "newName": "greet_kernel"},
+        lambda r: bool(r and r.get("changes")),
+    ),
 ]
 
-print(f"clangd LSP feature check ({os.path.basename(ROOT)}/src/hello.cu):")
+print(f"clangd LSP feature check ({os.path.basename(ROOT)}/src/main.cu):")
 width = max(len(t[0]) for t in tests)
 fails = 0
 for name, method, params, ok in tests:

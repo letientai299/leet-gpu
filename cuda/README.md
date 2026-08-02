@@ -11,7 +11,8 @@ cp .env.example .env   # then edit CONTAINER_NAME / SSH_HOST
 mise run dc:up         # build the image, start the container
 ```
 
-`SSH_HOST` must be reachable via `ssh <SSH_HOST>` (define it in `~/.ssh/config`).
+`SSH_HOST` must be reachable via `ssh <SSH_HOST>` (define it in
+`~/.ssh/config`).
 
 ## Workflow
 
@@ -20,7 +21,7 @@ Run `mise tasks` for the live list. The loop:
 - `mise run dev` — watch `src` + `CMakeLists.txt`, rebuild in the container, and
   deploy+run on the GPU host only when the binary actually changed.
 - `mise run build` — one-off build into `bin/` (forwards into the container).
-- `mise run deploy` — rsync `bin/hello` to `$SSH_HOST` and run it.
+- `mise run deploy` — rsync `bin/main` to `$SSH_HOST` and run it.
 
 ## CLion intellisense (Docker toolchain)
 
@@ -41,5 +42,6 @@ Docker toolchain is for editor intellisense and debugging, not deploy. See the
 [`Dockerfile.remote-cuda-env`][clion-remote-repo].
 
 [leetgpu]: https://leetgpu.com/resources
-[clion-docker]: https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
+[clion-docker]:
+  https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
 [clion-remote-repo]: https://github.com/JetBrains/clion-remote

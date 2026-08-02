@@ -6,9 +6,9 @@ __global__ static void hello_kernel() {
 }
 
 int main() {
-  printf("[Host] 16 CUDA ======= \n");
-  hello_kernel<<<2, 5>>>();
+  printf("[Host] CUDA ======= \n");
+  hello_kernel<<<3, 5>>>();
   cudaDeviceSynchronize();
-  printf("[Host] Done 18 ======= \n");
+  printf("[Host] Done ======= \n");
   return 0;
 }
