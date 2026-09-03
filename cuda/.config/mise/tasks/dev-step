@@ -5,9 +5,8 @@ set -euo pipefail
 
 mise run build
 
-# build is synchronous and writes bin/main onto the host mount before it
-# returns, so a content hash is enough to decide whether a deploy is needed.
-new=$(shasum bin/main | cut -d' ' -f1)
+# Include selection so changing host or kernel triggers a run without rebuilding.
+new=$({ shasum bin/main; printf '%s\n' "$SSH_HOST" "$CUDA_KERNEL"; } | shasum | cut -d' ' -f1)
 if [ "$new" = "$(cat bin/.deployed 2>/dev/null || true)" ]; then
   echo "binary unchanged — skipping deploy"
 else

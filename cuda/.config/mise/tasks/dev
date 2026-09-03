@@ -9,4 +9,4 @@ mise run dc:up
 # for macOS does not propagate those filesystem events back to host watchers.
 # So each source change runs dev-step, which builds and then deploys only when
 # the binary actually changed.
-exec watchexec --project-origin . --watch src --watch CMakeLists.txt --restart -- mise run dev-step
+exec watchexec --project-origin . --watch src --watch CMakeLists.txt --watch .env --restart -- mise run dev-step

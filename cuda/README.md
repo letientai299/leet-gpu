@@ -1,27 +1,38 @@
 # cuda
 
-CUDA subproject of the [leetgpu][leetgpu] learning monorepo. The Mac host has no
-CUDA toolchain, so builds run in a `linux/amd64` container (emulated under QEMU)
-and the resulting binary is shipped to an SSH GPU host to run.
+## About
+
+CUDA subproject of the [leetgpu][leetgpu] learning monorepo.
+
+I use a Mac, which can't run CUDA code. Thankfully, we can build in a
+`linux/amd64` container and run the binary on an SSH GPU host to run.
 
 ## Setup
 
 ```sh
-cp .env.example .env   # then edit CONTAINER_NAME / SSH_HOST
+cp .env.example .env   # then edit CONTAINER_NAME / SSH_HOST / CUDA_KERNEL
 mise run dc:up         # build the image, start the container
 ```
 
 `SSH_HOST` must be reachable via `ssh <SSH_HOST>` (define it in
-`~/.ssh/config`).
+`~/.ssh/config`). `CUDA_KERNEL` selects the kernel run by `mise run deploy` and
+`mise run dev`.
 
 ## Workflow
 
 Run `mise tasks` for the live list. The loop:
 
-- `mise run dev` — watch `src` + `CMakeLists.txt`, rebuild in the container, and
-  deploy+run on the GPU host only when the binary actually changed.
+- `mise run dev` — watch sources, build configuration, and `.env`; rebuild in
+  the container and deploy the selected kernel when its binary or selection
+  changes.
 - `mise run build` — one-off build into `bin/` (forwards into the container).
-- `mise run deploy` — rsync `bin/main` to `$SSH_HOST` and run it.
+- `mise run deploy` — rsync `bin/main` to `$SSH_HOST` and run `$CUDA_KERNEL`.
+- `mise run deploy -- <kernel>` — override `CUDA_KERNEL` for one run.
+- `mise run deploy -- --help` — show kernel IDs on the remote host.
+
+Run `bin/main --help` on a CUDA host to show available kernel IDs. Architecture
+specific kernels live under their matching `src/sm*/` directory. The checked-in
+`.clangd` selects that directory's analysis target automatically.
 
 ## CLion intellisense (Docker toolchain)
 

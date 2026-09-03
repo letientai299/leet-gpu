@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
-#MISE description="Rsync bin/main to the SSH GPU host and run it"
+#MISE description="Deploy and run CUDA_KERNEL on the SSH GPU host"
 set -euo pipefail
 
 # Fail fast with a clear message if .env wasn't loaded, instead of an empty
 # host/name producing a cryptic ssh/rsync error. See .env.example.
 : "${SSH_HOST:?not set — copy .env.example to .env}"
 : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+
+if [ "$#" -gt 1 ]; then
+  echo "usage: mise deploy -- [--help|kernel]" >&2
+  exit 2
+fi
+
+selection=${1:-${CUDA_KERNEL:-}}
+if [ -z "$selection" ]; then
+  echo "kernel missing; pass one or set CUDA_KERNEL" >&2
+  exit 2
+fi
 
 REMOTE=$SSH_HOST
 REMOTE_BIN=/tmp/${CONTAINER_NAME}-main
@@ -32,6 +43,13 @@ done
 # half-sent file around so an interrupted transfer resumes as a delta baseline.
 "$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" bin/main "$REMOTE:$REMOTE_BIN"
 
-# $REMOTE_BIN is a fixed local literal; expanding it client-side is intended.
+if [ "$selection" = "--help" ]; then
+  remote_args=(--help)
+else
+  remote_args=(--kernel "$selection")
+fi
+printf -v remote_command '%q ' "$REMOTE_BIN" "${remote_args[@]}"
+
+# The command is shell-escaped before crossing the SSH boundary.
 # shellcheck disable=SC2029
-ssh "${ssh_opts[@]}" "$REMOTE" "$REMOTE_BIN"
+ssh "${ssh_opts[@]}" "$REMOTE" "$remote_command"
