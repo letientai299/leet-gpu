@@ -12,12 +12,12 @@ an SSH GPU host.
 ### Local GPU host
 
 ```sh
-cp .env.example .env   # leave SSH_HOST unset
 mise run build
 mise run deploy
 ```
 
-Local targets use the installed CUDA toolchain. `CONTAINER_NAME` is unused.
+Local targets use the installed CUDA toolchain. `.env` and `CONTAINER_NAME` are
+optional; create `.env` only to set `CUDA_KERNEL`.
 
 ### Remote GPU host
 
@@ -38,9 +38,11 @@ value builds in the container and must be reachable via `ssh <SSH_HOST>`
 
 Run `mise tasks` for the live list. The loop:
 
-- `mise run dev` — watch sources, build configuration, and `.env`; rebuild in
-  the selected environment and deploy the selected kernel when its binary or
-  selection changes.
+- `mise run dev` — watch sources and configuration; rebuild in the selected
+  environment and deploy the selected kernel when its binary or selection
+  changes. It watches `.env` when present. Local targets require `nvcc` on
+  `PATH`.
+- `mise run dev -- <kernel>` — override `CUDA_KERNEL` for one watch session.
 - `mise run build` — one-off build into `bin/`; local targets use native CUDA.
 - `mise run deploy` — run `bin/main` locally when `SSH_HOST` is unset, `local`,
   or `localhost`; otherwise rsync it to `$SSH_HOST` and run `$CUDA_KERNEL`. If

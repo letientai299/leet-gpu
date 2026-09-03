@@ -3,13 +3,23 @@
 #MISE hide=true
 set -euo pipefail
 
+if [ "$#" -gt 1 ]; then
+  echo "usage: mise dev -- [kernel]" >&2
+  exit 2
+fi
+
+selection=${1:-${CUDA_KERNEL:-}}
 mise run build
 
 # Include selection so changing host or kernel triggers a run without rebuilding.
-new=$({ shasum bin/main; printf '%s\n' "$SSH_HOST" "$CUDA_KERNEL"; } | shasum | cut -d' ' -f1)
+new=$({ shasum bin/main; printf '%s\n' "${SSH_HOST:-local}" "$selection"; } | shasum | cut -d' ' -f1)
 if [ "$new" = "$(cat bin/.deployed 2>/dev/null || true)" ]; then
   echo "binary unchanged — skipping deploy"
 else
-  mise run deploy
+  if [ -n "$selection" ]; then
+    mise run deploy -- "$selection"
+  else
+    mise run deploy
+  fi
   printf '%s' "$new" > bin/.deployed
 fi

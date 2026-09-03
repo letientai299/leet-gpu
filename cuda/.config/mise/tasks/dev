@@ -2,13 +2,30 @@
 #MISE description="Watch, rebuild, then deploy on target changes"
 set -euo pipefail
 
+if [ "$#" -gt 1 ]; then
+  echo "usage: mise dev -- [kernel]" >&2
+  exit 2
+fi
+
+selection=${1:-}
 TARGET=${SSH_HOST:-local}
-if [ "$TARGET" != local ] && [ "$TARGET" != localhost ]; then
+if [ "$TARGET" = local ] || [ "$TARGET" = localhost ]; then
+  if ! command -v nvcc >/dev/null; then
+    echo "nvcc missing; install or load CUDA" >&2
+    exit 1
+  fi
+else
   mise run dc:up
 fi
 
-# One watcher on the sources. We can't watch bin/main directly: the build
-# writes it from inside the container through the bind mount, and Docker Desktop
-# for macOS does not propagate those filesystem events back to host watchers.
-# So each source change runs dev-step.
-exec watchexec --project-origin . --watch src --watch CMakeLists.txt --watch .env --restart -- mise run dev-step
+watch_args=(--watch src --watch CMakeLists.txt)
+if [ -f .env ]; then
+  watch_args+=(--watch .env)
+fi
+
+run_args=(mise run dev-step)
+if [ -n "$selection" ]; then
+  run_args+=(-- "$selection")
+fi
+
+exec watchexec --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"
