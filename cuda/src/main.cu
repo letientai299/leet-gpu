@@ -1,8 +1,9 @@
 #include <cstdio>
 
 __global__ static void hello_kernel() {
-  printf("[GPU ] Hello from block %d, thread %d\n", blockIdx.x + 1,
-         threadIdx.x + 1);
+  const int i = 9;
+  printf("[GPU ] Hello from block %d, thread %d, i=%d\n", blockIdx.x + 1,
+         threadIdx.x + 1, i);
 }
 
 int main() {
