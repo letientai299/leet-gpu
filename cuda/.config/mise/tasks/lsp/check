@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Smoke-test the in-container clangd LSP against src/hello.cu"
+#MISE description="Smoke-test the in-container clangd LSP against src/main.cu"
 set -euo pipefail
 
 root=${MISE_PROJECT_ROOT:-$PWD}

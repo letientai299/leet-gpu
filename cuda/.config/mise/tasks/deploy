@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Rsync bin/hello to the SSH GPU host and run it"
+#MISE description="Rsync bin/main to the SSH GPU host and run it"
 set -euo pipefail
 
 # Fail fast with a clear message if .env wasn't loaded, instead of an empty
@@ -8,7 +8,7 @@ set -euo pipefail
 : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
 
 REMOTE=$SSH_HOST
-REMOTE_BIN=/tmp/${CONTAINER_NAME}-hello
+REMOTE_BIN=/tmp/${CONTAINER_NAME}-main
 
 # Reuse one multiplexed SSH connection across the rsync + run round trips and
 # across dev-loop iterations, so the connection/auth handshake is paid once
@@ -30,7 +30,7 @@ done
 # directly into the remote file instead of building a full temp copy and
 # renaming it, which matters more as the binary grows; --partial keeps a
 # half-sent file around so an interrupted transfer resumes as a delta baseline.
-"$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" bin/hello "$REMOTE:$REMOTE_BIN"
+"$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" bin/main "$REMOTE:$REMOTE_BIN"
 
 # $REMOTE_BIN is a fixed local literal; expanding it client-side is intended.
 # shellcheck disable=SC2029

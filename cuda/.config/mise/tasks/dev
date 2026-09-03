@@ -4,7 +4,7 @@ set -euo pipefail
 
 mise run dc:up
 
-# One watcher on the sources. We can't watch bin/hello directly: the build
+# One watcher on the sources. We can't watch bin/main directly: the build
 # writes it from inside the container through the bind mount, and Docker Desktop
 # for macOS does not propagate those filesystem events back to host watchers.
 # So each source change runs dev-step, which builds and then deploys only when
