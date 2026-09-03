@@ -34,7 +34,7 @@ function(add_kernel target architectures source)
 endfunction()
 
 add_kernel(kernel_hello "86;90;100" src/common/hello.cu)
-add_kernel(kernel_ampere 86 src/sm86/async_copy.cu)
+add_kernel(kernel_ampere "80-real;86-real;90-real;90-virtual" src/sm86/async_copy.cu)
 add_kernel(kernel_hopper 90a src/sm90a/cluster.cu)
 add_kernel(kernel_blackwell 100a src/sm100a/fp4.cu)
 

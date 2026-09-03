@@ -13,8 +13,8 @@ namespace {
 
 constexpr std::array<Kernel, 4> kernels{
     Kernel{"hello", "Basic CUDA launch", 8, 6, false, run_hello},
-    Kernel{"ampere-async-copy", "Ampere asynchronous shared-memory copy", 8, 6,
-           true, run_ampere_async_copy},
+    Kernel{"ampere-async-copy", "Ampere asynchronous shared-memory copy", 8, 0,
+           false, run_ampere_async_copy},
     Kernel{"hopper-cluster", "Hopper thread-block cluster", 9, 0, true,
            run_hopper_cluster},
     Kernel{"blackwell-fp4", "Blackwell FP4 conversion", 10, 0, true,
