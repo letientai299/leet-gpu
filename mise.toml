@@ -1,3 +1,8 @@
+monorepo_root = true
+
+[monorepo]
+config_roots = ['cuda']
+
 # Repo-wide dev tooling, shared across all subprojects and inherited by their
 # mise configs. Per-project build/runtime tools and code style live in each
 # subproject (e.g. cuda/mise.toml, cuda/.clang-format).
