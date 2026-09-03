@@ -28,4 +28,4 @@ if [ -n "$selection" ]; then
   run_args+=(-- "$selection")
 fi
 
-exec watchexec --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"
+exec watchexec -I --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"

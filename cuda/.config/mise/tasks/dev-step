@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Internal: build, then deploy only when bin/main changed"
+#MISE description="Internal: build, then deploy"
 #MISE hide=true
 set -euo pipefail
 
@@ -11,15 +11,8 @@ fi
 selection=${1:-${CUDA_KERNEL:-}}
 mise run build
 
-# Include selection so changing host or kernel triggers a run without rebuilding.
-new=$({ shasum bin/main; printf '%s\n' "${SSH_HOST:-local}" "$selection"; } | shasum | cut -d' ' -f1)
-if [ "$new" = "$(cat bin/.deployed 2>/dev/null || true)" ]; then
-  echo "binary unchanged — skipping deploy"
+if [ -n "$selection" ]; then
+  mise run deploy -- "$selection"
 else
-  if [ -n "$selection" ]; then
-    mise run deploy -- "$selection"
-  else
-    mise run deploy
-  fi
-  printf '%s' "$new" > bin/.deployed
+  mise run deploy
 fi
