@@ -37,7 +37,6 @@ const Kernel *find_kernel(const char *name) {
 
 void print_help(const char *program) {
   HOST_LOG("Usage: %s --kernel <name>", program);
-  HOST_LOG("CUDA_KERNEL supplies the default kernel");
   HOST_LOG("Kernels:");
   for (const auto &kernel : kernels) {
     HOST_LOG("  %-20s %s", kernel.name, kernel.description);

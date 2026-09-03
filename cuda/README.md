@@ -43,7 +43,8 @@ Run `mise tasks` for the live list. The loop:
   selection changes.
 - `mise run build` — one-off build into `bin/`; local targets use native CUDA.
 - `mise run deploy` — run `bin/main` locally when `SSH_HOST` is unset, `local`,
-  or `localhost`; otherwise rsync it to `$SSH_HOST` and run `$CUDA_KERNEL`.
+  or `localhost`; otherwise rsync it to `$SSH_HOST` and run `$CUDA_KERNEL`. If
+  no kernel is selected, it prints the kernel list.
 - `mise run deploy -- <kernel>` — override `CUDA_KERNEL` for one run.
 - `mise run deploy -- --help` — show kernel IDs on the selected target.
 

@@ -10,14 +10,13 @@ if [ "$#" -gt 1 ]; then
 fi
 
 selection=${1:-${CUDA_KERNEL:-}}
-if [ -z "$selection" ]; then
-  echo "kernel missing; pass one or set CUDA_KERNEL" >&2
-  exit 2
-fi
 
 if [ "$TARGET" = local ] || [ "$TARGET" = localhost ]; then
   if [ "$selection" = "--help" ]; then
     exec bin/main --help
+  fi
+  if [ -z "$selection" ]; then
+    exec bin/main
   fi
   exec bin/main --kernel "$selection"
 fi
@@ -51,6 +50,8 @@ done
 
 if [ "$selection" = "--help" ]; then
   remote_args=(--help)
+elif [ -z "$selection" ]; then
+  remote_args=()
 else
   remote_args=(--kernel "$selection")
 fi

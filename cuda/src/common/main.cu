@@ -2,7 +2,6 @@
 #include "kernel.hpp"
 #include "log.hpp"
 
-#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -10,11 +9,6 @@ namespace {
 const char *select_kernel(int argc, char **argv) {
   if (argc == 3 && strcmp(argv[1], "--kernel") == 0) {
     return argv[2];
-  }
-  if (argc == 1) {
-    if (const char *name = std::getenv("CUDA_KERNEL")) {
-      return name;
-    }
   }
   return nullptr;
 }
@@ -31,7 +25,7 @@ bool supports(const Kernel &kernel, const cudaDeviceProp &device) {
 
 int main(int argc, char **argv) {
   init_log();
-  if (argc == 2 && strcmp(argv[1], "--help") == 0) {
+  if (argc == 1 || (argc == 2 && strcmp(argv[1], "--help") == 0)) {
     print_help(argv[0]);
     return 0;
   }
