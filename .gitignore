@@ -19,3 +19,5 @@ __pycache__/
 *.swp
 # clangd writes its index to .cache/clangd
 .cache/
+
+*.log

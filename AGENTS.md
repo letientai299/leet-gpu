@@ -1,0 +1,2 @@
+- Use conventional commits with no scope
+- Keep commit message body, comments and docs short, concise, direct.
