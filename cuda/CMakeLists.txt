@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.25)
 project(cuda LANGUAGES CXX CUDA)
 
+include(FetchContent)
+
+FetchContent_Declare(
+  spdlog
+  URL https://github.com/gabime/spdlog/archive/refs/tags/v1.16.0.tar.gz
+  URL_HASH
+    SHA256=8741753e488a78dd0d0024c980e1fb5b5c85888447e309d9cb9d949bdb52aa3e
+)
+FetchContent_MakeAvailable(spdlog)
+
 set(CMAKE_CUDA_STANDARD 17)
 # Include native code and forward-compatible PTX.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
@@ -30,6 +40,7 @@ add_kernel(kernel_blackwell 100a src/sm100a/fp4.cu)
 
 add_executable(
   main
+  src/common/log.cpp
   src/common/main.cu
   src/common/registry.cu
   $<TARGET_OBJECTS:kernel_hello>
@@ -39,6 +50,7 @@ add_executable(
 )
 set_target_properties(main PROPERTIES CUDA_ARCHITECTURES "86;90;100")
 target_include_directories(main PRIVATE src/common)
+target_link_libraries(main PRIVATE spdlog::spdlog)
 
 option(
   STRIP_DEPLOY

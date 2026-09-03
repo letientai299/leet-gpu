@@ -1,7 +1,7 @@
 #include "kernel.hpp"
+#include "log.hpp"
 
 #include <array>
-#include <cstdio>
 #include <cstring>
 
 bool run_hello();
@@ -36,9 +36,10 @@ const Kernel *find_kernel(const char *name) {
 }
 
 void print_help(const char *program) {
-  printf("Usage: %s --kernel <name>\n\n", program);
-  printf("CUDA_KERNEL supplies the default kernel.\n\nKernels:\n");
+  HOST_LOG("Usage: %s --kernel <name>", program);
+  HOST_LOG("CUDA_KERNEL supplies the default kernel");
+  HOST_LOG("Kernels:");
   for (const auto &kernel : kernels) {
-    printf("  %-20s %s\n", kernel.name, kernel.description);
+    HOST_LOG("  %-20s %s", kernel.name, kernel.description);
   }
 }

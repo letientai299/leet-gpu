@@ -2,7 +2,6 @@
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/memcpy_async.h>
-#include <cstdio>
 
 namespace cg = cooperative_groups;
 
@@ -29,9 +28,9 @@ bool run_ampere_async_copy() {
   int *device_input = nullptr;
   int *device_output = nullptr;
   int output[count]{};
-  if (!cuda_check(cudaMalloc(&device_input, sizeof(input))) ||
-      !cuda_check(cudaMalloc(&device_output, sizeof(output))) ||
-      !cuda_check(cudaMemcpy(device_input, input, sizeof(input),
+  if (!CUDA_CHECK(cudaMalloc(&device_input, sizeof(input))) ||
+      !CUDA_CHECK(cudaMalloc(&device_output, sizeof(output))) ||
+      !CUDA_CHECK(cudaMemcpy(device_input, input, sizeof(input),
                              cudaMemcpyHostToDevice))) {
     cudaFree(device_input);
     cudaFree(device_output);
@@ -39,8 +38,8 @@ bool run_ampere_async_copy() {
   }
 
   async_copy_kernel<<<1, count>>>(device_input, device_output);
-  const bool ok = cuda_check(cudaGetLastError()) &&
-                  cuda_check(cudaMemcpy(output, device_output, sizeof(output),
+  const bool ok = CUDA_CHECK(cudaGetLastError()) &&
+                  CUDA_CHECK(cudaMemcpy(output, device_output, sizeof(output),
                                         cudaMemcpyDeviceToHost));
   cudaFree(device_input);
   cudaFree(device_output);
@@ -48,6 +47,6 @@ bool run_ampere_async_copy() {
     return false;
   }
 
-  printf("[GPU ] cp.async result: %d\n", output[count - 1]);
+  GPU_LOG("cp.async result: %d", output[count - 1]);
   return output[count - 1] == (count - 1) * 2;
 }

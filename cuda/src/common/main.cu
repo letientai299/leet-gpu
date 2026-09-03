@@ -1,7 +1,7 @@
 #include "cuda_check.hpp"
 #include "kernel.hpp"
+#include "log.hpp"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -30,6 +30,7 @@ bool supports(const Kernel &kernel, const cudaDeviceProp &device) {
 } // namespace
 
 int main(int argc, char **argv) {
+  init_log();
   if (argc == 2 && strcmp(argv[1], "--help") == 0) {
     print_help(argv[0]);
     return 0;
@@ -39,7 +40,7 @@ int main(int argc, char **argv) {
   const Kernel *kernel = find_kernel(name);
   if (!kernel) {
     if (name) {
-      fprintf(stderr, "Unknown kernel: %s\n\n", name);
+      HOST_LOG("Unknown kernel: %s", name);
     }
     print_help(argv[0]);
     return 2;
@@ -47,18 +48,18 @@ int main(int argc, char **argv) {
 
   int device_id = 0;
   cudaDeviceProp device{};
-  if (!cuda_check(cudaGetDevice(&device_id)) ||
-      !cuda_check(cudaGetDeviceProperties(&device, device_id))) {
+  if (!CUDA_CHECK(cudaGetDevice(&device_id)) ||
+      !CUDA_CHECK(cudaGetDeviceProperties(&device, device_id))) {
     return 1;
   }
+  set_gpu_arch(device.major, device.minor);
   if (!supports(*kernel, device)) {
-    fprintf(stderr, "%s requires sm_%d%d%s; device is sm_%d%d\n", kernel->name,
-            kernel->major, kernel->minor, kernel->exact ? " exactly" : "+",
-            device.major, device.minor);
+    HOST_LOG("%s requires sm_%d%d%s; device is sm_%d%d", kernel->name,
+             kernel->major, kernel->minor, kernel->exact ? " exactly" : "+",
+             device.major, device.minor);
     return 2;
   }
 
-  printf("[Host] %s on %s (sm_%d%d)\n", name, device.name, device.major,
-         device.minor);
+  HOST_LOG("%s on %s (sm_%d%d)", name, device.name, device.major, device.minor);
   return kernel->run() ? 0 : 1;
 }

@@ -154,8 +154,8 @@ time.sleep(6)
 
 kernel = pos("hello_kernel", 2)
 kernel_def = pos("hello_kernel", 1)
-sync = pos("cudaDeviceSynchronize", 1, 4)
-printf_open = pos("printf(", 1, 7)
+copy = pos("cudaMemcpy", 1, 4)
+copy_open = pos("cudaMemcpy(", 1, 11)
 td = {"textDocument": {"uri": uri}}
 nonempty = lambda r: bool(r)
 
@@ -169,7 +169,7 @@ def verdict(r, ok):
 
 
 tests = [
-    ("hover", "textDocument/hover", {**td, "position": sync}, nonempty),
+    ("hover", "textDocument/hover", {**td, "position": copy}, nonempty),
     ("definition", "textDocument/definition", {**td, "position": kernel}, nonempty),
     (
         "references",
@@ -187,13 +187,13 @@ tests = [
     (
         "signatureHelp",
         "textDocument/signatureHelp",
-        {**td, "position": printf_open},
+        {**td, "position": copy_open},
         lambda r: bool(r and r.get("signatures")),
     ),
     (
         "completion",
         "textDocument/completion",
-        {**td, "position": sync},
+        {**td, "position": copy},
         lambda r: bool(r and (r.get("items") or r)),
     ),
     (
