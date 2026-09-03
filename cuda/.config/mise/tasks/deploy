@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-#MISE description="Deploy and run CUDA_KERNEL on the SSH GPU host"
+#MISE description="Deploy and run CUDA_KERNEL on the GPU target"
 set -euo pipefail
 
-# Fail fast with a clear message if .env wasn't loaded, instead of an empty
-# host/name producing a cryptic ssh/rsync error. See .env.example.
-: "${SSH_HOST:?not set — copy .env.example to .env}"
-: "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+TARGET=${SSH_HOST:-local}
 
 if [ "$#" -gt 1 ]; then
   echo "usage: mise deploy -- [--help|kernel]" >&2
@@ -18,7 +15,16 @@ if [ -z "$selection" ]; then
   exit 2
 fi
 
-REMOTE=$SSH_HOST
+if [ "$TARGET" = local ] || [ "$TARGET" = localhost ]; then
+  if [ "$selection" = "--help" ]; then
+    exec bin/main --help
+  fi
+  exec bin/main --kernel "$selection"
+fi
+
+: "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+
+REMOTE=$TARGET
 REMOTE_BIN=/tmp/${CONTAINER_NAME}-main
 
 # Reuse one multiplexed SSH connection across the rsync + run round trips and

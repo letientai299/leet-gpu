@@ -2,11 +2,10 @@
 #MISE description="Configure cmake if needed, then build into ./bin"
 set -euo pipefail
 
-# The Mac host has no CUDA toolchain, so on the host we forward the build into
-# the container by running this same script there. /.dockerenv only exists
-# inside a Docker container, so it tells us which side we're on.
-if [ ! -e /.dockerenv ]; then
-  # Only needed host-side; inside the container this var is intentionally unset.
+# Remote targets build in Docker.
+TARGET=${SSH_HOST:-local}
+if [ ! -e /.dockerenv ] && [ "$TARGET" != local ] && \
+  [ "$TARGET" != localhost ]; then
   : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
   if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
     echo "container not running; start it with: mise run dc:up" >&2
@@ -15,10 +14,16 @@ if [ ! -e /.dockerenv ]; then
   exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/build
 fi
 
-BUILD_DIR=/app/build
+if [ -e /.dockerenv ]; then
+  ROOT=/app
+else
+  ROOT=${MISE_PROJECT_ROOT:-$PWD}
+fi
 
-# Persist the ccache on the host mount so it survives container recreation.
-export CCACHE_DIR=/app/.ccache
+BUILD_DIR=$ROOT/build
+
+# Persist ccache between builds.
+export CCACHE_DIR=$ROOT/.ccache
 
 # Ninja can't reuse a build tree configured with a different generator, so drop
 # a stale Make tree left over from before we switched.
@@ -33,7 +38,8 @@ fi
 # `cmake --build` drives Ninja, whose generated cmake_check_build_system rule
 # re-runs CMake automatically, and only when a real CMake input actually changed.
 if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
-  cmake -S /app -B "$BUILD_DIR" -G Ninja -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/app/bin
+  cmake -S "$ROOT" -B "$BUILD_DIR" -G Ninja \
+    -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$ROOT/bin"
 fi
 
 cmake --build "$BUILD_DIR" --parallel

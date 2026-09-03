@@ -56,6 +56,8 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 ### 3. Multidimensional grids and data
 
 - [ ] 3.1 Multidimensional grid organization
+  - Until now,this book discuss only grid and block of thread. In CPG (CUDA
+    programming guide, v13.3), we know that that `grid > cluster > block`.
 - [ ] 3.2 Mapping threads to multidimensional data
 - [ ] 3.3 Image blur: a more complex kernel
 - [ ] 3.4 Matrix multiplication
