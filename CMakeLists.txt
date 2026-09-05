@@ -25,6 +25,7 @@ set(
   CACHE STRING
   "Default CUDA architectures"
 )
+set(CMAKE_CUDA_ARCHITECTURES "${LEET_GPU_CUDA_ARCHITECTURES}")
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)

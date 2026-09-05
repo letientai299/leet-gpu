@@ -94,16 +94,10 @@ std::size_t Image::pixel_count() const {
   return static_cast<std::size_t>(width) * height;
 }
 
-ImageBytes::~ImageBytes() {
-  cudaFree(input_);
-  cudaFree(output_);
-}
-
 bool ImageBytes::upload(const Image& input, std::size_t output_size) {
   output_size_ = output_size;
-  return CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&input_), input.size)) &&
-         CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&output_), output_size_)) &&
-         CUDA_CHECK(cudaMemcpy(input_, input.pixels, input.size, cudaMemcpyHostToDevice));
+  return input_.allocate(input.size) && output_.allocate(output_size_) &&
+         CUDA_CHECK(cudaMemcpy(input_.get(), input.pixels, input.size, cudaMemcpyHostToDevice));
 }
 
 bool ImageBytes::download(Image& output, unsigned width, unsigned height) const {
@@ -115,19 +109,19 @@ bool ImageBytes::download(Image& output, unsigned width, unsigned height) const 
   output.width = width;
   output.height = height;
   output.size = output_size_;
-  return CUDA_CHECK(cudaMemcpy(output.pixels, output_, output_size_, cudaMemcpyDeviceToHost));
+  return CUDA_CHECK(cudaMemcpy(output.pixels, output_.get(), output_size_, cudaMemcpyDeviceToHost));
 }
 
-const unsigned char* ImageBytes::input() const {
-  return input_;
+const ImageByte* ImageBytes::input() const {
+  return input_.get();
 }
 
-unsigned char* ImageBytes::output() const {
-  return output_;
+ImageByte* ImageBytes::output() const {
+  return output_.get();
 }
 
 int run_image_app(int argc, char** argv, ImageProcessor process) {
-  if (argc == 2 && std::strcmp(argv[1], "--help") == 0) {
+  if (help_requested(argc, argv)) {
     print_help(argv[0]);
     return 0;
   }
@@ -138,9 +132,8 @@ int run_image_app(int argc, char** argv, ImageProcessor process) {
     return 2;
   }
 
-  init_log();
-
   Image input;
+  init_log();
   if (!load_rgb_png(args.input, input) || !init_cuda()) {
     return 1;
   }

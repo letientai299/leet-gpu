@@ -1,5 +1,7 @@
 #pragma once
 
+#include "device.hpp"
+
 #include <cstddef>
 
 using ImageByte = unsigned char;
@@ -20,19 +22,14 @@ struct Image {
 
 class ImageBytes {
 public:
-  ImageBytes() = default;
-  ImageBytes(const ImageBytes&) = delete;
-  ImageBytes& operator=(const ImageBytes&) = delete;
-  ~ImageBytes();
-
   bool upload(const Image& input, std::size_t output_size);
   bool download(Image& output, unsigned width, unsigned height) const;
   [[nodiscard]] const ImageByte* input() const;
   [[nodiscard]] ImageByte* output() const;
 
 private:
-  ImageByte* input_ = nullptr;
-  ImageByte* output_ = nullptr;
+  DeviceBuffer<ImageByte> input_;
+  DeviceBuffer<ImageByte> output_;
   std::size_t output_size_ = 0;
 };
 

@@ -2,7 +2,10 @@
 
 #include "log.hpp"
 
+#include <cstdio>
+#include <cstring>
 #include <cuda_runtime.h>
+#include <utility>
 
 inline bool cuda_check(cudaError_t error, const char* file, int line) {
   if (error == cudaSuccess) {
@@ -26,4 +29,24 @@ inline bool init_cuda() {
   set_gpu_arch(device.major, device.minor);
   HOST_LOG("%s (sm_%d%d)", device.name, device.major, device.minor);
   return true;
+}
+
+inline bool init_host() {
+  init_log();
+  return init_cuda();
+}
+
+inline bool help_requested(int argc, char** argv) {
+  return argc == 2 && std::strcmp(argv[1], "--help") == 0;
+}
+
+template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
+  if (help_requested(argc, argv)) {
+    std::printf("Usage: %s\n", argv[0]);
+    return 0;
+  }
+  if (!init_host()) {
+    return 1;
+  }
+  return std::forward<Fn>(body)();
 }

@@ -1,32 +1,9 @@
-#include "checks.hpp"
+#include "device.hpp"
 
 #include <cstddef>
 #include <vector>
 
 namespace {
-
-// RAII: destructor frees owned device buffers.
-class DeviceVectors {
-public:
-  DeviceVectors() = default;
-  DeviceVectors(const DeviceVectors&) = delete;
-  DeviceVectors& operator=(const DeviceVectors&) = delete;
-
-  ~DeviceVectors() {
-    cudaFree(a);
-    cudaFree(b);
-    cudaFree(c);
-  }
-
-  bool allocate(std::size_t bytes) {
-    return CUDA_CHECK(cudaMalloc(&a, bytes)) && CUDA_CHECK(cudaMalloc(&b, bytes)) &&
-           CUDA_CHECK(cudaMalloc(&c, bytes));
-  }
-
-  float* a = nullptr;
-  float* b = nullptr;
-  float* c = nullptr;
-};
 
 __global__ void vec_add_kernel(const float* a, const float* b, float* c, std::size_t count) {
   const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -45,23 +22,25 @@ void init_vectors(std::vector<float>& a, std::vector<float>& b, std::vector<floa
 
 bool add_on_gpu(const std::vector<float>& a, const std::vector<float>& b, std::vector<float>& c) {
   const std::size_t bytes = a.size() * sizeof(float);
-  DeviceVectors device;
-  if (!device.allocate(bytes)) {
+  DeviceBuffer<float> device_a;
+  DeviceBuffer<float> device_b;
+  DeviceBuffer<float> device_c;
+  if (!device_a.allocate(bytes) || !device_b.allocate(bytes) || !device_c.allocate(bytes)) {
     return false;
   }
 
-  if (!CUDA_CHECK(cudaMemcpy(device.a, a.data(), bytes, cudaMemcpyHostToDevice)) ||
-      !CUDA_CHECK(cudaMemcpy(device.b, b.data(), bytes, cudaMemcpyHostToDevice)) ||
-      !CUDA_CHECK(cudaMemset(device.c, 0, bytes))) {
+  if (!CUDA_CHECK(cudaMemcpy(device_a.get(), a.data(), bytes, cudaMemcpyHostToDevice)) ||
+      !CUDA_CHECK(cudaMemcpy(device_b.get(), b.data(), bytes, cudaMemcpyHostToDevice)) ||
+      !CUDA_CHECK(cudaMemset(device_c.get(), 0, bytes))) {
     return false;
   }
 
   constexpr unsigned threads = 256;
   const auto blocks = static_cast<unsigned>((a.size() + threads - 1) / threads);
-  vec_add_kernel<<<blocks, threads>>>(device.a, device.b, device.c, a.size());
+  vec_add_kernel<<<blocks, threads>>>(device_a.get(), device_b.get(), device_c.get(), a.size());
 
   return CUDA_CHECK(cudaGetLastError()) &&
-         CUDA_CHECK(cudaMemcpy(c.data(), device.c, bytes, cudaMemcpyDeviceToHost));
+         CUDA_CHECK(cudaMemcpy(c.data(), device_c.get(), bytes, cudaMemcpyDeviceToHost));
 }
 
 bool verify_output(const std::vector<float>& c, const std::vector<float>& expected) {
@@ -75,23 +54,18 @@ bool verify_output(const std::vector<float>& c, const std::vector<float>& expect
   return true;
 }
 
-bool run_vec_add() {
+int run_vec_add() {
   constexpr std::size_t count = 600;
   std::vector<float> a(count);
   std::vector<float> b(count);
   std::vector<float> expected(count);
   std::vector<float> c(count);
   init_vectors(a, b, expected);
-
-  return add_on_gpu(a, b, c) && verify_output(c, expected);
+  return add_on_gpu(a, b, c) && verify_output(c, expected) ? 0 : 1;
 }
 
 } // namespace
 
-int main() {
-  init_log();
-  if (!init_cuda()) {
-    return 1;
-  }
-  return run_vec_add() ? 0 : 1;
+int main(int argc, char** argv) {
+  return run_host(argc, argv, run_vec_add);
 }
