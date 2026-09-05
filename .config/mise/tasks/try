@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Internal: build, then deploy"
-#MISE hide=true
+#MISE description="Build, then deploy one app"
 set -euo pipefail
 
 app=${APP:-}

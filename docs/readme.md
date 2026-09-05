@@ -53,9 +53,15 @@ mise run deploy -- src/pmpp/ch02/hello
 mise run deploy -- src/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 ```
 
+Build and deploy one app:
+
+```sh
+mise run try -- src/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
+```
+
 Remote argument paths refer to files on `SSH_HOST`. `APP` supplies the default
-app for `deploy` and `dev`. `ARGS` supplies trusted shell-word arguments when no
-arguments are passed explicitly.
+app for `deploy`, `try`, and `dev`. `ARGS` supplies trusted shell-word arguments
+when no arguments are passed explicitly.
 
 Watch the selected app and shared code, then rebuild and deploy after changes:
 
@@ -97,8 +103,7 @@ indexes against CUDA headers inside the image:
 Builds and deployments still use the mise tasks. See the [CLion Docker toolchain
 documentation][clion-docker].
 
-[clion-docker]:
-  <https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html>
+[clion-docker]: https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
 
 ### Format on save
 

@@ -18,7 +18,7 @@ if [ -f .env ]; then
 fi
 
 # Leave APP unresolved here so each iteration re-reads it from .env.
-run_args=(mise run dev-step --)
+run_args=(mise run try --)
 if [ -n "$app" ]; then
   run_args+=("$app")
 fi
