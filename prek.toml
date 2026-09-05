@@ -11,8 +11,7 @@ rev = "v22.1.8"
 hooks = [{ id = "clang-format" }]
 
 # gersemi has no published hook repo, so run the mise-pinned binary directly.
-# It reads each subproject's .gersemirc; build/ CMake files are gitignored and
-# never staged, so they never reach the hook.
+# It reads .gersemirc; ignored build files never reach the hook.
 [[repos]]
 repo = "local"
 hooks = [

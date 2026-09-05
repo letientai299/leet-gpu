@@ -1,6 +1,5 @@
 # Two jobs:
-# 1. Root marker: pins the LSP root to this dir (cuda/), so nvim finds
-#    .nvim/clangd here instead of climbing to the parent repo's .git.
+# 1. Root marker: pins the LSP root here, so nvim finds .nvim/clangd.
 # 2. CUDA flags for the container-side clangd (see .nvim/clangd). These let a
 #    lone .cu index correctly without a build/compile_commands.json. Paths are
 #    container paths. When build/compile_commands.json exists, clangd uses it

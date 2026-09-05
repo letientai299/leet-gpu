@@ -1,16 +1,24 @@
-monorepo_root = true
-
-[monorepo]
-config_roots = ['cuda']
-
-# Repo-wide dev tooling, shared across all subprojects and inherited by their
-# mise configs. Per-project build/runtime tools and code style live in each
-# subproject (e.g. cuda/mise.toml, cuda/.clang-format).
-#
-# Formatters are pinned: clang-format output drifts between releases, so a
-# floating version would reformat everything on upgrade. The prek hooks
-# (prek.toml) run these same binaries via `mise exec`. Bump
-# deliberately.
 [tools]
 "pipx:clang-format" = "22.1.8"
 "pipx:gersemi" = "0.28.0"
+watchexec = "latest"
+
+[env]
+_.file = ".env"
+
+[tasks."dc:run"]
+description = "Exec a command in the running container (usage: mise dc:run -- <cmd>)"
+usage = 'arg "<cmd>" var=#true'
+run = 'eval "cmd=($usage_cmd)"; docker exec -it "$CONTAINER_NAME" "${cmd[@]}"'
+
+[tasks."dc:down"]
+description = "Stop the container"
+run = 'docker stop "$CONTAINER_NAME"'
+
+[tasks.fmt]
+description = "Format C++/CUDA (clang-format) and CMake (gersemi)"
+run = '''
+find apps libs -type f \( -name '*.cu' -o -name '*.cuh' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) -exec clang-format -i {} +
+find . -path ./build -prune -o -name CMakeLists.txt -exec gersemi -i {} +
+gersemi -i cmake/*.cmake
+'''

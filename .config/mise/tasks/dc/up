@@ -17,9 +17,11 @@ docker build --platform linux/amd64 -t "$IMAGE" .
 # after the build switched to --platform linux/amd64.
 STATUS=$(docker inspect --format '{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)
 RUNNING_IMG=$(docker inspect --format '{{.Image}}' "$CONTAINER" 2>/dev/null || true)
+MOUNT_SOURCE=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app"}}{{.Source}}{{end}}{{end}}' "$CONTAINER" 2>/dev/null || true)
 CURRENT_IMG=$(docker image inspect --format '{{.Id}}' "$IMAGE")
+PROJECT_ROOT=$(pwd -P)
 
-if [ "$STATUS" != "running" ] || [ "$RUNNING_IMG" != "$CURRENT_IMG" ]; then
+if [ "$STATUS" != "running" ] || [ "$RUNNING_IMG" != "$CURRENT_IMG" ] || [ "$MOUNT_SOURCE" != "$PROJECT_ROOT" ]; then
   docker rm -f "$CONTAINER" 2>/dev/null || true
-  docker run -d --name "$CONTAINER" --platform linux/amd64 -v "$(pwd):/app" -w /app "$IMAGE" sleep infinity
+  docker run -d --name "$CONTAINER" --platform linux/amd64 -v "$PROJECT_ROOT:/app" -w /app "$IMAGE" sleep infinity
 fi
