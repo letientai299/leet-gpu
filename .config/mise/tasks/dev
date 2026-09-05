@@ -2,12 +2,12 @@
 #MISE description="Watch, rebuild, then deploy one app"
 set -euo pipefail
 
-app=${APP:-}
+app=
 if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
   app=$1
   shift
 fi
-if [ -z "$app" ]; then
+if [ -z "$app" ] && [ -z "${APP:-}" ]; then
   echo "app missing; pass one or set APP" >&2
   exit 2
 fi
@@ -17,6 +17,11 @@ if [ -f .env ]; then
   watch_args+=(--watch .env)
 fi
 
-run_args=(mise run dev-step -- "$app" "$@")
+# Leave APP unresolved here so each iteration re-reads it from .env.
+run_args=(mise run dev-step --)
+if [ -n "$app" ]; then
+  run_args+=("$app")
+fi
+run_args+=("$@")
 
 exec watchexec -I --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"

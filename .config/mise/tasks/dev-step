@@ -3,12 +3,15 @@
 #MISE hide=true
 set -euo pipefail
 
-if [ "$#" -lt 1 ]; then
-  echo "usage: mise dev -- <app> [args]" >&2
+app=${APP:-}
+if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
+  app=$1
+  shift
+fi
+if [ -z "$app" ]; then
+  echo "app missing; pass one or set APP" >&2
   exit 2
 fi
 
-app=$1
-shift
 mise run build -- "$app"
 mise run deploy -- "$app" "$@"

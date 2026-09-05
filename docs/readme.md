@@ -57,6 +57,8 @@ mise run dev -- pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 mise run dev
 ```
 
+`dev` also watches `.env`, so editing `APP` or `ARGS` retargets the running loop.
+
 Every binary supports `--help` without initializing CUDA.
 
 ## macOS: CLion Intellisense
