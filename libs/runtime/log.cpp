@@ -7,11 +7,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <string>
-#include <string_view>
-
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
+#include <string>
+#include <string_view>
 
 namespace {
 
@@ -31,7 +30,7 @@ constexpr auto cuda = "\033[1;31m";
 
 } // namespace color
 
-const char *kind_color(const char *kind) {
+const char* kind_color(const char* kind) {
   if (std::string_view(kind).substr(0, 3) == "sm_") {
     return color::gpu;
   }
@@ -41,7 +40,7 @@ const char *kind_color(const char *kind) {
   return color::host;
 }
 
-void append_column(std::string &output, std::string_view value, size_t width) {
+void append_column(std::string& output, std::string_view value, size_t width) {
   output.append(value);
   if (value.size() < width) {
     output.append(width - value.size(), ' ');
@@ -49,7 +48,7 @@ void append_column(std::string &output, std::string_view value, size_t width) {
   output.push_back(' ');
 }
 
-std::string format_message(const char *format, va_list args) {
+std::string format_message(const char* format, va_list args) {
   std::array<char, 512> buffer{};
   va_list copy;
   va_copy(copy, args);
@@ -68,9 +67,8 @@ std::string format_message(const char *format, va_list args) {
   return message;
 }
 
-std::string add_metadata(const char *kind, const char *file, int line,
-                         std::string message) {
-  const char *basename = strrchr(file, '/');
+std::string add_metadata(const char* kind, const char* file, int line, std::string message) {
+  const char* basename = strrchr(file, '/');
   basename = basename ? basename + 1 : file;
   const std::string source = std::string(basename) + ":" + std::to_string(line);
   std::string output;
@@ -96,8 +94,7 @@ void init_log() {
   color_enabled = std::getenv("NO_COLOR") == nullptr;
   auto logger = spdlog::stdout_color_mt("cuda");
   if (color_enabled) {
-    logger->set_pattern(std::string(color::time) + "%T.%e" + color::reset +
-                        " %v");
+    logger->set_pattern(std::string(color::time) + "%T.%e" + color::reset + " %v");
   } else {
     logger->set_pattern("%T.%e %v");
   }
@@ -109,15 +106,15 @@ void set_gpu_arch(int major, int minor) {
   kind_width = std::max(kind_width, gpu_architecture.size());
 }
 
-const char *gpu_arch() { return gpu_architecture.c_str(); }
+const char* gpu_arch() {
+  return gpu_architecture.c_str();
+}
 
-void write_log(const char *kind, const char *file, int line, const char *format,
-               ...) {
+void write_log(const char* kind, const char* file, int line, const char* format, ...) {
   va_list args;
   va_start(args, format);
   auto message = format_message(format, args);
   va_end(args);
-  spdlog::default_logger_raw()->log(
-      {file, line, ""}, spdlog::level::info,
-      add_metadata(kind, file, line, std::move(message)));
+  spdlog::default_logger_raw()->log({file, line, ""}, spdlog::level::info,
+                                    add_metadata(kind, file, line, std::move(message)));
 }

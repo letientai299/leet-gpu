@@ -5,10 +5,9 @@ namespace {
 constexpr int blocks = 3;
 constexpr int threads = 5;
 
-__global__ void hello_kernel(int *output) {
+__global__ void hello_kernel(int* output) {
   const int index = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-  output[index] = (static_cast<int>(blockIdx.x) + 1) * 100 +
-                  static_cast<int>(threadIdx.x) + 1;
+  output[index] = (static_cast<int>(blockIdx.x) + 1) * 100 + static_cast<int>(threadIdx.x) + 1;
 }
 
 } // namespace
@@ -19,16 +18,16 @@ int main() {
     return 1;
   }
 
-  int *device_output = nullptr;
+  int* device_output = nullptr;
   int output[blocks * threads]{};
   if (!CUDA_CHECK(cudaMalloc(&device_output, sizeof(output)))) {
     return 1;
   }
 
   hello_kernel<<<blocks, threads>>>(device_output);
-  const bool ok = CUDA_CHECK(cudaGetLastError()) &&
-                  CUDA_CHECK(cudaMemcpy(output, device_output, sizeof(output),
-                                        cudaMemcpyDeviceToHost));
+  const bool ok =
+      CUDA_CHECK(cudaGetLastError()) &&
+      CUDA_CHECK(cudaMemcpy(output, device_output, sizeof(output), cudaMemcpyDeviceToHost));
   cudaFree(device_output);
   if (!ok) {
     return 1;

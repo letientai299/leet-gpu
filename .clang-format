@@ -2,4 +2,29 @@
 BasedOnStyle: LLVM
 IndentWidth: 2
 TabWidth: 2
+ColumnLimit: 100
+AllowShortFunctionsOnASingleLine: None
 UseTab: Never
+PointerAlignment: Left # Google/Chromium/Mozilla
+DerivePointerAlignment: false
+
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+
+BinPackParameters: OnePerLine # Chromium/Mozilla
+IncludeBlocks: Regroup # Google
+FixNamespaceComments: true
+
+Standard: c++17
+
+AttributeMacros:
+  - __constant__
+  - __device__
+  - __global__
+  - __host__
+  - __managed__
+  - __shared__
+
+AllowShortLambdasOnASingleLine: Empty
