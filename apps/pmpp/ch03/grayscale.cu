@@ -1,5 +1,6 @@
 #include "checks.hpp"
 #include "image.hpp"
+#include "log.hpp"
 
 /// Convert RGB pixels in parallel.
 __global__ static void
@@ -26,6 +27,9 @@ static bool grayscale_on_gpu(const Image& rgb, Image& gray) {
 
   constexpr dim3 block(16, 16);
   const dim3 grid((rgb.width + block.x - 1) / block.x, (rgb.height + block.y - 1) / block.y);
+  const size_t thread_count = static_cast<size_t>(grid.x) * grid.y * block.x * block.y;
+  HOST_LOG("Grid %ux%u, block %ux%u, threads %zu, pixels %zu", grid.x, grid.y, block.x, block.y,
+           thread_count, rgb.pixel_count());
   grayscale_kernel<<<grid, block>>>(bytes.input(), bytes.output(), rgb.width, rgb.height);
 
   return CUDA_CHECK(cudaGetLastError()) && bytes.download(gray, rgb.width, rgb.height);
