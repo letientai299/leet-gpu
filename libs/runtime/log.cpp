@@ -67,7 +67,7 @@ std::string format_message(const char* format, va_list args) {
   return message;
 }
 
-std::string add_metadata(const char* kind, const char* file, int line, std::string message) {
+std::string add_metadata(const char* kind, const char* file, int line, const std::string& message) {
   const char* basename = strrchr(file, '/');
   basename = basename ? basename + 1 : file;
   const std::string source = std::string(basename) + ":" + std::to_string(line);
@@ -116,5 +116,5 @@ void write_log(const char* kind, const char* file, int line, const char* format,
   auto message = format_message(format, args);
   va_end(args);
   spdlog::default_logger_raw()->log({file, line, ""}, spdlog::level::info,
-                                    add_metadata(kind, file, line, std::move(message)));
+                                    add_metadata(kind, file, line, message));
 }
