@@ -29,7 +29,7 @@ target_link_libraries(leet_gpu_runtime PUBLIC spdlog::spdlog)
 add_library(lodepng STATIC "${lodepng_SOURCE_DIR}/lodepng.cpp")
 target_include_directories(lodepng PUBLIC "${lodepng_SOURCE_DIR}")
 
-add_library(leet_gpu_image STATIC image.cpp image_bytes.cpp)
+add_library(leet_gpu_image STATIC image.cpp)
 target_include_directories(leet_gpu_image PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(
   leet_gpu_image

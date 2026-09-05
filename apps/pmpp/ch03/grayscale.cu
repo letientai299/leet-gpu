@@ -1,4 +1,4 @@
-#include "cuda_check.hpp"
+#include "checks.hpp"
 #include "image.hpp"
 
 /// Convert RGB pixels in parallel.
