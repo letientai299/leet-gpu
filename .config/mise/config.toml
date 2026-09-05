@@ -11,7 +11,7 @@ watchexec = "latest"
 postinstall = "prek --config .config/prek.toml install"
 
 [env]
-_.file = ".env"
+_.source = ".env"
 
 [tasks."dc:run"]
 description = "Exec a command in the running container (usage: mise dc:run -- <cmd>)"

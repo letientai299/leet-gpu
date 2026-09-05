@@ -31,7 +31,7 @@ cp .env.example .env
 in `.cache/fetchcontent/`; compiler caches live under the matching build
 directory. Deleting `build/` drops compiler caches but keeps downloaded sources.
 `SSH_HOST` independently selects the run host; leave it empty for local
-execution.
+execution. A non-empty shell value overrides the fallback in `.env`.
 
 ## Workflow
 
