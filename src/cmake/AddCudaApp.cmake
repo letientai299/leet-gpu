@@ -18,6 +18,13 @@ function(add_cuda_app key)
 
   add_executable(${target} "${PROJECT_SOURCE_DIR}/src/${key}.cu")
   target_link_libraries(${target} PRIVATE leet_gpu_runtime ${APP_LIBRARIES})
+  # nvcc injects CCCL; clang tooling reads compile_commands and does not.
+  if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
+    target_include_directories(
+      ${target}
+      PRIVATE "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/cccl"
+    )
+  endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(${target} PRIVATE -static-libgcc -static-libstdc++)
   endif()

@@ -101,7 +101,7 @@ bool ImageBytes::upload(const Image& input, std::size_t output_size) {
 }
 
 bool ImageBytes::download(Image& output, unsigned width, unsigned height) const {
-  output.pixels = static_cast<unsigned char*>(std::malloc(output_size_));
+  output.pixels = static_cast<ImageByte*>(std::malloc(output_size_));
   if (output.pixels == nullptr) {
     HOST_LOG("Image allocation failed: %zu bytes", output_size_);
     return false;

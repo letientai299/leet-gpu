@@ -1,20 +1,20 @@
-#include "checks.hpp"
 #include "image.hpp"
-#include "log.hpp"
+
+#include <cstddef>
+#include <cuda/cmath>
 
 /// Convert RGB pixels in parallel.
-__global__ static void grayscale_kernel(const ImageByte* input,
-                                        ImageByte* output,
-                                        const unsigned width,
-                                        const unsigned height) {
-  const unsigned column = blockIdx.x * blockDim.x + threadIdx.x;
-  const unsigned row = blockIdx.y * blockDim.y + threadIdx.y;
-  if (column >= width || row >= height) {
+__global__ void grayscale_kernel(const ImageByte* input,
+                                 ImageByte* output,
+                                 const unsigned width,
+                                 const unsigned height) {
+  const auto pos = image_thread();
+  if (!pos.in_bounds(width, height)) {
     return;
   }
 
-  const size_t pixel = static_cast<size_t>(row) * width + column;
-  const size_t rgb = pixel * 3;
+  const std::size_t pixel = static_cast<std::size_t>(pos.row) * width + pos.column;
+  const std::size_t rgb = pixel * 3;
   const auto r = static_cast<float>(input[rgb]);
   const auto g = static_cast<float>(input[rgb + 1]);
   const auto b = static_cast<float>(input[rgb + 2]);
@@ -28,15 +28,13 @@ static bool grayscale_on_gpu(const Image& rgb, Image& gray) {
   }
 
   constexpr dim3 block(16, 16);
-  const dim3 grid((rgb.width + block.x - 1) / block.x, (rgb.height + block.y - 1) / block.y);
-  const size_t thread_count = static_cast<size_t>(grid.x) * grid.y * block.x * block.y;
-  HOST_LOG("Grid %ux%u, block %ux%u, threads %zu, pixels %zu", grid.x, grid.y, block.x, block.y,
-           thread_count, rgb.pixel_count());
+  const dim3 grid(cuda::ceil_div(rgb.width, block.x), cuda::ceil_div(rgb.height, block.y));
+  log_image_launch(grid, block, rgb.pixel_count());
   grayscale_kernel<<<grid, block>>>(bytes.input(), bytes.output(), rgb.width, rgb.height);
 
   return CUDA_CHECK(cudaGetLastError()) && bytes.download(gray, rgb.width, rgb.height);
 }
 
-int main(const int argc, char** argv) {
+int main(int argc, char** argv) {
   return run_image_app(argc, argv, grayscale_on_gpu);
 }

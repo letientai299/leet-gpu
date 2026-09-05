@@ -1,6 +1,7 @@
 #include "device.hpp"
 
 #include <cstddef>
+#include <cuda/cmath>
 #include <vector>
 
 namespace {
@@ -36,7 +37,7 @@ bool add_on_gpu(const std::vector<float>& a, const std::vector<float>& b, std::v
   }
 
   constexpr unsigned threads = 256;
-  const auto blocks = static_cast<unsigned>((a.size() + threads - 1) / threads);
+  const auto blocks = static_cast<unsigned>(cuda::ceil_div(a.size(), threads));
   vec_add_kernel<<<blocks, threads>>>(device_a.get(), device_b.get(), device_c.get(), a.size());
 
   return CUDA_CHECK(cudaGetLastError()) &&

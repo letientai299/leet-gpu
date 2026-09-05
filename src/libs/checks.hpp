@@ -2,6 +2,7 @@
 
 #include "log.hpp"
 
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <cuda_runtime.h>
@@ -49,4 +50,10 @@ template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
     return 1;
   }
   return std::forward<Fn>(body)();
+}
+
+inline void log_image_launch(dim3 grid, dim3 block, std::size_t pixels) {
+  const auto threads = static_cast<std::size_t>(grid.x) * grid.y * block.x * block.y;
+  HOST_LOG("Grid %ux%u, block %ux%u, threads %zu, pixels %zu", grid.x, grid.y, block.x, block.y,
+           threads, pixels);
 }

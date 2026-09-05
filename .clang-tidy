@@ -20,5 +20,5 @@ Checks: >
 HeaderFilterRegex: "/app/src/"
 WarningsAsErrors: ""
 CheckOptions:
-  misc-include-cleaner.IgnoreHeaders: "cstdlib"
+  misc-include-cleaner.IgnoreHeaders: "cstdlib;cuda/cmath"
   misc-include-cleaner.MissingIncludes: false

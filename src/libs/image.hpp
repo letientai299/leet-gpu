@@ -36,3 +36,21 @@ private:
 using ImageProcessor = bool (*)(const Image& input, Image& output);
 
 int run_image_app(int argc, char** argv, ImageProcessor process);
+
+#ifdef __CUDACC__
+struct ImageThread {
+  unsigned column;
+  unsigned row;
+
+  [[nodiscard]] __device__ bool in_bounds(unsigned width, unsigned height) const {
+    return column < width && row < height;
+  }
+};
+
+__device__ inline ImageThread image_thread() {
+  return {
+      blockIdx.x * blockDim.x + threadIdx.x,
+      blockIdx.y * blockDim.y + threadIdx.y,
+  };
+}
+#endif
