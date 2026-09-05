@@ -30,12 +30,39 @@ FetchContent_Declare(
   SOURCE_DIR "${LEET_GPU_DEP_CACHE}/cccl-src"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
-FetchContent_MakeAvailable(spdlog lodepng cccl)
+FetchContent_Declare(
+  cutlass
+  URL https://github.com/NVIDIA/cutlass/archive/refs/tags/v4.7.1.tar.gz
+  URL_HASH
+    SHA256=8290eb914cd5aaf4c665ee4108ba5bd65383cfee1296286a42a7ef711554d365
+  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/cutlass-src"
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
+# Header INTERFACE only. CUTLASS still enables tools unless these are off.
+set(CUTLASS_ENABLE_HEADERS_ONLY ON CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_LIBRARY OFF CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_PROFILER OFF CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_CUBLAS OFF CACHE BOOL "" FORCE)
+set(CUTLASS_ENABLE_CUDNN OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(spdlog lodepng cccl cutlass)
 
 find_package(CUDAToolkit REQUIRED)
 
-add_library(leet_gpu_cublas INTERFACE)
-target_link_libraries(leet_gpu_cublas INTERFACE CUDA::cublas)
+# Oracle GEMM. Header-only: one instantiated kernel instead of the ~280 MB of
+# precompiled kernels cuBLAS links in.
+add_library(leet_gpu_cutlass INTERFACE)
+target_compile_definitions(leet_gpu_cutlass INTERFACE LEET_GPU_HAS_CUTLASS)
+target_link_libraries(leet_gpu_cutlass INTERFACE nvidia::cutlass::cutlass)
+# CUTLASS's CMake puts this on its own apps, not on nvidia::cutlass::cutlass.
+target_compile_options(
+  leet_gpu_cutlass
+  INTERFACE "$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>"
+)
 
 add_library(leet_gpu_runtime STATIC log.cpp)
 target_include_directories(

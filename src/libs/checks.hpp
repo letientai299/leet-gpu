@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
-#include <cublas_v2.h>
 #include <cuda/devices>
 #include <cuda/memory_pool>
 #include <cuda/stream>
@@ -24,42 +23,20 @@ inline bool cuda_check(cudaError_t error, const char* file, int line) {
 
 #define CUDA_CHECK(expression) cuda_check((expression), __FILE__, __LINE__)
 
-inline bool cublas_check(cublasStatus_t status, const char* file, int line) {
-  if (status == CUBLAS_STATUS_SUCCESS) {
+#ifdef LEET_GPU_HAS_CUTLASS
+#include <cutlass/cutlass.h>
+
+inline bool cutlass_check(cutlass::Status status, const char* file, int line) {
+  if (status == cutlass::Status::kSuccess) {
     return true;
   }
 
-  write_log("CUBLAS", file, line, "%s", cublasGetStatusString(status));
+  write_log("CUTLASS", file, line, "%s", cutlass::cutlassGetStatusString(status));
   return false;
 }
 
-#define CUBLAS_CHECK(expression) cublas_check((expression), __FILE__, __LINE__)
-
-class CublasHandle {
-public:
-  CublasHandle() = default;
-  CublasHandle(const CublasHandle&) = delete;
-  CublasHandle& operator=(const CublasHandle&) = delete;
-
-  ~CublasHandle() {
-    if (handle_ != nullptr) {
-      cublasDestroy(handle_);
-    }
-  }
-
-  bool create() {
-    // Pedantic IEEE FP32: default math may use TF32 on Ampere+ and miss a naive kernel.
-    return CUBLAS_CHECK(cublasCreate(&handle_)) &&
-           CUBLAS_CHECK(cublasSetMathMode(handle_, CUBLAS_PEDANTIC_MATH));
-  }
-
-  [[nodiscard]] cublasHandle_t get() const {
-    return handle_;
-  }
-
-private:
-  cublasHandle_t handle_ = nullptr;
-};
+#define CUTLASS_CHECK(expression) cutlass_check((expression), __FILE__, __LINE__)
+#endif
 
 inline cuda::stream_ref default_stream() {
   return cuda::stream_ref{cudaStream_t{nullptr}};

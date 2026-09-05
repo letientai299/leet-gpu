@@ -12,6 +12,7 @@ CompileFlags:
     - -I/app/.cache/fetchcontent/cccl-src/libcudacxx/include
     - -I/app/.cache/fetchcontent/cccl-src/cub
     - -I/app/.cache/fetchcontent/cccl-src/thrust
+    - -I/app/.cache/fetchcontent/cutlass-src/include
     - -std=c++17
   # build/docker/compile_commands.json drives nvcc; strip its nvcc-only flags that
   # clang(d) rejects. Path-specific fragments restore one analysis target.
@@ -24,6 +25,7 @@ CompileFlags:
     - --options-file*
     - -arch=*
     - -t0
+    - --expt-relaxed-constexpr
 
 ---
 If:

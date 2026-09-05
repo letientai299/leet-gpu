@@ -19,6 +19,10 @@ NVIDIA driver, CUDA toolkit (`nvcc`), CMake 3.22+, Ninja, and ccache. With
 architectures are 86, 90, and 100. Binaries from Docker use CUDA 13.3 and a
 static runtime; the host driver must load them.
 
+`deploy` copies only the binary, so an app must not need a CUDA shared library
+at run time. The run host has its own toolkit, and its version rarely matches
+the container's.
+
 ## Environment
 
 ```sh

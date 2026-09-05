@@ -1,5 +1,6 @@
 # Shared by clangd and mise lint. Curated for CUDA:
 # https://clang.llvm.org/extra/clang-tidy/checks/list.html
+# UninitializedObject: CUTLASS Gemm() leaves unused gather pointers unset.
 Checks: >
   clang-diagnostic-*, clang-analyzer-*, bugprone-*, performance-*,
   misc-const-correctness, misc-include-cleaner,
@@ -12,6 +13,7 @@ Checks: >
   readability-make-member-function-const, readability-qualified-auto,
   readability-non-const-parameter, readability-simplify-boolean-expr,
   -bugprone-easily-swappable-parameters,
+  -clang-analyzer-optin.cplusplus.UninitializedObject,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
 # Only lint this project's own headers, not the CUDA/system headers pulled in by
