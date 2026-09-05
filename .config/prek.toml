@@ -9,10 +9,12 @@ repo = "https://github.com/pre-commit/mirrors-clang-format"
 rev = "v22.1.8"
 hooks = [{ id = "clang-format" }]
 
-# Run pinned gersemi directly.
+# Run pinned gersemi, shfmt, and shellcheck directly.
 [[repos]]
 repo = "local"
 hooks = [
   { id = "clang-tidy", name = "clang-tidy (C++/CUDA)", entry = "mise run lint --", language = "system", files = '\.(cc|cpp|cu|cuh|h|hpp)$' },
   { id = "gersemi", name = "gersemi (CMake)", entry = "mise exec -- gersemi --config .config/gersemi/config.yaml -i", language = "system", files = '(^|/)CMakeLists\.txt$|\.cmake$', exclude = "/build/" },
+  { id = "shfmt", name = "shfmt", entry = "mise exec -- shfmt -i 2 -ci -bn -w", language = "system", types = ["shell"], exclude = '(^|/)\.nvim/' },
+  { id = "shellcheck", name = "shellcheck", entry = "mise exec -- shellcheck --rcfile .config/shellcheckrc", language = "system", types = ["shell"], exclude = '(^|/)\.nvim/' },
 ]

@@ -1,0 +1,2 @@
+# Follow `source` so mise tasks can load .config/mise/lib/app.sh.
+external-sources=true

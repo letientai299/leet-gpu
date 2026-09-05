@@ -48,9 +48,9 @@ else
 fi
 
 # Old layout was a single CMake tree at build/.
-if [ -f "$root/build/CMakeCache.txt" ] &&
-  [ ! -d "$root/build/docker" ] &&
-  [ ! -d "$root/build/local" ]; then
+if [ -f "$root/build/CMakeCache.txt" ] \
+  && [ ! -d "$root/build/docker" ] \
+  && [ ! -d "$root/build/local" ]; then
   rm -rf "$root/build"
 fi
 
@@ -67,8 +67,8 @@ else
 fi
 export CMAKE_BUILD_PARALLEL_LEVEL=$jobs
 
-if [ -f "$build_dir/CMakeCache.txt" ] &&
-  ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$build_dir/CMakeCache.txt"; then
+if [ -f "$build_dir/CMakeCache.txt" ] \
+  && ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$build_dir/CMakeCache.txt"; then
   rm -rf "$build_dir"
 fi
 

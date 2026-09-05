@@ -55,7 +55,10 @@ ssh_opts=(-o ControlMaster=auto -o ControlPath="/tmp/ssh-${CONTAINER_NAME}-%r@%h
 # default PATH order, so resolve it explicitly.
 rsync_bin=$(command -v rsync)
 for candidate in /opt/homebrew/bin/rsync /usr/local/bin/rsync; do
-  [ -x "$candidate" ] && { rsync_bin=$candidate; break; }
+  [ -x "$candidate" ] && {
+    rsync_bin=$candidate
+    break
+  }
 done
 
 # rsync sends only the changed blocks of the recompiled binary (delta, against

@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
-#MISE description="Fix and format C++/CUDA and CMake"
+#MISE description="Fix and format C++/CUDA, CMake, and shell"
 #USAGE arg "[files]" var=#true
 set -euo pipefail
+
+shfmt_args=(-i 2 -ci -bn -w)
+shellcheck_args=(--rcfile .config/shellcheckrc)
 
 if [ "$#" -gt 0 ]; then
   cpp_files=()
   cmake_files=()
+  sh_files=()
   for file in "$@"; do
     case "$file" in
       *.cu | *.cuh | *.cpp | *.cc | *.h | *.hpp) cpp_files+=("$file") ;;
       CMakeLists.txt | */CMakeLists.txt | *.cmake) cmake_files+=("$file") ;;
+      *.sh) sh_files+=("$file") ;;
       *)
-        echo "Unsupported format path: $file" >&2
-        exit 2
+        if [[ $file == .config/mise/* && $file != *.toml ]]; then
+          sh_files+=("$file")
+        else
+          echo "Unsupported format path: $file" >&2
+          exit 2
+        fi
         ;;
     esac
   done
@@ -25,6 +34,10 @@ if [ "$#" -gt 0 ]; then
   if [ "${#cmake_files[@]}" -gt 0 ]; then
     gersemi --config .config/gersemi/config.yaml -i "${cmake_files[@]}"
   fi
+  if [ "${#sh_files[@]}" -gt 0 ]; then
+    shfmt "${shfmt_args[@]}" "${sh_files[@]}"
+    shellcheck "${shellcheck_args[@]}" "${sh_files[@]}"
+  fi
   exit
 fi
 
@@ -33,4 +46,12 @@ find src -type f \
   \( -name '*.cu' -o -name '*.cuh' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) \
   -exec clang-format -i {} +
 gersemi --config .config/gersemi/config.yaml -i .
+shfmt "${shfmt_args[@]}" .config/mise
+sh_all=()
+while IFS= read -r sh_file; do
+  sh_all+=("$sh_file")
+done < <(shfmt -f .config/mise)
+if [ "${#sh_all[@]}" -gt 0 ]; then
+  shellcheck "${shellcheck_args[@]}" "${sh_all[@]}"
+fi
 mise run lint

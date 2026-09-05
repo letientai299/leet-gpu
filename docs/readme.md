@@ -41,8 +41,8 @@ mise run build -- src/pmpp/ch03/grayscale
 ```
 
 Each source path under `src/` defines its app key and binary path. For example,
-`src/pmpp/ch03/grayscale.cu` builds `bin/pmpp/ch03/grayscale`.
-The `src/` prefix is optional. Use it in `.env` for editor path completion.
+`src/pmpp/ch03/grayscale.cu` builds `bin/pmpp/ch03/grayscale`. The `src/` prefix
+is optional. Use it in `.env` for editor path completion.
 
 Deploy one app and forward its arguments:
 
@@ -62,7 +62,8 @@ mise run dev -- src/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 mise run dev
 ```
 
-`dev` also watches `.env`, so editing `APP` or `ARGS` retargets the running loop.
+`dev` also watches `.env`, so editing `APP` or `ARGS` retargets the running
+loop.
 
 Every binary supports `--help` without initializing CUDA.
 
@@ -91,11 +92,11 @@ indexes against CUDA headers inside the image:
 Builds and deployments still use the mise tasks. See the [CLion Docker toolchain
 documentation][clion-docker].
 
-### Format on save (match nvim)
+### Format on save
 
 nvim formats `.cu` / `.cuh` / `.cpp` / headers on save with `clang-format` and
-this repo's [`.clang-format`](../.clang-format). CLion is configured the same way
-via `.idea` (untracked, so redo this on a new machine):
+this repo's [`.clang-format`](../.clang-format). CLion is configured the same
+way via `.idea` (untracked, so redo this on a new machine):
 
 - `.idea/codeStyles/Project.xml`, `.idea/editor.xml` — ClangFormat is the
   formatting engine, so `.clang-format` wins over CLion's own code style.
@@ -107,9 +108,7 @@ CLion formats with the clang-format built into its bundled clangd, not the
 **Settings | Editor | Code Style | C/C++ | General** to use an external
 clang-format at the path from `mise which clang-format`.
 
-CMake is not format-on-save in either editor. `gersemi` reads
-`.config/gersemi/config.yaml` and runs via `mise run fmt` and the prek hook.
-
-[clion-docker]: https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
+[clion-docker]:
+  https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
 [clang-tidy]: https://clang.llvm.org/extra/clang-tidy/
 [prek]: https://prek.j178.dev/
