@@ -1,13 +1,11 @@
 #include "cuda_check.hpp"
 
+#define LODEPNG_NO_COMPILE_CPP
 #include <lodepng.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-#include <string>
-#include <vector>
-
-namespace {
 
 struct Options {
   const char *input = nullptr;
@@ -15,9 +13,14 @@ struct Options {
 };
 
 struct Image {
-  std::vector<unsigned char> pixels;
+  unsigned char *pixels = nullptr;
   unsigned width = 0;
   unsigned height = 0;
+
+  Image() = default;
+  Image(const Image &) = delete;
+  Image &operator=(const Image &) = delete;
+  ~Image() { std::free(pixels); }
 };
 
 /// Convert RGB pixels in parallel.
@@ -32,8 +35,10 @@ __global__ void grayscale_kernel(const unsigned char *input,
 
   const size_t pixel = static_cast<size_t>(row) * width + column;
   const size_t rgb = pixel * 3;
-  output[pixel] = static_cast<unsigned char>(
-      0.21F * input[rgb] + 0.72F * input[rgb + 1] + 0.07F * input[rgb + 2]);
+  output[pixel] =
+      static_cast<unsigned char>(0.21F * static_cast<float>(input[rgb]) +
+                                 0.72F * static_cast<float>(input[rgb + 1]) +
+                                 0.07F * static_cast<float>(input[rgb + 2]));
 }
 
 void print_help(const char *program) {
@@ -57,8 +62,8 @@ bool parse_args(int argc, char **argv, Options &options) {
 
 /// Load an RGB PNG.
 bool load_rgb_png(const char *path, Image &image) {
-  const unsigned error = lodepng::decode(
-      image.pixels, image.width, image.height, std::string(path), LCT_RGB, 8);
+  const unsigned error = lodepng_decode_file(&image.pixels, &image.width,
+                                             &image.height, path, LCT_RGB, 8);
   if (error != 0) {
     HOST_LOG("PNG decode failed: %s", lodepng_error_text(error));
     return false;
@@ -69,11 +74,12 @@ bool load_rgb_png(const char *path, Image &image) {
 /// Convert RGB pixels on the GPU.
 bool grayscale_on_gpu(const Image &rgb, Image &gray) {
   const size_t pixels = static_cast<size_t>(rgb.width) * rgb.height;
+  const size_t rgb_bytes = pixels * 3;
   unsigned char *device_input = nullptr;
   unsigned char *device_output = nullptr;
-  if (!CUDA_CHECK(cudaMalloc(&device_input, rgb.pixels.size())) ||
+  if (!CUDA_CHECK(cudaMalloc(&device_input, rgb_bytes)) ||
       !CUDA_CHECK(cudaMalloc(&device_output, pixels)) ||
-      !CUDA_CHECK(cudaMemcpy(device_input, rgb.pixels.data(), rgb.pixels.size(),
+      !CUDA_CHECK(cudaMemcpy(device_input, rgb.pixels, rgb_bytes,
                              cudaMemcpyHostToDevice))) {
     cudaFree(device_input);
     cudaFree(device_output);
@@ -86,12 +92,19 @@ bool grayscale_on_gpu(const Image &rgb, Image &gray) {
   grayscale_kernel<<<grid, block>>>(device_input, device_output, rgb.width,
                                     rgb.height);
 
-  gray.pixels.resize(pixels);
+  auto *host_gray = static_cast<unsigned char *>(std::malloc(pixels));
+  if (host_gray == nullptr) {
+    cudaFree(device_input);
+    cudaFree(device_output);
+    HOST_LOG("Failed to allocate %zu grayscale bytes", pixels);
+    return false;
+  }
+  gray.pixels = host_gray;
   gray.width = rgb.width;
   gray.height = rgb.height;
   const bool ok = CUDA_CHECK(cudaGetLastError()) &&
-                  CUDA_CHECK(cudaMemcpy(gray.pixels.data(), device_output,
-                                        pixels, cudaMemcpyDeviceToHost));
+                  CUDA_CHECK(cudaMemcpy(gray.pixels, device_output, pixels,
+                                        cudaMemcpyDeviceToHost));
   cudaFree(device_input);
   cudaFree(device_output);
   return ok;
@@ -99,8 +112,8 @@ bool grayscale_on_gpu(const Image &rgb, Image &gray) {
 
 /// Write a grayscale PNG.
 bool save_gray_png(const char *path, const Image &image) {
-  const unsigned error = lodepng::encode(
-      std::string(path), image.pixels, image.width, image.height, LCT_GREY, 8);
+  const unsigned error = lodepng_encode_file(path, image.pixels, image.width,
+                                             image.height, LCT_GREY, 8);
   if (error != 0) {
     HOST_LOG("PNG encode failed: %s", lodepng_error_text(error));
     return false;
@@ -108,8 +121,6 @@ bool save_gray_png(const char *path, const Image &image) {
   HOST_LOG("Wrote %ux%u grayscale PNG", image.width, image.height);
   return true;
 }
-
-} // namespace
 
 int main(int argc, char **argv) {
   if (argc == 2 && std::strcmp(argv[1], "--help") == 0) {
