@@ -25,8 +25,10 @@ cp .env.example .env
 
 `BUILD_ENV` accepts `auto`, `local`, or `docker`. `auto` builds locally when
 `nvcc` exists and uses Docker otherwise. CMake writes to `build/local` or
-`build/docker`; binaries still land in `bin/`. `SSH_HOST` independently
-selects the run host; leave it empty for local execution.
+`build/docker`; binaries still land in `bin/`. Fetched dependency sources live
+in `.cache/fetchcontent/` (and compiles in `.ccache/`) so deleting `build/` and
+`bin/` does not re-download. `SSH_HOST` independently selects the run host;
+leave it empty for local execution.
 
 ## Workflow
 
@@ -34,17 +36,18 @@ Build every app or one app:
 
 ```sh
 mise run build
-mise run build -- pmpp/ch03/grayscale
+mise run build -- apps/pmpp/ch03/grayscale
 ```
 
 Each source path under `apps/` defines its app key and binary path. For example,
 `apps/pmpp/ch03/grayscale.cu` builds `bin/pmpp/ch03/grayscale`.
+The `apps/` prefix is optional. Use it in `.env` for editor path completion.
 
 Deploy one app and forward its arguments:
 
 ```sh
-mise run deploy -- pmpp/ch02/hello
-mise run deploy -- pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
+mise run deploy -- apps/pmpp/ch02/hello
+mise run deploy -- apps/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 ```
 
 Remote argument paths refer to files on `SSH_HOST`. `APP` supplies the default
@@ -54,7 +57,7 @@ arguments are passed explicitly.
 Watch the selected app and shared code, then rebuild and deploy after changes:
 
 ```sh
-mise run dev -- pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
+mise run dev -- apps/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 mise run dev
 ```
 

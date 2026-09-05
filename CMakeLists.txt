@@ -3,6 +3,15 @@ project(cuda LANGUAGES CXX CUDA)
 
 include(FetchContent)
 
+# nvcc compiles each CUDA_ARCHITECTURES entry in one invocation; -t0 uses
+# every core for those device passes.
+if(
+  CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA"
+  AND CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11.6
+)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-t0>")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)

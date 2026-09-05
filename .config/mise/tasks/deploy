@@ -2,6 +2,10 @@
 #MISE description="Deploy and run one app on the GPU target"
 set -euo pipefail
 
+task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=.config/mise/lib/app.sh
+source "$task_dir/../lib/app.sh"
+
 target=${SSH_HOST:-local}
 app=${APP:-}
 
@@ -13,10 +17,7 @@ if [ -z "$app" ]; then
   echo "app missing; pass one or set APP" >&2
   exit 2
 fi
-if [[ ! "$app" =~ ^[a-z0-9][a-z0-9/-]*[a-z0-9]$ ]]; then
-  echo "invalid app: $app" >&2
-  exit 2
-fi
+app=$(normalize_app "$app")
 
 args=("$@")
 if [ "${#args[@]}" -eq 0 ] && [ -n "${ARGS:-}" ]; then

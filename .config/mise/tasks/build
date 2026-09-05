@@ -2,16 +2,16 @@
 #MISE description="Build all apps or one app into ./bin"
 set -euo pipefail
 
+task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=.config/mise/lib/app.sh
+source "$task_dir/../lib/app.sh"
+
 if [ "$#" -gt 1 ]; then
   echo "usage: mise build -- [app]" >&2
   exit 2
 fi
 
-app=${1:-}
-if [ -n "$app" ] && [[ ! "$app" =~ ^[a-z0-9][a-z0-9/-]*[a-z0-9]$ ]]; then
-  echo "invalid app: $app" >&2
-  exit 2
-fi
+app=$(normalize_app "${1:-}")
 
 if [ -e /.dockerenv ]; then
   root=/app
@@ -56,6 +56,16 @@ fi
 
 build_dir=$root/build/$flavor
 export CCACHE_DIR=$root/.ccache
+export CCACHE_BASEDIR=$root
+
+if command -v nproc >/dev/null; then
+  jobs=$(nproc)
+elif command -v sysctl >/dev/null; then
+  jobs=$(sysctl -n hw.ncpu)
+else
+  jobs=8
+fi
+export CMAKE_BUILD_PARALLEL_LEVEL=$jobs
 
 if [ -f "$build_dir/CMakeCache.txt" ] &&
   ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$build_dir/CMakeCache.txt"; then
@@ -67,9 +77,9 @@ if [ ! -f "$build_dir/CMakeCache.txt" ]; then
 fi
 
 if [ -z "$app" ]; then
-  cmake --build "$build_dir" --parallel
+  cmake --build "$build_dir" --parallel "$jobs"
   exit
 fi
 
 target=app_${app//\//_}
-cmake --build "$build_dir" --parallel --target "$target"
+cmake --build "$build_dir" --parallel "$jobs" --target "$target"
