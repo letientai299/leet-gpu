@@ -8,7 +8,6 @@
 CompileFlags:
   Add:
     - --cuda-path=/usr/local/cuda
-    - --no-cuda-version-check
     - -std=c++17
   # build/compile_commands.json drives nvcc; strip its nvcc-only flags that
   # clang(d) rejects. Path-specific fragments restore one analysis target.
