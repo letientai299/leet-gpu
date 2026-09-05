@@ -66,7 +66,7 @@ inline cuda::stream_ref default_stream() {
 }
 
 inline auto& device_pool() {
-  return cuda::device_default_memory_pool(default_stream().device());
+  return cuda::device_default_memory_pool(cuda::devices[0]);
 }
 
 [[noreturn]] inline __host__ __device__ void not_implemented() {
@@ -80,7 +80,7 @@ inline auto& device_pool() {
 inline bool init_cuda() {
   int device_id = 0;
   cudaDeviceProp device{};
-  if (!CUDA_CHECK(cudaGetDevice(&device_id)) ||
+  if (!CUDA_CHECK(cudaGetDevice(&device_id)) || !CUDA_CHECK(cudaFree(nullptr)) ||
       !CUDA_CHECK(cudaGetDeviceProperties(&device, device_id))) {
     return false;
   }
