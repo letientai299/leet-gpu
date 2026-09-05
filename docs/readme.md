@@ -76,8 +76,8 @@ prek --config .config/prek.toml run --all-files
 
 [`clang-tidy`][clang-tidy] runs inside the CUDA container against
 `build/docker`. [`prek`][prek] runs `mise run lint` before commits and treats
-every diagnostic as an error. Install its Git hook with
-`prek --config .config/prek.toml install`.
+every diagnostic as an error. `mise install` installs its Git hook after the
+tools.
 
 ## macOS: CLion Intellisense
 

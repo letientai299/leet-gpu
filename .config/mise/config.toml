@@ -3,6 +3,9 @@
 "pipx:gersemi" = "0.28.0"
 watchexec = "latest"
 
+[hooks]
+postinstall = "prek --config .config/prek.toml install"
+
 [env]
 _.file = ".env"
 
