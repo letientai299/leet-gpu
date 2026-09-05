@@ -69,7 +69,7 @@ loop.
 
 Every binary supports `--help` without initializing CUDA.
 
-Fix or check C++ and CUDA sources:
+Fix or check C++ and CUDA sources. Python is linted and formatted with ruff:
 
 ```sh
 mise run fmt

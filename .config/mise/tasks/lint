@@ -33,7 +33,7 @@ if [ ! -f build/docker/compile_commands.json ]; then
   exit 1
 fi
 
-python3.12 scripts/clang-tidy-db.py build/docker/compile_commands.json \
+python3.12 scripts/tidy.py build/docker/compile_commands.json \
   build/docker/clang-tidy
 
 args=(-p build/docker/clang-tidy -quiet)

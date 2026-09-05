@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Smoke-test the in-container clangd LSP through the project's .nvim/clangd wrapper.
 
-Usage:  python3 scripts/lsp_features.py [project_root]   (default: repo root)
+Usage:  python3 scripts/lsp.py [project_root]   (default: repo root)
 Or:     mise run lsp:check
 
 Drives .nvim/clangd (docker exec + --path-mappings) over stdio, opens

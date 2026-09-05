@@ -51,10 +51,14 @@ def main() -> None:
         args = command.get("arguments") or shlex.split(command["command"])
         if file.suffix == ".cu":
             args = cuda_args(args)
-        result.append({"directory": command["directory"], "file": str(file), "arguments": args})
+        result.append(
+            {"directory": command["directory"], "file": str(file), "arguments": args}
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "compile_commands.json").write_text(json.dumps(result, indent=2) + "\n")
+    (output_dir / "compile_commands.json").write_text(
+        json.dumps(result, indent=2) + "\n"
+    )
 
 
 if __name__ == "__main__":
