@@ -34,6 +34,9 @@ FetchContent_MakeAvailable(spdlog lodepng cccl)
 
 find_package(CUDAToolkit REQUIRED)
 
+add_library(leet_gpu_cublas INTERFACE)
+target_link_libraries(leet_gpu_cublas INTERFACE CUDA::cublas)
+
 add_library(leet_gpu_runtime STATIC log.cpp)
 target_include_directories(
   leet_gpu_runtime
