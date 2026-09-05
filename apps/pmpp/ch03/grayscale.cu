@@ -4,9 +4,9 @@
 #include <lodepng.h>
 
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 
+namespace {
 struct Options {
   const char *input = nullptr;
   const char *output = nullptr;
@@ -22,11 +22,12 @@ struct Image {
   Image &operator=(const Image &) = delete;
   ~Image() { std::free(pixels); }
 };
+} // namespace
 
 /// Convert RGB pixels in parallel.
-__global__ void grayscale_kernel(const unsigned char *input,
-                                 unsigned char *output, unsigned width,
-                                 unsigned height) {
+__global__ static void grayscale_kernel(const unsigned char *input,
+                                        unsigned char *output, unsigned width,
+                                        unsigned height) {
   const unsigned column = blockIdx.x * blockDim.x + threadIdx.x;
   const unsigned row = blockIdx.y * blockDim.y + threadIdx.y;
   if (column >= width || row >= height) {
@@ -41,11 +42,11 @@ __global__ void grayscale_kernel(const unsigned char *input,
                                  0.07F * static_cast<float>(input[rgb + 2]));
 }
 
-void print_help(const char *program) {
+static void print_help(const char *program) {
   std::printf("Usage: %s -i <input.png> -o <output.png>\n", program);
 }
 
-bool parse_args(int argc, char **argv, Options &options) {
+static bool parse_args(int argc, char **argv, Options &options) {
   for (int index = 1; index < argc; ++index) {
     if (std::strcmp(argv[index], "-i") == 0 && index + 1 < argc) {
       options.input = argv[++index];
@@ -61,7 +62,7 @@ bool parse_args(int argc, char **argv, Options &options) {
 }
 
 /// Load an RGB PNG.
-bool load_rgb_png(const char *path, Image &image) {
+static bool load_rgb_png(const char *path, Image &image) {
   const unsigned error = lodepng_decode_file(&image.pixels, &image.width,
                                              &image.height, path, LCT_RGB, 8);
   if (error != 0) {
@@ -72,7 +73,7 @@ bool load_rgb_png(const char *path, Image &image) {
 }
 
 /// Convert RGB pixels on the GPU.
-bool grayscale_on_gpu(const Image &rgb, Image &gray) {
+static bool grayscale_on_gpu(const Image &rgb, Image &gray) {
   const size_t pixels = static_cast<size_t>(rgb.width) * rgb.height;
   const size_t rgb_bytes = pixels * 3;
   unsigned char *device_input = nullptr;
@@ -111,7 +112,7 @@ bool grayscale_on_gpu(const Image &rgb, Image &gray) {
 }
 
 /// Write a grayscale PNG.
-bool save_gray_png(const char *path, const Image &image) {
+static bool save_gray_png(const char *path, const Image &image) {
   const unsigned error = lodepng_encode_file(path, image.pixels, image.width,
                                              image.height, LCT_GREY, 8);
   if (error != 0) {
