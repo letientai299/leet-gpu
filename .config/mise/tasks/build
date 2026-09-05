@@ -20,7 +20,7 @@ else
   root=${MISE_PROJECT_ROOT:-$PWD}
   build_env=${BUILD_ENV:-auto}
   if [ "$build_env" = auto ]; then
-    if command -v nvcc >/dev/null; then
+    if [ "$(uname -s)" = Linux ] || command -v nvcc >/dev/null; then
       build_env=local
     else
       build_env=docker
