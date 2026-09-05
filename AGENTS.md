@@ -8,3 +8,6 @@
   `readme.md`. Keep setup, workflow, and editor notes in `docs/readme.md`.
 - Use ref style links in markdown files to prevent broken prose lines. Keep link
   definitions below and near the referencing paragraphs.
+- When adding C++ or CUDA libraries, update `.clangd` for required include paths
+  or flags missing from the compilation database. Check an affected translation
+  unit with container clangd and run `mise run lsp:check`.

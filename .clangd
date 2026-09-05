@@ -5,10 +5,11 @@
 #    container paths. When build/docker/compile_commands.json exists, clangd
 #    uses it and merges these on top.
 # https://clangd.llvm.org/config#compileflags
-CompilationDatabase: build/docker
 CompileFlags:
+  CompilationDatabase: build/docker
   Add:
     - --cuda-path=/usr/local/cuda
+    - -isystem/usr/local/cuda/include/cccl
     - -std=c++17
   # build/docker/compile_commands.json drives nvcc; strip its nvcc-only flags that
   # clang(d) rejects. Path-specific fragments restore one analysis target.
