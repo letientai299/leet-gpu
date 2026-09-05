@@ -121,7 +121,7 @@ When optimizing [`src/pmpp/ch03/blur.cu`][blur], see
 tiling so later chapters have a baseline.
 
 [blur]: ../../src/pmpp/ch03/blur.cu
-[blur-todo]: ../pmpp/todo.md
+[blur-todo]: ../pmpp/todo.md#blur
 
 ## Resources
 
