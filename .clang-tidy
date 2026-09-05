@@ -3,19 +3,14 @@
 # analyzer + bugprone + performance, minus checks that are noisy on kernel/host
 # glue code. https://clang.llvm.org/extra/clang-tidy/checks/list.html
 Checks: >
-  clang-diagnostic-*,
-  clang-analyzer-*,
-  bugprone-*,
-  performance-*,
-  modernize-use-nullptr,
-  modernize-use-override,
-  readability-braces-around-statements,
-  readability-misleading-indentation,
+  clang-diagnostic-*, clang-analyzer-*, bugprone-*, performance-*,
+  modernize-use-nullptr, modernize-use-override,
+  readability-braces-around-statements, readability-misleading-indentation,
   -bugprone-easily-swappable-parameters,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
 # Only lint this project's own headers, not the CUDA/system headers pulled in by
 # the fetched-header view. Empty/omitted would lint only the main file; this also
 # covers project headers under apps/ and libs/.
-HeaderFilterRegex: '/app/(apps|libs)/'
-WarningsAsErrors: ''
+HeaderFilterRegex: "/app/(apps|libs)/"
+WarningsAsErrors: ""
