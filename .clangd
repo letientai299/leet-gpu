@@ -1,15 +1,16 @@
 # Two jobs:
 # 1. Root marker: pins the LSP root here, so nvim finds .nvim/clangd.
 # 2. CUDA flags for the container-side clangd (see .nvim/clangd). These let a
-#    lone .cu index correctly without a build/compile_commands.json. Paths are
-#    container paths. When build/compile_commands.json exists, clangd uses it
-#    and merges these on top.
+#    lone .cu index correctly without a compilation database. Paths are
+#    container paths. When build/docker/compile_commands.json exists, clangd
+#    uses it and merges these on top.
 # https://clangd.llvm.org/config#compileflags
+CompilationDatabase: build/docker
 CompileFlags:
   Add:
     - --cuda-path=/usr/local/cuda
     - -std=c++17
-  # build/compile_commands.json drives nvcc; strip its nvcc-only flags that
+  # build/docker/compile_commands.json drives nvcc; strip its nvcc-only flags that
   # clang(d) rejects. Path-specific fragments restore one analysis target.
   # Trailing * is a clangd glob. Add more here as nvcc flags appear in the build.
   Remove:

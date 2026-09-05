@@ -24,8 +24,9 @@ cp .env.example .env
 ```
 
 `BUILD_ENV` accepts `auto`, `local`, or `docker`. `auto` builds locally when
-`nvcc` exists and uses Docker otherwise. `SSH_HOST` independently selects the
-run host; leave it empty for local execution.
+`nvcc` exists and uses Docker otherwise. CMake writes to `build/local` or
+`build/docker`; binaries still land in `bin/`. `SSH_HOST` independently
+selects the run host; leave it empty for local execution.
 
 ## Workflow
 
@@ -68,9 +69,9 @@ mise run fmt
 mise run lint
 ```
 
-[`clang-tidy`][clang-tidy] runs inside the CUDA container against the build
-compilation database. [`prek`][prek] runs `mise run lint` before commits and
-treats every diagnostic as an error.
+[`clang-tidy`][clang-tidy] runs inside the CUDA container against
+`build/docker`. [`prek`][prek] runs `mise run lint` before commits and treats
+every diagnostic as an error.
 
 ## macOS: CLion Intellisense
 

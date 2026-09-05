@@ -28,14 +28,15 @@ if [ ! -e /.dockerenv ]; then
     "$@"
 fi
 
-if [ ! -f build/compile_commands.json ]; then
-  echo "compile database missing; run mise build" >&2
+if [ ! -f build/docker/compile_commands.json ]; then
+  echo "compile database missing; run mise build with BUILD_ENV=docker" >&2
   exit 1
 fi
 
-python3.12 scripts/clang-tidy-db.py build/compile_commands.json build/clang-tidy
+python3.12 scripts/clang-tidy-db.py build/docker/compile_commands.json \
+  build/docker/clang-tidy
 
-args=(-p build/clang-tidy -quiet)
+args=(-p build/docker/clang-tidy -quiet)
 if [ "$mode" = fix ]; then
   args+=(-fix -format -style=file)
 else
