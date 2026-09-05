@@ -32,7 +32,5 @@ mise run lint -- --fix
 find src -type f \
   \( -name '*.cu' -o -name '*.cuh' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) \
   -exec clang-format -i {} +
-find . -type d \( -name build -o -name 'cmake-build-*' \) -prune \
-  -o -name CMakeLists.txt -exec gersemi --config .config/gersemi/config.yaml -i {} +
-gersemi --config .config/gersemi/config.yaml -i src/cmake/*.cmake
+gersemi --config .config/gersemi/config.yaml -i .
 mise run lint

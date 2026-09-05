@@ -1,2 +1,5 @@
-# CMake formatting. Match the 2-space C++ style.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/BlankSpruce/gersemi/0.28.0/gersemi/configuration.schema.json
+# Match the 2-space C++ style. Custom commands live under src/cmake.
 indent: 2
+definitions:
+  - ../../src/cmake
