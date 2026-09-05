@@ -10,4 +10,4 @@ if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
   exit 1
 fi
 
-exec python3 "$root/tools/lsp_features.py" "$root"
+exec python3 "$root/scripts/lsp_features.py" "$root"
