@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="Stop the development container and remove generated directories"
+set -euo pipefail
+
+root=${MISE_PROJECT_ROOT:-$PWD}
+
+if [ -n "${CONTAINER_NAME:-}" ] \
+  && [ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)" = true ]; then
+  docker stop "$CONTAINER_NAME" >/dev/null
+fi
+
+rm -rf -- \
+  "${root:?}/build" \
+  "${root:?}/bin" \
+  "${root:?}/.cache" \
+  "${root:?}/.ruff_cache" \
+  "${root:?}/.rumdl_cache"
