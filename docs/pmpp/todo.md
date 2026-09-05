@@ -1,6 +1,6 @@
 # TODO
 
-## [`../../apps/pmpp/ch03/blur.cu`](../../apps/pmpp/ch03/blur.cu)
+## [`../../src/pmpp/ch03/blur.cu`](../../src/pmpp/ch03/blur.cu)
 
 Ch03 kernel: one thread per pixel, full 2D window from global memory. Correct
 teaching code. Slow box blur.

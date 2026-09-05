@@ -16,8 +16,8 @@ Checks: >
 
 # Only lint this project's own headers, not the CUDA/system headers pulled in by
 # the fetched-header view. Empty/omitted would lint only the main file; this also
-# covers project headers under apps/ and libs/.
-HeaderFilterRegex: "/app/(apps|libs)/"
+# covers project headers under src/.
+HeaderFilterRegex: "/app/src/"
 WarningsAsErrors: ""
 CheckOptions:
   misc-include-cleaner.IgnoreHeaders: "cstdlib"

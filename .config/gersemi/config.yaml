@@ -1,0 +1,2 @@
+# CMake formatting. Match the 2-space C++ style.
+indent: 2

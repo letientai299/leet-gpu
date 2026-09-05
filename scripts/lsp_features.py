@@ -5,7 +5,7 @@ Usage:  python3 scripts/lsp_features.py [project_root]   (default: repo root)
 Or:     mise run lsp:check
 
 Drives .nvim/clangd (docker exec + --path-mappings) over stdio, opens
-    apps/pmpp/ch02/hello.cu, and issues one request per LSP feature, printing FOUND / empty /
+    src/pmpp/ch02/hello.cu, and issues one request per LSP feature, printing FOUND / empty /
 ERR. No nvim needed -- it validates the server side of this container setup.
 Exit code is non-zero if the client can't even initialize.
 """
@@ -23,7 +23,7 @@ ROOT = (
     if len(sys.argv) > 1
     else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-FILE = os.path.join(ROOT, "apps", "pmpp", "ch02", "hello.cu")
+FILE = os.path.join(ROOT, "src", "pmpp", "ch02", "hello.cu")
 uri = "file://" + FILE
 text = pathlib.Path(FILE).read_text()
 lines = text.splitlines()
@@ -229,7 +229,7 @@ tests = [
     ),
 ]
 
-print(f"clangd LSP feature check ({os.path.basename(ROOT)}/apps/pmpp/ch02/hello.cu):")
+print(f"clangd LSP feature check ({os.path.basename(ROOT)}/src/pmpp/ch02/hello.cu):")
 width = max(len(t[0]) for t in tests)
 fails = 0
 for name, method, params, ok in tests:

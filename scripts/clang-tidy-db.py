@@ -17,7 +17,11 @@ def cuda_args(args: list[str]) -> list[str]:
     index = 1
     while index < len(args):
         arg = args[index]
-        if arg == "-forward-unknown-to-host-compiler" or arg.startswith(("--generate-code=", "-arch=")):
+        if (
+            arg == "-forward-unknown-to-host-compiler"
+            or arg.startswith(("--generate-code=", "-arch="))
+            or (arg.startswith("-t") and arg[2:].isdigit())
+        ):
             index += 1
             continue
         if arg in {"-Xcompiler", "--options-file"}:
@@ -42,7 +46,7 @@ def main() -> None:
     result = []
     for command in commands:
         file = Path(command["file"])
-        if not str(file).startswith(("/app/apps/", "/app/libs/")):
+        if not str(file).startswith("/app/src/"):
             continue
         args = command.get("arguments") or shlex.split(command["command"])
         if file.suffix == ".cu":

@@ -2,7 +2,7 @@
 
 PMPP teaches *what* to look at (occupancy, coalescing, traffic). It does not
 teach a timing harness or Nsight. Use this note when measuring kernels in
-`apps/`.
+`src/`.
 
 CUDA has both **micro** (one kernel) and **macro** (whole app) tools. They are
 not one `pprof` binary.
@@ -107,7 +107,7 @@ warmup launches. On some shared GPUs, counters need extra permissions
 Ch 4 occupancy, ch 6 coalescing / bottleneck checklist, ch 22 bandwidth vs
 compute. No harness, no `nsys`/`ncu` tutorial.
 
-When optimizing [`apps/pmpp/ch03/blur.cu`](../../apps/pmpp/ch03/blur.cu), see
+When optimizing [`src/pmpp/ch03/blur.cu`](../../src/pmpp/ch03/blur.cu), see
 [`docs/pmpp/todo.md`](../pmpp/todo.md). Measure kernel-only time *before*
 tiling so later chapters have a baseline.
 

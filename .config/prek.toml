@@ -1,0 +1,18 @@
+#:schema https://www.schemastore.org/prek.json
+# Format staged files on commit.
+# Installed globally through mise.
+
+# Use an isolated clang-format mirror.
+# Keep rev aligned with mise config.
+[[repos]]
+repo = "https://github.com/pre-commit/mirrors-clang-format"
+rev = "v22.1.8"
+hooks = [{ id = "clang-format" }]
+
+# Run pinned gersemi directly.
+[[repos]]
+repo = "local"
+hooks = [
+  { id = "clang-tidy", name = "clang-tidy (C++/CUDA)", entry = "mise run lint --", language = "system", files = '\.(cc|cpp|cu|cuh|h|hpp)$' },
+  { id = "gersemi", name = "gersemi (CMake)", entry = "mise exec -- gersemi --config .config/gersemi/config.yaml -i", language = "system", files = '(^|/)CMakeLists\.txt$|\.cmake$', exclude = "/build/" },
+]

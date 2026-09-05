@@ -8,5 +8,7 @@ normalize_app() {
     return 2
   fi
 
-  printf '%s\n' "${app#apps/}"
+  app=${app#apps/}
+  app=${app#src/}
+  printf '%s\n' "$app"
 }

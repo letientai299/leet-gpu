@@ -36,18 +36,18 @@ Build every app or one app:
 
 ```sh
 mise run build
-mise run build -- apps/pmpp/ch03/grayscale
+mise run build -- src/pmpp/ch03/grayscale
 ```
 
-Each source path under `apps/` defines its app key and binary path. For example,
-`apps/pmpp/ch03/grayscale.cu` builds `bin/pmpp/ch03/grayscale`.
-The `apps/` prefix is optional. Use it in `.env` for editor path completion.
+Each source path under `src/` defines its app key and binary path. For example,
+`src/pmpp/ch03/grayscale.cu` builds `bin/pmpp/ch03/grayscale`.
+The `src/` prefix is optional. Use it in `.env` for editor path completion.
 
 Deploy one app and forward its arguments:
 
 ```sh
-mise run deploy -- apps/pmpp/ch02/hello
-mise run deploy -- apps/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
+mise run deploy -- src/pmpp/ch02/hello
+mise run deploy -- src/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 ```
 
 Remote argument paths refer to files on `SSH_HOST`. `APP` supplies the default
@@ -57,7 +57,7 @@ arguments are passed explicitly.
 Watch the selected app and shared code, then rebuild and deploy after changes:
 
 ```sh
-mise run dev -- apps/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
+mise run dev -- src/pmpp/ch03/grayscale -i /data/input.png -o /data/output.png
 mise run dev
 ```
 
@@ -70,11 +70,13 @@ Fix or check C++ and CUDA sources:
 ```sh
 mise run fmt
 mise run lint
+prek --config .config/prek.toml run --all-files
 ```
 
 [`clang-tidy`][clang-tidy] runs inside the CUDA container against
 `build/docker`. [`prek`][prek] runs `mise run lint` before commits and treats
-every diagnostic as an error.
+every diagnostic as an error. Install its Git hook with
+`prek --config .config/prek.toml install`.
 
 ## macOS: CLion Intellisense
 
@@ -100,12 +102,12 @@ via `.idea` (untracked, so redo this on a new machine):
   `C/C++` and `C/C++ Header` file types. CMake and Markdown stay untouched.
 
 CLion formats with the clang-format built into its bundled clangd, not the
-`clang-format` pinned in [`mise.toml`](../mise.toml). For an exact match, set
+`clang-format` pinned in `.config/mise/config.toml`. For an exact match, set
 **Settings | Editor | Code Style | C/C++ | General** to use an external
 clang-format at the path from `mise which clang-format`.
 
 CMake is not format-on-save in either editor. `gersemi` reads
-[`.gersemirc`](../.gersemirc) and runs via `mise run fmt` and the prek hook.
+`.config/gersemi/config.yaml` and runs via `mise run fmt` and the prek hook.
 
 [clion-docker]: https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
 [clang-tidy]: https://clang.llvm.org/extra/clang-tidy/

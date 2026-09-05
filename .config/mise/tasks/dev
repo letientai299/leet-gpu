@@ -12,7 +12,7 @@ if [ -z "$app" ] && [ -z "${APP:-}" ]; then
   exit 2
 fi
 
-watch_args=(--watch apps --watch libs --watch cmake --watch CMakeLists.txt)
+watch_args=(--watch src --watch CMakeLists.txt)
 if [ -f .env ]; then
   watch_args+=(--watch .env)
 fi

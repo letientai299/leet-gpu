@@ -23,16 +23,16 @@ if [ "$#" -gt 0 ]; then
     mise run lint -- "${cpp_files[@]}"
   fi
   if [ "${#cmake_files[@]}" -gt 0 ]; then
-    gersemi -i "${cmake_files[@]}"
+    gersemi --config .config/gersemi/config.yaml -i "${cmake_files[@]}"
   fi
   exit
 fi
 
 mise run lint -- --fix
-find apps libs -type f \
+find src -type f \
   \( -name '*.cu' -o -name '*.cuh' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) \
   -exec clang-format -i {} +
 find . -type d \( -name build -o -name 'cmake-build-*' \) -prune \
-  -o -name CMakeLists.txt -exec gersemi -i {} +
-gersemi -i cmake/*.cmake
+  -o -name CMakeLists.txt -exec gersemi --config .config/gersemi/config.yaml -i {} +
+gersemi --config .config/gersemi/config.yaml -i src/cmake/*.cmake
 mise run lint

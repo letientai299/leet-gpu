@@ -20,15 +20,16 @@ CompileFlags:
     - -Xcompiler*
     - --options-file*
     - -arch=*
+    - -t0
 
 ---
 If:
-  PathMatch: ^(apps|libs)/.*\.(cuh|h|hpp)$
+  PathMatch: ^src/.*\.(cuh|h|hpp)$
 CompileFlags:
   Add: -xcuda
 
 ---
 If:
-  PathMatch: ^(apps|libs)/.*
+  PathMatch: ^src/.*
 CompileFlags:
   Add: --cuda-gpu-arch=sm_86

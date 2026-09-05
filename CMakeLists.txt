@@ -34,8 +34,8 @@ endif()
 
 option(STRIP_DEPLOY "Strip symbols from deploy binaries" ON)
 
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/src/cmake")
 include(AddCudaApp)
 
-add_subdirectory(libs/runtime)
-add_subdirectory(apps/pmpp)
+add_subdirectory(src/libs)
+add_subdirectory(src/pmpp)
