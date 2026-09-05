@@ -61,11 +61,12 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
     programming guide, v13.3), we know that that `grid > cluster > block`.
 - [x] 3.2 Mapping threads to multidimensional data
   - [`../../apps/pmpp/ch03/grayscale.cu`](../../apps/pmpp/ch03/grayscale.cu)
-- [ ] 3.3 Image blur: a more complex kernel
+- [x] 3.3 Image blur: a more complex kernel
   - _Convolution pattern_: In math, an operation on 2 funcs $f$ and $g$, produce
     3rd func $f*g$. In this chapter, it's about a square sliding filter on the
     image.
   - [`../../apps/pmpp/ch03/blur.cu`](../../apps/pmpp/ch03/blur.cu)
+  - Faster blur: after later chapters, see [`todo.md`](./todo.md).
 - [ ] 3.4 Matrix multiplication
 - [ ] 3.5 Summary
 - [ ] [Exercises](./ch03-ex.md)
