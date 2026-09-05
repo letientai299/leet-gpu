@@ -5,6 +5,7 @@
 
 namespace {
 
+// RAII: destructor frees owned device buffers.
 class DeviceVectors {
 public:
   DeviceVectors() = default;
