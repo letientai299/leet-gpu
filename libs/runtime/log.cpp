@@ -16,8 +16,12 @@ namespace {
 
 constexpr size_t source_width = 16;
 bool color_enabled = false;
-std::string gpu_architecture = "GPU";
 size_t kind_width = 4;
+
+std::string& gpu_name() {
+  static std::string name = "GPU";
+  return name;
+}
 
 namespace color {
 
@@ -102,18 +106,18 @@ void init_log() {
 }
 
 void set_gpu_arch(int major, int minor) {
-  gpu_architecture = "sm_" + std::to_string(major) + std::to_string(minor);
-  kind_width = std::max(kind_width, gpu_architecture.size());
+  gpu_name() = "sm_" + std::to_string(major) + std::to_string(minor);
+  kind_width = std::max(kind_width, gpu_name().size());
 }
 
 const char* gpu_arch() {
-  return gpu_architecture.c_str();
+  return gpu_name().c_str();
 }
 
 void write_log(const char* kind, const char* file, int line, const char* format, ...) {
   va_list args;
   va_start(args, format);
-  auto message = format_message(format, args);
+  const auto message = format_message(format, args);
   va_end(args);
   spdlog::default_logger_raw()->log({file, line, ""}, spdlog::level::info,
                                     add_metadata(kind, file, line, message));

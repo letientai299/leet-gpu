@@ -15,7 +15,7 @@ struct Image {
   Image& operator=(const Image&) = delete;
   ~Image();
 
-  std::size_t pixel_count() const;
+  [[nodiscard]] std::size_t pixel_count() const;
 };
 
 class ImageBytes {
@@ -26,9 +26,9 @@ public:
   ~ImageBytes();
 
   bool upload(const Image& input, std::size_t output_size);
-  bool download(Image& output, unsigned width, unsigned height);
-  const ImageByte* input() const;
-  ImageByte* output();
+  bool download(Image& output, unsigned width, unsigned height) const;
+  [[nodiscard]] const ImageByte* input() const;
+  [[nodiscard]] ImageByte* output() const;
 
 private:
   ImageByte* input_ = nullptr;

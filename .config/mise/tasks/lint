@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#MISE description="Check C++/CUDA with clang-tidy"
+set -euo pipefail
+
+mode=check
+if [ "${1:-}" = --fix ]; then
+  mode=fix
+  shift
+elif [[ "${1:-}" == -* ]]; then
+  echo "usage: mise lint [-- --fix] [files]" >&2
+  exit 2
+fi
+
+if [ ! -e /.dockerenv ]; then
+  : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+  root=${MISE_PROJECT_ROOT:-$PWD}
+  project_root=$(cd "$root" && pwd -P)
+  mount_source=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || true)
+  if ! docker exec "$CONTAINER_NAME" true 2>/dev/null || [ "$mount_source" != "$project_root" ]; then
+    echo "CUDA container unavailable; run mise build" >&2
+    exit 1
+  fi
+  if [ "$mode" = fix ]; then
+    exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/lint \
+      --fix "$@"
+  fi
+  exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/lint \
+    "$@"
+fi
+
+if [ ! -f build/compile_commands.json ]; then
+  echo "compile database missing; run mise build" >&2
+  exit 1
+fi
+
+python3.12 scripts/clang-tidy-db.py build/compile_commands.json build/clang-tidy
+
+args=(-p build/clang-tidy -quiet)
+if [ "$mode" = fix ]; then
+  args+=(-fix -format -style=file)
+else
+  args+=(-warnings-as-errors='*')
+fi
+
+files=()
+for file in "$@"; do
+  case "$file" in
+    *.h | *.hpp | *.cuh)
+      source=${file%.*}.cpp
+      if [ -f "$source" ]; then
+        files+=("$source$")
+      else
+        files=()
+        break
+      fi
+      ;;
+    *.cc | *.cpp | *.cu) files+=("$file$") ;;
+  esac
+done
+run-clang-tidy.py "${args[@]}" "${files[@]}"

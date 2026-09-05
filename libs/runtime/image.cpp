@@ -46,14 +46,41 @@ bool load_rgb_png(const char* path, Image& image) {
   return true;
 }
 
-bool save_gray_png(const char* path, const Image& image) {
+bool save_png(const char* path, const Image& image) {
+  const auto pixels = image.pixel_count();
+  if (pixels == 0 || image.size % pixels != 0) {
+    HOST_LOG("PNG encode failed: invalid size %zu for %ux%u", image.size, image.width,
+             image.height);
+    return false;
+  }
+
+  const auto channels = image.size / pixels;
+  LodePNGColorType color_type = LCT_GREY;
+  switch (channels) {
+  case 1:
+    color_type = LCT_GREY;
+    break;
+  case 2:
+    color_type = LCT_GREY_ALPHA;
+    break;
+  case 3:
+    color_type = LCT_RGB;
+    break;
+  case 4:
+    color_type = LCT_RGBA;
+    break;
+  default:
+    HOST_LOG("PNG encode failed: unsupported channel count %zu", channels);
+    return false;
+  }
+
   const unsigned error =
-      lodepng_encode_file(path, image.pixels, image.width, image.height, LCT_GREY, 8);
+      lodepng_encode_file(path, image.pixels, image.width, image.height, color_type, 8);
   if (error != 0) {
     HOST_LOG("PNG encode failed: %s", lodepng_error_text(error));
     return false;
   }
-  HOST_LOG("Wrote %ux%u grayscale PNG", image.width, image.height);
+  HOST_LOG("Wrote %ux%u %s", image.width, image.height, path);
   return true;
 }
 
@@ -74,15 +101,12 @@ ImageBytes::~ImageBytes() {
 
 bool ImageBytes::upload(const Image& input, std::size_t output_size) {
   output_size_ = output_size;
-  if (!CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&input_), input.size)) ||
-      !CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&output_), output_size_)) ||
-      !CUDA_CHECK(cudaMemcpy(input_, input.pixels, input.size, cudaMemcpyHostToDevice))) {
-    return false;
-  }
-  return true;
+  return CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&input_), input.size)) &&
+         CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&output_), output_size_)) &&
+         CUDA_CHECK(cudaMemcpy(input_, input.pixels, input.size, cudaMemcpyHostToDevice));
 }
 
-bool ImageBytes::download(Image& output, unsigned width, unsigned height) {
+bool ImageBytes::download(Image& output, unsigned width, unsigned height) const {
   output.pixels = static_cast<unsigned char*>(std::malloc(output_size_));
   if (output.pixels == nullptr) {
     HOST_LOG("Image allocation failed: %zu bytes", output_size_);
@@ -98,7 +122,7 @@ const unsigned char* ImageBytes::input() const {
   return input_;
 }
 
-unsigned char* ImageBytes::output() {
+unsigned char* ImageBytes::output() const {
   return output_;
 }
 
@@ -122,7 +146,7 @@ int run_image_app(int argc, char** argv, ImageProcessor process) {
   }
 
   Image output;
-  if (!process(input, output) || !save_gray_png(args.output, output)) {
+  if (!process(input, output) || !save_png(args.output, output)) {
     return 1;
   }
   return 0;

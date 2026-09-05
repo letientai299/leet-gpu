@@ -14,6 +14,7 @@ RUN yum install -y \
     ninja-build \
     cmake \
     libstdc++-static \
+    python3.12-pip \
     unzip \
     curl \
     ca-certificates \
@@ -27,6 +28,8 @@ RUN curl -fsSLo /tmp/clangd.zip \
     && echo "${CLANGD_SHA256}  /tmp/clangd.zip" | sha256sum -c - \
     && unzip -q /tmp/clangd.zip -d /opt \
     && rm /tmp/clangd.zip
+
+RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore clang-tidy
 
 ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_CACHE_DIR=/usr/local/share/mise/cache \

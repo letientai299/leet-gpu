@@ -14,11 +14,3 @@ run = 'eval "cmd=($usage_cmd)"; docker exec -it "$CONTAINER_NAME" "${cmd[@]}"'
 [tasks."dc:down"]
 description = "Stop the container"
 run = 'docker stop "$CONTAINER_NAME"'
-
-[tasks.fmt]
-description = "Format C++/CUDA (clang-format) and CMake (gersemi)"
-run = '''
-find apps libs -type f \( -name '*.cu' -o -name '*.cuh' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) -exec clang-format -i {} +
-find . -path ./build -prune -o -name CMakeLists.txt -exec gersemi -i {} +
-gersemi -i cmake/*.cmake
-'''

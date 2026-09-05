@@ -15,5 +15,6 @@ hooks = [{ id = "clang-format" }]
 [[repos]]
 repo = "local"
 hooks = [
+  { id = "clang-tidy", name = "clang-tidy (C++/CUDA)", entry = "mise run lint --", language = "system", files = '\.(cc|cpp|cu|cuh|h|hpp)$' },
   { id = "gersemi", name = "gersemi (CMake)", entry = "mise exec -- gersemi -i", language = "system", files = '(^|/)CMakeLists\.txt$|\.cmake$', exclude = "/build/" },
 ]

@@ -65,6 +65,7 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
   - _Convolution pattern_: In math, an operation on 2 funcs $f$ and $g$, produce
     3rd func $f*g$. In this chapter, it's about a square sliding filter on the
     image.
+  - [`../../apps/pmpp/ch03/blur.cu`](../../apps/pmpp/ch03/blur.cu)
 - [ ] 3.4 Matrix multiplication
 - [ ] 3.5 Summary
 - [ ] [Exercises](./ch03-ex.md)

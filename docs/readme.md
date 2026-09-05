@@ -61,6 +61,17 @@ mise run dev
 
 Every binary supports `--help` without initializing CUDA.
 
+Fix or check C++ and CUDA sources:
+
+```sh
+mise run fmt
+mise run lint
+```
+
+[`clang-tidy`][clang-tidy] runs inside the CUDA container against the build
+compilation database. [`prek`][prek] runs `mise run lint` before commits and
+treats every diagnostic as an error.
+
 ## macOS: CLion Intellisense
 
 CLion runs on the Mac without `nvcc`. Point it at the Docker toolchain so it
@@ -92,5 +103,6 @@ clang-format at the path from `mise which clang-format`.
 CMake is not format-on-save in either editor. `gersemi` reads
 [`.gersemirc`](../.gersemirc) and runs via `mise run fmt` and the prek hook.
 
-[clion-docker]:
-  <https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html>
+[clion-docker]: https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
+[clang-tidy]: https://clang.llvm.org/extra/clang-tidy/
+[prek]: https://prek.j178.dev/
