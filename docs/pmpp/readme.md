@@ -37,6 +37,7 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
   - Task parallelism
 - [x] 2.2 CUDA C program structure
 - [x] 2.3 A vector addition kernel
+  - [`../../apps/pmpp/ch02/vec-add.cu`](../../apps/pmpp/ch02/vec-add.cu)
 - [x] 2.4 Device global memory and data transfer
 - [x] 2.5 Kernel functions and threading
   - 2d or 3d thread blocks be picked by data shape.
@@ -55,11 +56,15 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 
 ### 3. Multidimensional grids and data
 
-- [ ] 3.1 Multidimensional grid organization
+- [x] 3.1 Multidimensional grid organization
   - Until now,this book discuss only grid and block of thread. In CPG (CUDA
     programming guide, v13.3), we know that that `grid > cluster > block`.
-- [ ] 3.2 Mapping threads to multidimensional data
+- [x] 3.2 Mapping threads to multidimensional data
+  - [`../../apps/pmpp/ch03/grayscale.cu`](../../apps/pmpp/ch03/grayscale.cu)
 - [ ] 3.3 Image blur: a more complex kernel
+  - _Convolution pattern_: In math, an operation on 2 funcs $f$ and $g$, produce
+    3rd func $f*g$. In this chapter, it's about a square sliding filter on the
+    image.
 - [ ] 3.4 Matrix multiplication
 - [ ] 3.5 Summary
 - [ ] [Exercises](./ch03-ex.md)
