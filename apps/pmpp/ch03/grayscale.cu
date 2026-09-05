@@ -14,6 +14,13 @@ struct Options {
   const char *output = nullptr;
 };
 
+struct Image {
+  std::vector<unsigned char> pixels;
+  unsigned width = 0;
+  unsigned height = 0;
+};
+
+/// Convert RGB pixels in parallel.
 __global__ void grayscale_kernel(const unsigned char *input,
                                  unsigned char *output, unsigned width,
                                  unsigned height) {
@@ -48,6 +55,60 @@ bool parse_args(int argc, char **argv, Options &options) {
   return options.input && options.output;
 }
 
+/// Load an RGB PNG.
+bool load_rgb_png(const char *path, Image &image) {
+  const unsigned error = lodepng::decode(
+      image.pixels, image.width, image.height, std::string(path), LCT_RGB, 8);
+  if (error != 0) {
+    HOST_LOG("PNG decode failed: %s", lodepng_error_text(error));
+    return false;
+  }
+  return true;
+}
+
+/// Convert RGB pixels on the GPU.
+bool grayscale_on_gpu(const Image &rgb, Image &gray) {
+  const size_t pixels = static_cast<size_t>(rgb.width) * rgb.height;
+  unsigned char *device_input = nullptr;
+  unsigned char *device_output = nullptr;
+  if (!CUDA_CHECK(cudaMalloc(&device_input, rgb.pixels.size())) ||
+      !CUDA_CHECK(cudaMalloc(&device_output, pixels)) ||
+      !CUDA_CHECK(cudaMemcpy(device_input, rgb.pixels.data(), rgb.pixels.size(),
+                             cudaMemcpyHostToDevice))) {
+    cudaFree(device_input);
+    cudaFree(device_output);
+    return false;
+  }
+
+  constexpr dim3 block(16, 16);
+  const dim3 grid((rgb.width + block.x - 1) / block.x,
+                  (rgb.height + block.y - 1) / block.y);
+  grayscale_kernel<<<grid, block>>>(device_input, device_output, rgb.width,
+                                    rgb.height);
+
+  gray.pixels.resize(pixels);
+  gray.width = rgb.width;
+  gray.height = rgb.height;
+  const bool ok = CUDA_CHECK(cudaGetLastError()) &&
+                  CUDA_CHECK(cudaMemcpy(gray.pixels.data(), device_output,
+                                        pixels, cudaMemcpyDeviceToHost));
+  cudaFree(device_input);
+  cudaFree(device_output);
+  return ok;
+}
+
+/// Write a grayscale PNG.
+bool save_gray_png(const char *path, const Image &image) {
+  const unsigned error = lodepng::encode(
+      std::string(path), image.pixels, image.width, image.height, LCT_GREY, 8);
+  if (error != 0) {
+    HOST_LOG("PNG encode failed: %s", lodepng_error_text(error));
+    return false;
+  }
+  HOST_LOG("Wrote %ux%u grayscale PNG", image.width, image.height);
+  return true;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -64,53 +125,14 @@ int main(int argc, char **argv) {
 
   init_log();
 
-  std::vector<unsigned char> input;
-  unsigned width = 0;
-  unsigned height = 0;
-  unsigned error = lodepng::decode(input, width, height,
-                                   std::string(options.input), LCT_RGB, 8);
-  if (error != 0) {
-    HOST_LOG("PNG decode failed: %s", lodepng_error_text(error));
-    return 1;
-  }
-  if (!init_cuda()) {
+  Image rgb;
+  if (!load_rgb_png(options.input, rgb) || !init_cuda()) {
     return 1;
   }
 
-  const size_t pixels = static_cast<size_t>(width) * height;
-  unsigned char *device_input = nullptr;
-  unsigned char *device_output = nullptr;
-  if (!CUDA_CHECK(cudaMalloc(&device_input, input.size())) ||
-      !CUDA_CHECK(cudaMalloc(&device_output, pixels)) ||
-      !CUDA_CHECK(cudaMemcpy(device_input, input.data(), input.size(),
-                             cudaMemcpyHostToDevice))) {
-    cudaFree(device_input);
-    cudaFree(device_output);
+  Image gray;
+  if (!grayscale_on_gpu(rgb, gray) || !save_gray_png(options.output, gray)) {
     return 1;
   }
-
-  constexpr dim3 block(16, 16);
-  const dim3 grid((width + block.x - 1) / block.x,
-                  (height + block.y - 1) / block.y);
-  grayscale_kernel<<<grid, block>>>(device_input, device_output, width, height);
-
-  std::vector<unsigned char> output(pixels);
-  const bool ok = CUDA_CHECK(cudaGetLastError()) &&
-                  CUDA_CHECK(cudaMemcpy(output.data(), device_output, pixels,
-                                        cudaMemcpyDeviceToHost));
-  cudaFree(device_input);
-  cudaFree(device_output);
-  if (!ok) {
-    return 1;
-  }
-
-  error = lodepng::encode(std::string(options.output), output, width, height,
-                          LCT_GREY, 8);
-  if (error != 0) {
-    HOST_LOG("PNG encode failed: %s", lodepng_error_text(error));
-    return 1;
-  }
-
-  HOST_LOG("Wrote %ux%u grayscale PNG", width, height);
   return 0;
 }

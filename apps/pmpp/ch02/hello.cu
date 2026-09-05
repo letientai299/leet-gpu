@@ -1,8 +1,5 @@
 #include "cuda_check.hpp"
 
-#include <cstdio>
-#include <cstring>
-
 namespace {
 
 constexpr int blocks = 3;
@@ -14,20 +11,9 @@ __global__ void hello_kernel(int *output) {
                   static_cast<int>(threadIdx.x) + 1;
 }
 
-void print_help(const char *program) { std::printf("Usage: %s\n", program); }
-
 } // namespace
 
-int main(int argc, char **argv) {
-  if (argc == 2 && std::strcmp(argv[1], "--help") == 0) {
-    print_help(argv[0]);
-    return 0;
-  }
-  if (argc != 1) {
-    print_help(argv[0]);
-    return 2;
-  }
-
+int main() {
   init_log();
   if (!init_cuda()) {
     return 1;
