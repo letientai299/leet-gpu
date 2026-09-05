@@ -1,0 +1,13 @@
+[global]
+flavor = "gfm"
+
+[MD013]
+# Line length applies to prose, not to fenced code blocks.
+code-blocks = false
+# Rewrap prose paragraphs to the limit instead of only reporting them.
+reflow = true
+
+[MD060]
+# Align table cells and delimiter rows.
+enabled = true
+style = "aligned"

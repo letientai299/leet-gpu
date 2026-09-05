@@ -1,6 +1,8 @@
 # TODO
 
-## [`../../src/pmpp/ch03/blur.cu`](../../src/pmpp/ch03/blur.cu)
+## [`../../src/pmpp/ch03/blur.cu`][blur]
+
+[blur]: ../../src/pmpp/ch03/blur.cu
 
 Ch03 kernel: one thread per pixel, full 2D window from global memory. Correct
 teaching code. Slow box blur.
@@ -22,4 +24,6 @@ After that, extra algorithm changes the book does not require:
 - Planar RGB or RGBX if load width matters
 
 Revisit `blur.cu` once ch 7 (and ideally 8) is done. Timing and Nsight:
-[`../bench/readme.md`](../bench/readme.md).
+[`../bench/readme.md`][benchmarking].
+
+[benchmarking]: ../bench/readme.md

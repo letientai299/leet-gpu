@@ -1,7 +1,8 @@
 # Chapter 2 exercises — Heterogeneous data parallel computing
 
-Back to the
-[reading checklist](./readme.md#2-heterogeneous-data-parallel-computing).
+Back to the [reading checklist][reading-checklist].
+
+[reading-checklist]: ./readme.md#2-heterogeneous-data-parallel-computing
 
 Questions transcribed from the book. Answers left blank to fill in while
 reading.

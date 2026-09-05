@@ -9,13 +9,13 @@ not one `pprof` binary.
 
 ## Map from Go
 
-| Go | CUDA |
-| --- | --- |
-| `go test -bench` | Timer around **one kernel**: `cudaEvent`, warmup, many launches. That is the microbenchmark. There is no `testing.B`. |
-| `pprof` CPU (who is hot) | **Nsight Systems** (`nsys`): CPU + GPU **timeline**. Kernels, memcpy, idle GPU, launch gaps. |
-| One hot function in pprof | **Nsight Compute** (`ncu`): **one kernel**, occupancy, coalescing, roofline, warp stalls. |
-| `go tool trace` | Closest is **Nsight Systems**. |
-| Heap/alloc pprof | No device-heap analog. Use **compute-sanitizer**, not a profiler. |
+| Go                        | CUDA                                                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `go test -bench`          | Timer around **one kernel**: `cudaEvent`, warmup, many launches. That is the microbenchmark. There is no `testing.B`. |
+| `pprof` CPU (who is hot)  | **Nsight Systems** (`nsys`): CPU + GPU **timeline**. Kernels, memcpy, idle GPU, launch gaps.                          |
+| One hot function in pprof | **Nsight Compute** (`ncu`): **one kernel**, occupancy, coalescing, roofline, warp stalls.                             |
+| `go tool trace`           | Closest is **Nsight Systems**.                                                                                        |
+| Heap/alloc pprof          | No device-heap analog. Use **compute-sanitizer**, not a profiler.                                                     |
 
 `nvprof` is gone. Use `nsys` + `ncu`.
 
@@ -68,12 +68,17 @@ Pitfalls:
 - Tiny kernels: launch overhead dominates. Raise work or batch launches.
 - Changing `BLUR_SIZE` without kernel-only time often just measures PNG size.
 
-Docs: [CUDA events](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__EVENT.html).
+Docs:
+[CUDA events][cuda-events].
+
+[cuda-events]: https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__EVENT.html
 
 ## Nsight Systems (macro)
 
-[Nsight Systems](https://developer.nvidia.com/nsight-systems) —
-[user guide](https://docs.nvidia.com/nsight-systems/).
+[Nsight Systems][nsight-systems] — [user guide][nsight-systems-guide].
+
+[nsight-systems]: https://developer.nvidia.com/nsight-systems
+[nsight-systems-guide]: https://docs.nvidia.com/nsight-systems/
 
 ```sh
 nsys profile -o out ./bin/pmpp/ch03/blur -i in.png -o out.png
@@ -83,12 +88,16 @@ Open `out.nsys-rep` in `nsys-ui`, or `nsys stats`. Look for: memcpy vs kernel,
 GPU idle, many tiny kernels.
 
 **NVTX** names ranges so the timeline is readable (like pprof labels):
-[NVTX](https://nvidia.github.io/NVTX/). Wrap upload, kernel, download, encode.
+[NVTX][nvtx]. Wrap upload, kernel, download, encode.
+
+[nvtx]: https://nvidia.github.io/NVTX/
 
 ## Nsight Compute (micro)
 
-[Nsight Compute](https://developer.nvidia.com/nsight-compute) —
-[profiling guide](https://docs.nvidia.com/nsight-compute/).
+[Nsight Compute][nsight-compute] — [profiling guide][nsight-compute-guide].
+
+[nsight-compute]: https://developer.nvidia.com/nsight-compute
+[nsight-compute-guide]: https://docs.nvidia.com/nsight-compute/
 
 ```sh
 ncu --kernel-name blur_kernel --launch-skip 1 --launch-count 5 -o blur \
@@ -107,14 +116,19 @@ warmup launches. On some shared GPUs, counters need extra permissions
 Ch 4 occupancy, ch 6 coalescing / bottleneck checklist, ch 22 bandwidth vs
 compute. No harness, no `nsys`/`ncu` tutorial.
 
-When optimizing [`src/pmpp/ch03/blur.cu`](../../src/pmpp/ch03/blur.cu), see
-[`docs/pmpp/todo.md`](../pmpp/todo.md). Measure kernel-only time *before*
+When optimizing [`src/pmpp/ch03/blur.cu`][blur], see
+[`docs/pmpp/todo.md`][blur-todo]. Measure kernel-only time *before*
 tiling so later chapters have a baseline.
+
+[blur]: ../../src/pmpp/ch03/blur.cu
+[blur-todo]: ../pmpp/todo.md
 
 ## Resources
 
 - NVIDIA CUDA Developer Tools videos: Intro to Nsight Systems, Intro to Nsight
   Compute (from the product pages above).
-- [CUDA C++ Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
+- [CUDA C++ Best Practices Guide][cuda-best-practices]
   — measure first, then memory and occupancy.
 - CUPTI sits under `nsys`/`ncu`; skip it until the CLIs are familiar.
+
+[cuda-best-practices]: https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/

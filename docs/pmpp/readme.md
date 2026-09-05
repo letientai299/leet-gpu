@@ -37,7 +37,7 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
   - Task parallelism
 - [x] 2.2 CUDA C program structure
 - [x] 2.3 A vector addition kernel
-  - [`../../src/pmpp/ch02/vec-add.cu`](../../src/pmpp/ch02/vec-add.cu)
+  - [`../../src/pmpp/ch02/vec-add.cu`][ch02-vec-add]
 - [x] 2.4 Device global memory and data transfer
 - [x] 2.5 Kernel functions and threading
   - 2d or 3d thread blocks be picked by data shape.
@@ -52,7 +52,10 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [x] 2.6 Calling kernel functions
 - [x] 2.7 Compilation
 - [x] 2.8 Summary
-- [x] [Exercises](./ch02-ex.md)
+- [x] [Exercises][ch02-exercises]
+
+[ch02-exercises]: ./ch02-ex.md
+[ch02-vec-add]: ../../src/pmpp/ch02/vec-add.cu
 
 ### 3. Multidimensional grids and data
 
@@ -60,16 +63,21 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
   - Until now,this book discuss only grid and block of thread. In CPG (CUDA
     programming guide, v13.3), we know that that `grid > cluster > block`.
 - [x] 3.2 Mapping threads to multidimensional data
-  - [`../../src/pmpp/ch03/grayscale.cu`](../../src/pmpp/ch03/grayscale.cu)
+  - [`../../src/pmpp/ch03/grayscale.cu`][ch03-grayscale]
 - [x] 3.3 Image blur: a more complex kernel
   - _Convolution pattern_: In math, an operation on 2 funcs $f$ and $g$, produce
     3rd func $f*g$. In this chapter, it's about a square sliding filter on the
     image.
-  - [`../../src/pmpp/ch03/blur.cu`](../../src/pmpp/ch03/blur.cu)
-  - Faster blur: after later chapters, see [`todo.md`](./todo.md).
+  - [`../../src/pmpp/ch03/blur.cu`][ch03-blur]
+  - Faster blur: after later chapters, see [`todo.md`][blur-todo].
 - [ ] 3.4 Matrix multiplication
 - [ ] 3.5 Summary
-- [ ] [Exercises](./ch03-ex.md)
+- [ ] [Exercises][ch03-exercises]
+
+[blur-todo]: ./todo.md
+[ch03-blur]: ../../src/pmpp/ch03/blur.cu
+[ch03-exercises]: ./ch03-ex.md
+[ch03-grayscale]: ../../src/pmpp/ch03/grayscale.cu
 
 ### 4. Compute architecture and scheduling
 
@@ -82,7 +90,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 4.7 Resource partitioning and occupancy
 - [ ] 4.8 Querying device properties
 - [ ] 4.9 Summary
-- [ ] [Exercises](./ch04-ex.md)
+- [ ] [Exercises][ch04-exercises]
+
+[ch04-exercises]: ./ch04-ex.md
 
 ### 5. Memory architecture and data locality
 
@@ -93,7 +103,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 5.5 Boundary checks
 - [ ] 5.6 Impact of memory usage on occupancy
 - [ ] 5.7 Summary
-- [ ] [Exercises](./ch05-ex.md)
+- [ ] [Exercises][ch05-exercises]
+
+[ch05-exercises]: ./ch05-ex.md
 
 ### 6. Performance considerations
 
@@ -103,7 +115,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 6.4 A checklist of optimizations
 - [ ] 6.5 Knowing your computation's bottleneck
 - [ ] 6.6 Summary
-- [ ] [Exercises](./ch06-ex.md)
+- [ ] [Exercises][ch06-exercises]
+
+[ch06-exercises]: ./ch06-ex.md
 
 ## Part II — Parallel Patterns
 
@@ -115,7 +129,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 7.4 Tiled convolution with halo cells
 - [ ] 7.5 Tiled convolution using caches for halo cells
 - [ ] 7.6 Summary
-- [ ] [Exercises](./ch07-ex.md)
+- [ ] [Exercises][ch07-exercises]
+
+[ch07-exercises]: ./ch07-ex.md
 
 ### 8. Stencil
 
@@ -125,7 +141,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 8.4 Thread coarsening
 - [ ] 8.5 Register tiling
 - [ ] 8.6 Summary
-- [ ] [Exercises](./ch08-ex.md)
+- [ ] [Exercises][ch08-exercises]
+
+[ch08-exercises]: ./ch08-ex.md
 
 ### 9. Parallel histogram
 
@@ -136,7 +154,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 9.5 Coarsening
 - [ ] 9.6 Aggregation
 - [ ] 9.7 Summary
-- [ ] [Exercises](./ch09-ex.md)
+- [ ] [Exercises][ch09-exercises]
+
+[ch09-exercises]: ./ch09-ex.md
 
 ### 10. Reduction
 
@@ -149,7 +169,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 10.7 Hierarchical reduction for arbitrary input length
 - [ ] 10.8 Thread coarsening for reduced overhead
 - [ ] 10.9 Summary
-- [ ] [Exercises](./ch10-ex.md)
+- [ ] [Exercises][ch10-exercises]
+
+[ch10-exercises]: ./ch10-ex.md
 
 ### 11. Prefix sum (scan)
 
@@ -161,7 +183,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 11.6 Segmented parallel scan for arbitrary-length inputs
 - [ ] 11.7 Single-pass scan for memory access efficiency
 - [ ] 11.8 Summary
-- [ ] [Exercises](./ch11-ex.md)
+- [ ] [Exercises][ch11-exercises]
+
+[ch11-exercises]: ./ch11-ex.md
 
 ### 12. Merge
 
@@ -174,7 +198,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 12.7 A circular buffer merge kernel
 - [ ] 12.8 Thread coarsening for merge
 - [ ] 12.9 Summary
-- [ ] [Exercises](./ch12-ex.md)
+- [ ] [Exercises][ch12-exercises]
+
+[ch12-exercises]: ./ch12-ex.md
 
 ## Part III — Advanced Patterns and Applications
 
@@ -189,7 +215,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 13.7 Parallel merge sort
 - [ ] 13.8 Other parallel sort methods
 - [ ] 13.9 Summary
-- [ ] [Exercises](./ch13-ex.md)
+- [ ] [Exercises][ch13-exercises]
+
+[ch13-exercises]: ./ch13-ex.md
 
 ### 14. Sparse matrix computation
 
@@ -200,7 +228,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 14.5 Regulating padding with the hybrid ELL-COO format
 - [ ] 14.6 Reducing control divergence with the JDS format
 - [ ] 14.7 Summary
-- [ ] [Exercises](./ch14-ex.md)
+- [ ] [Exercises][ch14-exercises]
+
+[ch14-exercises]: ./ch14-ex.md
 
 ### 15. Graph traversal
 
@@ -212,7 +242,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 15.6 Reducing contention with privatization
 - [ ] 15.7 Other optimizations
 - [ ] 15.8 Summary
-- [ ] [Exercises](./ch15-ex.md)
+- [ ] [Exercises][ch15-exercises]
+
+[ch15-exercises]: ./ch15-ex.md
 
 ### 16. Deep learning
 
@@ -222,7 +254,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 16.4 Formulating a convolutional layer as GEMM
 - [ ] 16.5 CUDNN library
 - [ ] 16.6 Summary
-- [ ] [Exercises](./ch16-ex.md)
+- [ ] [Exercises][ch16-exercises]
+
+[ch16-exercises]: ./ch16-ex.md
 
 ### 17. Iterative magnetic resonance imaging reconstruction
 
@@ -230,7 +264,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 17.2 Iterative reconstruction
 - [ ] 17.3 Computing FHD
 - [ ] 17.4 Summary
-- [ ] [Exercises](./ch17-ex.md)
+- [ ] [Exercises][ch17-exercises]
+
+[ch17-exercises]: ./ch17-ex.md
 
 ### 18. Electrostatic potential map
 
@@ -240,7 +276,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 18.4 Memory coalescing
 - [ ] 18.5 Cutoff binning for data size scalability
 - [ ] 18.6 Summary
-- [ ] [Exercises](./ch18-ex.md)
+- [ ] [Exercises][ch18-exercises]
+
+[ch18-exercises]: ./ch18-ex.md
 
 ### 19. Parallel programming and computational thinking
 
@@ -249,7 +287,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 19.3 Problem decomposition
 - [ ] 19.4 Computational thinking
 - [ ] 19.5 Summary
-- [ ] [Exercises](./ch19-ex.md)
+- [ ] [Exercises][ch19-exercises]
+
+[ch19-exercises]: ./ch19-ex.md
 
 ## Part IV — Advanced Practices
 
@@ -263,7 +303,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 20.6 Message passing interface collective communication
 - [ ] 20.7 CUDA aware message passing interface
 - [ ] 20.8 Summary
-- [ ] [Exercises](./ch20-ex.md)
+- [ ] [Exercises][ch20-exercises]
+
+[ch20-exercises]: ./ch20-ex.md
 
 ### 21. CUDA dynamic parallelism
 
@@ -273,7 +315,9 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 21.4 A recursive example: quadtrees
 - [ ] 21.5 Important considerations
 - [ ] 21.6 Summary
-- [ ] [Exercises](./ch21-ex.md)
+- [ ] [Exercises][ch21-exercises]
+
+[ch21-exercises]: ./ch21-ex.md
 
 ### 22. Advanced practices and future evolution
 

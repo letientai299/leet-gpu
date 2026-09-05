@@ -2,7 +2,9 @@
 
 ## Prerequisites
 
-[mise](https://mise.jdx.dev) for tools and tasks.
+[mise][mise] for tools and tasks.
+
+[mise]: https://mise.jdx.dev
 
 ### macOS
 
@@ -80,6 +82,9 @@ prek --config .config/prek.toml run --all-files
 every diagnostic as an error. `mise install` installs its Git hook after the
 tools.
 
+[clang-tidy]: https://clang.llvm.org/extra/clang-tidy/
+[prek]: https://prek.j178.dev/
+
 ## macOS: CLion Intellisense
 
 CLion runs on the Mac without `nvcc`. Point it at the Docker toolchain so it
@@ -92,11 +97,16 @@ indexes against CUDA headers inside the image:
 Builds and deployments still use the mise tasks. See the [CLion Docker toolchain
 documentation][clion-docker].
 
+[clion-docker]:
+  <https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html>
+
 ### Format on save
 
 nvim formats `.cu` / `.cuh` / `.cpp` / headers on save with `clang-format` and
-this repo's [`.clang-format`](../.clang-format). CLion is configured the same
+this repo's [`.clang-format`][clang-format-config]. CLion is configured the same
 way via `.idea` (untracked, so redo this on a new machine):
+
+[clang-format-config]: ../.clang-format
 
 - `.idea/codeStyles/Project.xml`, `.idea/editor.xml` — ClangFormat is the
   formatting engine, so `.clang-format` wins over CLion's own code style.
@@ -107,8 +117,3 @@ CLion formats with the clang-format built into its bundled clangd, not the
 `clang-format` pinned in `.config/mise/config.toml`. For an exact match, set
 **Settings | Editor | Code Style | C/C++ | General** to use an external
 clang-format at the path from `mise which clang-format`.
-
-[clion-docker]:
-  https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
-[clang-tidy]: https://clang.llvm.org/extra/clang-tidy/
-[prek]: https://prek.j178.dev/

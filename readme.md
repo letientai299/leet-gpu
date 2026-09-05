@@ -2,11 +2,19 @@
 
 ## Materials
 
-- [PMPP](docs/pmpp/readme.md) — [`src/pmpp/`](src/pmpp/)
-- [Benchmark / profile kernels](docs/bench/readme.md)
+- [PMPP][pmpp] — [`src/pmpp/`][pmpp-src]
+- [Benchmark / profile kernels][benchmarking]
 
-Setup, workflow, and editor config: [`docs/readme.md`](docs/readme.md).
+[benchmarking]: docs/bench/readme.md
+[pmpp]: docs/pmpp/readme.md
+[pmpp-src]: src/pmpp/
+
+Setup, workflow, and editor config: [`docs/readme.md`][setup].
+
+[setup]: docs/readme.md
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [`LICENSE`][license].
+
+[license]: LICENSE
