@@ -55,7 +55,7 @@ if [ -f "$root/build/CMakeCache.txt" ] &&
 fi
 
 build_dir=$root/build/$flavor
-export CCACHE_DIR=$root/.ccache
+export CCACHE_DIR=$build_dir/ccache
 export CCACHE_BASEDIR=$root
 
 if command -v nproc >/dev/null; then

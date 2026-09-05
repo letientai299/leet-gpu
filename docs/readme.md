@@ -26,9 +26,10 @@ cp .env.example .env
 `BUILD_ENV` accepts `auto`, `local`, or `docker`. `auto` builds locally when
 `nvcc` exists and uses Docker otherwise. CMake writes to `build/local` or
 `build/docker`; binaries still land in `bin/`. Fetched dependency sources live
-in `.cache/fetchcontent/` (and compiles in `.ccache/`) so deleting `build/` and
-`bin/` does not re-download. `SSH_HOST` independently selects the run host;
-leave it empty for local execution.
+in `.cache/fetchcontent/`; compiler caches live under the matching build
+directory. Deleting `build/` drops compiler caches but keeps downloaded sources.
+`SSH_HOST` independently selects the run host; leave it empty for local
+execution.
 
 ## Workflow
 
