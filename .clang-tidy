@@ -20,5 +20,6 @@ Checks: >
 HeaderFilterRegex: "/app/src/"
 WarningsAsErrors: ""
 CheckOptions:
-  misc-include-cleaner.IgnoreHeaders: "cstdlib;cuda/cmath"
+  # CCCL aliases hide providers from include-cleaner.
+  misc-include-cleaner.IgnoreHeaders: "cstdlib;cuda/buffer;cuda/cmath"
   misc-include-cleaner.MissingIncludes: false

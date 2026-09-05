@@ -1,6 +1,7 @@
-#include "device.hpp"
+#include "checks.hpp"
 
 #include <cstddef>
+#include <cuda/buffer>
 #include <cuda/cmath>
 #include <vector>
 
@@ -23,25 +24,22 @@ void init_vectors(std::vector<float>& a, std::vector<float>& b, std::vector<floa
 
 bool add_on_gpu(const std::vector<float>& a, const std::vector<float>& b, std::vector<float>& c) {
   const std::size_t bytes = a.size() * sizeof(float);
-  DeviceBuffer<float> device_a;
-  DeviceBuffer<float> device_b;
-  DeviceBuffer<float> device_c;
-  if (!device_a.allocate(bytes) || !device_b.allocate(bytes) || !device_c.allocate(bytes)) {
-    return false;
-  }
+  cuda::device_buffer<float> device_a{default_stream(), device_pool(), a.size(), cuda::no_init};
+  cuda::device_buffer<float> device_b{default_stream(), device_pool(), b.size(), cuda::no_init};
+  cuda::device_buffer<float> device_c{default_stream(), device_pool(), c.size(), cuda::no_init};
 
-  if (!CUDA_CHECK(cudaMemcpy(device_a.get(), a.data(), bytes, cudaMemcpyHostToDevice)) ||
-      !CUDA_CHECK(cudaMemcpy(device_b.get(), b.data(), bytes, cudaMemcpyHostToDevice)) ||
-      !CUDA_CHECK(cudaMemset(device_c.get(), 0, bytes))) {
+  if (!CUDA_CHECK(cudaMemcpy(device_a.data(), a.data(), bytes, cudaMemcpyHostToDevice)) ||
+      !CUDA_CHECK(cudaMemcpy(device_b.data(), b.data(), bytes, cudaMemcpyHostToDevice)) ||
+      !CUDA_CHECK(cudaMemset(device_c.data(), 0, bytes))) {
     return false;
   }
 
   constexpr unsigned threads = 256;
   const auto blocks = static_cast<unsigned>(cuda::ceil_div(a.size(), threads));
-  vec_add_kernel<<<blocks, threads>>>(device_a.get(), device_b.get(), device_c.get(), a.size());
+  vec_add_kernel<<<blocks, threads>>>(device_a.data(), device_b.data(), device_c.data(), a.size());
 
   return CUDA_CHECK(cudaGetLastError()) &&
-         CUDA_CHECK(cudaMemcpy(c.data(), device_c.get(), bytes, cudaMemcpyDeviceToHost));
+         CUDA_CHECK(cudaMemcpy(c.data(), device_c.data(), bytes, cudaMemcpyDeviceToHost));
 }
 
 bool verify_output(const std::vector<float>& c, const std::vector<float>& expected) {

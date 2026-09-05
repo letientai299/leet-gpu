@@ -5,6 +5,9 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <cuda/devices>
+#include <cuda/memory_pool>
+#include <cuda/stream>
 #include <cuda_runtime.h>
 #include <utility>
 
@@ -18,6 +21,14 @@ inline bool cuda_check(cudaError_t error, const char* file, int line) {
 }
 
 #define CUDA_CHECK(expression) cuda_check((expression), __FILE__, __LINE__)
+
+inline cuda::stream_ref default_stream() {
+  return cuda::stream_ref{cudaStream_t{nullptr}};
+}
+
+inline auto& device_pool() {
+  return cuda::device_default_memory_pool(default_stream().device());
+}
 
 inline bool init_cuda() {
   int device_id = 0;

@@ -1,4 +1,7 @@
-#include "device.hpp"
+#include "checks.hpp"
+
+#include <cstddef>
+#include <cuda/buffer>
 
 namespace {
 
@@ -12,15 +15,13 @@ __global__ void hello_kernel(int* output) {
 
 int run_hello() {
   int output[blocks * threads]{};
-  DeviceBuffer<int> device_output;
-  if (!device_output.allocate(sizeof(output))) {
-    return 1;
-  }
+  constexpr auto count = static_cast<std::size_t>(blocks) * threads;
+  cuda::device_buffer<int> device_output{default_stream(), device_pool(), count, cuda::no_init};
 
-  hello_kernel<<<blocks, threads>>>(device_output.get());
+  hello_kernel<<<blocks, threads>>>(device_output.data());
   if (!CUDA_CHECK(cudaGetLastError()) ||
       !CUDA_CHECK(
-          cudaMemcpy(output, device_output.get(), sizeof(output), cudaMemcpyDeviceToHost))) {
+          cudaMemcpy(output, device_output.data(), sizeof(output), cudaMemcpyDeviceToHost))) {
     return 1;
   }
 

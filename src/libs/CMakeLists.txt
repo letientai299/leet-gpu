@@ -22,7 +22,15 @@ FetchContent_Declare(
   SOURCE_DIR "${LEET_GPU_DEP_CACHE}/lodepng-src"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
-FetchContent_MakeAvailable(spdlog lodepng)
+FetchContent_Declare(
+  cccl
+  URL https://github.com/NVIDIA/cccl/archive/refs/tags/v3.4.2.tar.gz
+  URL_HASH
+    SHA256=544f5f14c59cae6cfdad3156aa720f2dd44fbd6feb3556d10bdb4fe6aa3cdf4b
+  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/cccl-src"
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(spdlog lodepng cccl)
 
 find_package(CUDAToolkit REQUIRED)
 
@@ -40,6 +48,6 @@ add_library(leet_gpu_image STATIC image.cpp)
 target_include_directories(leet_gpu_image PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(
   leet_gpu_image
-  PUBLIC leet_gpu_runtime CUDA::cudart_static
+  PUBLIC leet_gpu_runtime CUDA::cudart_static CCCL::CCCL
   PRIVATE lodepng
 )

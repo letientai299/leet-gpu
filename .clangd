@@ -9,7 +9,9 @@ CompileFlags:
   CompilationDatabase: build/docker
   Add:
     - --cuda-path=/usr/local/cuda
-    - -isystem/usr/local/cuda/include/cccl
+    - -I/app/.cache/fetchcontent/cccl-src/libcudacxx/include
+    - -I/app/.cache/fetchcontent/cccl-src/cub
+    - -I/app/.cache/fetchcontent/cccl-src/thrust
     - -std=c++17
   # build/docker/compile_commands.json drives nvcc; strip its nvcc-only flags that
   # clang(d) rejects. Path-specific fragments restore one analysis target.

@@ -96,8 +96,11 @@ std::size_t Image::pixel_count() const {
 
 bool ImageBytes::upload(const Image& input, std::size_t output_size) {
   output_size_ = output_size;
-  return input_.allocate(input.size) && output_.allocate(output_size_) &&
-         CUDA_CHECK(cudaMemcpy(input_.get(), input.pixels, input.size, cudaMemcpyHostToDevice));
+  input_ =
+      cuda::device_buffer<ImageByte>{default_stream(), device_pool(), input.size, cuda::no_init};
+  output_ =
+      cuda::device_buffer<ImageByte>{default_stream(), device_pool(), output_size_, cuda::no_init};
+  return CUDA_CHECK(cudaMemcpy(input_.data(), input.pixels, input.size, cudaMemcpyHostToDevice));
 }
 
 bool ImageBytes::download(Image& output, unsigned width, unsigned height) const {
@@ -109,15 +112,16 @@ bool ImageBytes::download(Image& output, unsigned width, unsigned height) const 
   output.width = width;
   output.height = height;
   output.size = output_size_;
-  return CUDA_CHECK(cudaMemcpy(output.pixels, output_.get(), output_size_, cudaMemcpyDeviceToHost));
+  return CUDA_CHECK(
+      cudaMemcpy(output.pixels, output_.data(), output_size_, cudaMemcpyDeviceToHost));
 }
 
 const ImageByte* ImageBytes::input() const {
-  return input_.get();
+  return input_.data();
 }
 
-ImageByte* ImageBytes::output() const {
-  return output_.get();
+ImageByte* ImageBytes::output() {
+  return output_.data();
 }
 
 int run_image_app(int argc, char** argv, ImageProcessor process) {

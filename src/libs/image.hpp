@@ -1,8 +1,9 @@
 #pragma once
 
-#include "device.hpp"
+#include "checks.hpp"
 
 #include <cstddef>
+#include <cuda/buffer>
 
 using ImageByte = unsigned char;
 
@@ -25,11 +26,11 @@ public:
   bool upload(const Image& input, std::size_t output_size);
   bool download(Image& output, unsigned width, unsigned height) const;
   [[nodiscard]] const ImageByte* input() const;
-  [[nodiscard]] ImageByte* output() const;
+  [[nodiscard]] ImageByte* output();
 
 private:
-  DeviceBuffer<ImageByte> input_;
-  DeviceBuffer<ImageByte> output_;
+  cuda::device_buffer<ImageByte> input_{default_stream(), device_pool()};
+  cuda::device_buffer<ImageByte> output_{default_stream(), device_pool()};
   std::size_t output_size_ = 0;
 };
 
