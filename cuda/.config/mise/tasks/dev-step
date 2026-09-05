@@ -3,16 +3,12 @@
 #MISE hide=true
 set -euo pipefail
 
-if [ "$#" -gt 1 ]; then
-  echo "usage: mise dev -- [kernel]" >&2
+if [ "$#" -lt 1 ]; then
+  echo "usage: mise dev -- <app> [args]" >&2
   exit 2
 fi
 
-selection=${1:-${CUDA_KERNEL:-}}
-mise run build
-
-if [ -n "$selection" ]; then
-  mise run deploy -- "$selection"
-else
-  mise run deploy
-fi
+app=$1
+shift
+mise run build -- "$app"
+mise run deploy -- "$app" "$@"

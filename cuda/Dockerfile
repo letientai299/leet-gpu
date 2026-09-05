@@ -1,4 +1,4 @@
-FROM nvidia/cuda:13.3.1-devel-ubuntu26.04
+FROM nvidia/cuda:13.0.2-devel-ubuntu22.04
 
 # Install mise from its apt repo instead of the mise.run script: the script
 # extracts a tarball with GNU tar, which fails under QEMU emulation

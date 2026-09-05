@@ -1,31 +1,22 @@
 #!/usr/bin/env bash
-#MISE description="Watch, rebuild, then deploy on target changes"
+#MISE description="Watch, rebuild, then deploy one app"
 set -euo pipefail
 
-if [ "$#" -gt 1 ]; then
-  echo "usage: mise dev -- [kernel]" >&2
+app=${APP:-}
+if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
+  app=$1
+  shift
+fi
+if [ -z "$app" ]; then
+  echo "app missing; pass one or set APP" >&2
   exit 2
 fi
 
-selection=${1:-}
-TARGET=${SSH_HOST:-local}
-if [ "$TARGET" = local ] || [ "$TARGET" = localhost ]; then
-  if ! command -v nvcc >/dev/null; then
-    echo "nvcc missing; install or load CUDA" >&2
-    exit 1
-  fi
-else
-  mise run dc:up
-fi
-
-watch_args=(--watch src --watch CMakeLists.txt)
+watch_args=(--watch apps --watch libs --watch cmake --watch CMakeLists.txt)
 if [ -f .env ]; then
   watch_args+=(--watch .env)
 fi
 
-run_args=(mise run dev-step)
-if [ -n "$selection" ]; then
-  run_args+=(-- "$selection")
-fi
+run_args=(mise run dev-step -- "$app" "$@")
 
 exec watchexec -I --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"

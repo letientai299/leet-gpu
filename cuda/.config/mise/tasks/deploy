@@ -1,30 +1,47 @@
 #!/usr/bin/env bash
-#MISE description="Deploy and run CUDA_KERNEL on the GPU target"
+#MISE description="Deploy and run one app on the GPU target"
 set -euo pipefail
 
-TARGET=${SSH_HOST:-local}
+target=${SSH_HOST:-local}
+app=${APP:-}
 
-if [ "$#" -gt 1 ]; then
-  echo "usage: mise deploy -- [--help|kernel]" >&2
+if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
+  app=$1
+  shift
+fi
+if [ -z "$app" ]; then
+  echo "app missing; pass one or set APP" >&2
+  exit 2
+fi
+if [[ ! "$app" =~ ^[a-z0-9][a-z0-9/-]*[a-z0-9]$ ]]; then
+  echo "invalid app: $app" >&2
   exit 2
 fi
 
-selection=${1:-${CUDA_KERNEL:-}}
+args=("$@")
+if [ "${#args[@]}" -eq 0 ] && [ -n "${ARGS:-}" ]; then
+  # ARGS is trusted project-local shell input.
+  eval "args=($ARGS)"
+fi
 
-if [ "$TARGET" = local ] || [ "$TARGET" = localhost ]; then
-  if [ "$selection" = "--help" ]; then
-    exec bin/main --help
+binary=bin/$app
+if [ ! -x "$binary" ]; then
+  echo "app not built: $app" >&2
+  exit 1
+fi
+
+if [ "$target" = local ] || [ "$target" = localhost ]; then
+  if [ "${#args[@]}" -eq 0 ]; then
+    exec "$binary"
   fi
-  if [ -z "$selection" ]; then
-    exec bin/main
-  fi
-  exec bin/main --kernel "$selection"
+  exec "$binary" "${args[@]}"
 fi
 
 : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
 
-REMOTE=$TARGET
-REMOTE_BIN=/tmp/${CONTAINER_NAME}-main
+remote=$target
+remote_name=${app//\//-}
+remote_bin=/tmp/${CONTAINER_NAME}-${remote_name}
 
 # Reuse one multiplexed SSH connection across the rsync + run round trips and
 # across dev-loop iterations, so the connection/auth handshake is paid once
@@ -46,17 +63,15 @@ done
 # directly into the remote file instead of building a full temp copy and
 # renaming it, which matters more as the binary grows; --partial keeps a
 # half-sent file around so an interrupted transfer resumes as a delta baseline.
-"$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" bin/main "$REMOTE:$REMOTE_BIN"
+"$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" "$binary" \
+  "$remote:$remote_bin"
 
-if [ "$selection" = "--help" ]; then
-  remote_args=(--help)
-elif [ -z "$selection" ]; then
-  remote_args=()
+if [ "${#args[@]}" -eq 0 ]; then
+  printf -v remote_command '%q ' "$remote_bin"
 else
-  remote_args=(--kernel "$selection")
+  printf -v remote_command '%q ' "$remote_bin" "${args[@]}"
 fi
-printf -v remote_command '%q ' "$REMOTE_BIN" "${remote_args[@]}"
 
 # The command is shell-escaped before crossing the SSH boundary.
 # shellcheck disable=SC2029
-ssh "${ssh_opts[@]}" "$REMOTE" "$remote_command"
+ssh "${ssh_opts[@]}" "$remote" "$remote_command"

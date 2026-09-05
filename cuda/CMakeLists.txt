@@ -1,22 +1,20 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22)
 project(cuda LANGUAGES CXX CUDA)
 
 include(FetchContent)
 
-FetchContent_Declare(
-  spdlog
-  URL https://github.com/gabime/spdlog/archive/refs/tags/v1.16.0.tar.gz
-  URL_HASH
-    SHA256=8741753e488a78dd0d0024c980e1fb5b5c85888447e309d9cb9d949bdb52aa3e
-)
-FetchContent_MakeAvailable(spdlog)
-
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
-# Include native code and forward-compatible PTX.
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
-
-# Generate compile commands for host tooling.
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(
+  LEET_GPU_CUDA_ARCHITECTURES
+  "86;90;100"
+  CACHE STRING
+  "Default CUDA architectures"
+)
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -24,45 +22,10 @@ if(CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
-function(add_kernel target architectures source)
-  add_library(${target} OBJECT ${source})
-  set_target_properties(
-    ${target}
-    PROPERTIES CUDA_ARCHITECTURES "${architectures}"
-  )
-  target_include_directories(${target} PRIVATE src/common)
-endfunction()
+option(STRIP_DEPLOY "Strip symbols from deploy binaries" ON)
 
-add_kernel(kernel_hello "86;90;100" src/common/hello.cu)
-add_kernel(kernel_ampere "80-real;86-real;90-real;90-virtual" src/sm86/async_copy.cu)
-add_kernel(kernel_hopper 90a src/sm90a/cluster.cu)
-add_kernel(kernel_blackwell 100a src/sm100a/fp4.cu)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+include(AddCudaApp)
 
-add_executable(
-  main
-  src/common/log.cpp
-  src/common/main.cu
-  src/common/registry.cu
-  $<TARGET_OBJECTS:kernel_hello>
-  $<TARGET_OBJECTS:kernel_ampere>
-  $<TARGET_OBJECTS:kernel_hopper>
-  $<TARGET_OBJECTS:kernel_blackwell>
-)
-set_target_properties(main PROPERTIES CUDA_ARCHITECTURES "86;90;100")
-target_include_directories(main PRIVATE src/common)
-target_link_libraries(main PRIVATE spdlog::spdlog)
-
-option(
-  STRIP_DEPLOY
-  "Strip symbols from the binary for smaller, faster deploys"
-  ON
-)
-if(STRIP_DEPLOY AND CMAKE_STRIP)
-  add_custom_command(
-    TARGET main
-    POST_BUILD
-    COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:main>"
-    COMMENT "Stripping binary for deploy (disable with -DSTRIP_DEPLOY=OFF)"
-    VERBATIM
-  )
-endif()
+add_subdirectory(libs/runtime)
+add_subdirectory(apps/pmpp)

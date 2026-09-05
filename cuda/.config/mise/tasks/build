@@ -1,45 +1,63 @@
 #!/usr/bin/env bash
-#MISE description="Configure cmake if needed, then build into ./bin"
+#MISE description="Build all apps or one app into ./bin"
 set -euo pipefail
 
-# Remote targets build in Docker.
-TARGET=${SSH_HOST:-local}
-if [ ! -e /.dockerenv ] && [ "$TARGET" != local ] && \
-  [ "$TARGET" != localhost ]; then
-  : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
-  if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
-    echo "container not running; start it with: mise run dc:up" >&2
-    exit 1
-  fi
-  exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/build
+if [ "$#" -gt 1 ]; then
+  echo "usage: mise build -- [app]" >&2
+  exit 2
+fi
+
+app=${1:-}
+if [ -n "$app" ] && [[ ! "$app" =~ ^[a-z0-9][a-z0-9/-]*[a-z0-9]$ ]]; then
+  echo "invalid app: $app" >&2
+  exit 2
 fi
 
 if [ -e /.dockerenv ]; then
-  ROOT=/app
+  root=/app
 else
-  ROOT=${MISE_PROJECT_ROOT:-$PWD}
+  root=${MISE_PROJECT_ROOT:-$PWD}
+  build_env=${BUILD_ENV:-auto}
+  if [ "$build_env" = auto ]; then
+    if command -v nvcc >/dev/null; then
+      build_env=local
+    else
+      build_env=docker
+    fi
+  fi
+
+  case "$build_env" in
+    local) ;;
+    docker)
+      : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+      if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
+        mise run dc:up
+      fi
+      exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/build ${app:+"$app"}
+      ;;
+    *)
+      echo "invalid BUILD_ENV: $build_env" >&2
+      exit 2
+      ;;
+  esac
 fi
 
-BUILD_DIR=$ROOT/build
+build_dir=$root/build
+export CCACHE_DIR=$root/.ccache
 
-# Persist ccache between builds.
-export CCACHE_DIR=$ROOT/.ccache
-
-# Ninja can't reuse a build tree configured with a different generator, so drop
-# a stale Make tree left over from before we switched.
-if [ -f "$BUILD_DIR/CMakeCache.txt" ] && ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$BUILD_DIR/CMakeCache.txt"; then
-  rm -rf "$BUILD_DIR"
+if [ -f "$build_dir/CMakeCache.txt" ] &&
+  ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$build_dir/CMakeCache.txt"; then
+  rm -rf "$build_dir"
 fi
 
-# Configure only when the build tree doesn't exist yet. We deliberately do NOT
-# guard on "CMakeLists.txt newer than the cache": a no-op reconfigure doesn't
-# rewrite CMakeCache.txt, so its mtime never catches up and the check stays true
-# forever once CMakeLists.txt is edited — reconfiguring on every build. Instead
-# `cmake --build` drives Ninja, whose generated cmake_check_build_system rule
-# re-runs CMake automatically, and only when a real CMake input actually changed.
-if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
-  cmake -S "$ROOT" -B "$BUILD_DIR" -G Ninja \
-    -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$ROOT/bin"
+if [ ! -f "$build_dir/CMakeCache.txt" ]; then
+  cmake -S "$root" -B "$build_dir" -G Ninja
 fi
 
-cmake --build "$BUILD_DIR" --parallel
+if [ -z "$app" ]; then
+  cmake --build "$build_dir" --parallel
+  exit
+fi
+
+target=app_${app//\//_}
+cmake --build "$build_dir" --parallel --target "$target"

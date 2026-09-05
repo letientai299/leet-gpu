@@ -24,24 +24,12 @@ CompileFlags:
 
 ---
 If:
-  PathMatch: ^src/.*\.(cuh|h|hpp)$
+  PathMatch: ^(apps|libs)/.*\.(cuh|h|hpp)$
 CompileFlags:
   Add: -xcuda
 
 ---
 If:
-  PathMatch: ^src/(common/.*|sm86/.*)$
+  PathMatch: ^(apps|libs)/.*
 CompileFlags:
   Add: --cuda-gpu-arch=sm_86
-
----
-If:
-  PathMatch: ^src/sm90a/.*
-CompileFlags:
-  Add: --cuda-gpu-arch=sm_90a
-
----
-If:
-  PathMatch: ^src/sm100a/.*
-CompileFlags:
-  Add: --cuda-gpu-arch=sm_100a
