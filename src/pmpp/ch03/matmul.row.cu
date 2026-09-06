@@ -5,8 +5,23 @@
 namespace {
 
 // Ex 3.1a: each thread produces one output matrix row.
-__global__ void matmul_kernel(
+__global__ void matmul_row_kernel(
     const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k) {
+  // launch is 1d block covering the y-index of C
+  const auto y = blockIdx.x * blockDim.x + threadIdx.x;
+  if (y >= height) {
+    return;
+  }
+
+  for (auto x = 0; x < width; x++) {
+    const auto idx = y * width + x;
+    c[idx] = 0; // defensive
+
+    // compute the cell C[x, y]
+    for (auto i = 0; i < k; i++) {
+      c[idx] += a[y * k + i] * b[i * width + x];
+    }
+  }
 }
 
 int run_matmul() {
@@ -18,7 +33,7 @@ int run_matmul() {
       .run([](const dbuf& a, const dbuf& b, dbuf& c, unsigned height, unsigned width, unsigned k) {
         constexpr unsigned block = 256;
         const auto grid = static_cast<unsigned>(cuda::ceil_div(height, block));
-        matmul_kernel<<<grid, block>>>(a.data(), b.data(), c.data(), height, width, k);
+        matmul_row_kernel<<<grid, block>>>(a.data(), b.data(), c.data(), height, width, k);
         return CUDA_CHECK(cudaGetLastError());
       });
 }
