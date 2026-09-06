@@ -44,6 +44,11 @@ void launch_matmul_col(const float* a,
                        unsigned k,
                        cudaStream_t stream = nullptr);
 
+// Ragged defaults so every kernel bound-checks. Shared by matmul and matmul.bench.
+inline constexpr unsigned kMatmulHeight = 67;
+inline constexpr unsigned kMatmulWidth = 33;
+inline constexpr unsigned kMatmulK = 50;
+
 // Host driver: random A/B, CUTLASS oracle, then the kernel under test.
 // C[height, width] = A[height, k] * B[k, width], all row-major.
 struct Matmul {

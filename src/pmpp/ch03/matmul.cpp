@@ -8,10 +8,6 @@
 
 namespace {
 
-constexpr unsigned height = 67;
-constexpr unsigned width = 33;
-constexpr unsigned inner = 50;
-
 enum class Kernel : std::uint8_t { cell, row, col };
 
 struct AppArgs {
@@ -93,50 +89,26 @@ char* get_benchmark(Kernel kernel) {
   return cell;
 }
 
-void bench(nvbench::state& state, MatmulKernel launch) {
-  unsigned bench_height = 0;
-  unsigned bench_width = 0;
-  unsigned bench_k = 0;
-  if (get_matmul_dimensions(state, bench_height, bench_width, bench_k)) {
-    benchmark_matmul(state, bench_height, bench_width, bench_k, launch);
-  }
-}
-
-void bench_cell(nvbench::state& state) {
-  bench(state, launch_matmul_cell);
-}
-
-void bench_row(nvbench::state& state) {
-  bench(state, launch_matmul_row);
-}
-
-void bench_col(nvbench::state& state) {
-  bench(state, launch_matmul_col);
-}
-
-#define MATMUL_BENCHMARK(name, function)                                                           \
-  NVBENCH_BENCH(function)                                                                          \
-      .set_name(name)                                                                              \
-      .set_min_samples(20)                                                                         \
-      .set_cold_warmup_runs(5)                                                                     \
-      .set_batch_target_time(1.0)                                                                  \
-      .set_throttle_threshold(0.9F)                                                                \
-      .set_throttle_recovery_delay(0.1F)                                                           \
-      .add_int64_axis("Height", {height})                                                          \
-      .add_int64_axis("Width", {width})                                                            \
-      .add_int64_axis("K", {inner})
-
-MATMUL_BENCHMARK("matmul.cell", bench_cell);
-MATMUL_BENCHMARK("matmul.row", bench_row);
-MATMUL_BENCHMARK("matmul.col", bench_col);
-
-#undef MATMUL_BENCHMARK
-
 void print_usage(const char* app) {
   std::printf("Usage: %s [--kernel cell|row|col] [--bench [options]]\n", app);
 }
 
 } // namespace
+
+void matmul_nvbench(nvbench::state& state, MatmulKernel launch) {
+  unsigned height = 0;
+  unsigned width = 0;
+  unsigned k = 0;
+  if (get_matmul_dimensions(state, height, width, k)) {
+    benchmark_matmul(state, height, width, k, launch);
+  }
+}
+
+#define MATMUL_NVBENCH_AXES()                                                                      \
+  .add_int64_axis("Height", {kMatmulHeight})                                                       \
+      .add_int64_axis("Width", {kMatmulWidth})                                                     \
+      .add_int64_axis("K", {kMatmulK})
+#include "matmul.nvbench.hpp"
 
 int main(int argc, char** argv) try {
   AppArgs args;
@@ -152,7 +124,7 @@ int main(int argc, char** argv) try {
   const auto launch = get_kernel(args.kernel);
   const int result = run_host(1, argv, [launch] {
     // Ragged dimensions require every kernel to bound-check.
-    return run_matmul_kernel(height, width, inner, launch);
+    return run_matmul_kernel(kMatmulHeight, kMatmulWidth, kMatmulK, launch);
   });
   if (result != 0 || !args.bench) {
     return result;

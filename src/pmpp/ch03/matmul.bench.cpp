@@ -14,9 +14,9 @@ void release_matmul_benchmark_data();
 namespace {
 
 struct BenchmarkArgs {
-  unsigned height = 67;
-  unsigned width = 33;
-  unsigned k = 50;
+  unsigned height = kMatmulHeight;
+  unsigned width = kMatmulWidth;
+  unsigned k = kMatmulK;
   std::vector<char*> nvbench;
 };
 
@@ -98,39 +98,18 @@ MatmulDeviceData& get_device_data(nvbench::state& state) {
   return *found->second;
 }
 
-void bench_cell(nvbench::state& state) {
-  benchmark_matmul(state, get_device_data(state), launch_matmul_cell, true);
-}
-
-void bench_row(nvbench::state& state) {
-  benchmark_matmul(state, get_device_data(state), launch_matmul_row, true);
-}
-
-void bench_col(nvbench::state& state) {
-  benchmark_matmul(state, get_device_data(state), launch_matmul_col, true);
-}
-
-#define MATMUL_BENCHMARK(name, function)                                                           \
-  NVBENCH_BENCH(function)                                                                          \
-      .set_name(name)                                                                              \
-      .set_min_samples(20)                                                                         \
-      .set_cold_warmup_runs(5)                                                                     \
-      .set_batch_target_time(1.0)                                                                  \
-      .set_throttle_threshold(0.9F)                                                                \
-      .set_throttle_recovery_delay(0.1F)
-
-MATMUL_BENCHMARK("matmul.cell", bench_cell);
-MATMUL_BENCHMARK("matmul.row", bench_row);
-MATMUL_BENCHMARK("matmul.col", bench_col);
-
-#undef MATMUL_BENCHMARK
-
 void print_usage(const char* app) {
   std::printf("Usage: %s [--height N] [--width N] [--k N] [NVBench options]\n", app);
-  std::printf("Defaults: --height 67 --width 33 --k 50\n");
+  std::printf("Defaults: --height %u --width %u --k %u\n", kMatmulHeight, kMatmulWidth, kMatmulK);
 }
 
 } // namespace
+
+void matmul_nvbench(nvbench::state& state, MatmulKernel launch) {
+  benchmark_matmul(state, get_device_data(state), launch, true);
+}
+
+#include "matmul.nvbench.hpp"
 
 void release_matmul_benchmark_data() {
   for (auto& [device, data] : device_data) {
