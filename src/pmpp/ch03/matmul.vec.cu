@@ -7,6 +7,14 @@ namespace {
 // Ex 3.2: A[i] = sum_j B[i][j] * C[j]. One thread per output element.
 // a: output vector n, b: row-major n*n matrix, c: input vector n.
 __global__ void matvec_kernel(float* a, const float* b, const float* c, unsigned n) {
+  const auto i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0;
+    for (auto j = 0; j < n; j++) {
+      sum += c[j] * b[i * n + j];
+    }
+    a[i] = sum;
+  }
 }
 
 /// Host stub: one thread per output vector element.
