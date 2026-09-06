@@ -4,33 +4,20 @@
 
 namespace {
 
-// C[height, width] = A[height, k] * B[k, width]. One thread per output element.
+// Ex 3.1b: each thread produces one output matrix column.
 __global__ void matmul_kernel(
     const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k) {
-  const auto col = blockIdx.x * blockDim.x + threadIdx.x;
-  const auto row = blockIdx.y * blockDim.y + threadIdx.y;
-
-  if (col >= width || row >= height) {
-    return;
-  }
-
-  const auto idx = row * width + col;
-  auto sum = 0.0F;
-  for (auto i = 0; i < k; ++i) {
-    sum += a[row * k + i] * b[width * i + col];
-  }
-  c[idx] = sum;
 }
 
 int run_matmul() {
-  // Not multiples of 16: kernel must bound-check.
+  // Not a multiple of 256: kernel must bound-check.
   constexpr unsigned height = 67;
   constexpr unsigned width = 33;
   constexpr unsigned k = 50;
   return Matmul(height, width, k)
       .run([](const dbuf& a, const dbuf& b, dbuf& c, unsigned height, unsigned width, unsigned k) {
-        const dim3 block(16, 16);
-        const dim3 grid(cuda::ceil_div(width, block.x), cuda::ceil_div(height, block.y));
+        constexpr unsigned block = 256;
+        const auto grid = static_cast<unsigned>(cuda::ceil_div(width, block));
         matmul_kernel<<<grid, block>>>(a.data(), b.data(), c.data(), height, width, k);
         return CUDA_CHECK(cudaGetLastError());
       });

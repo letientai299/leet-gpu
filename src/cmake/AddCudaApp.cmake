@@ -1,7 +1,7 @@
 function(add_cuda_app key)
   cmake_parse_arguments(APP "" "" "LIBRARIES" ${ARGN})
 
-  if(NOT key MATCHES "^[a-z0-9][a-z0-9/-]*[a-z0-9]$")
+  if(NOT key MATCHES "^[a-z0-9][a-z0-9./-]*[a-z0-9]$")
     message(FATAL_ERROR "Invalid app key: ${key}")
   endif()
   if(APP_UNPARSED_ARGUMENTS)
@@ -12,6 +12,7 @@ function(add_cuda_app key)
   endif()
 
   string(REPLACE "/" "_" target_suffix "${key}")
+  string(REPLACE "." "_" target_suffix "${target_suffix}")
   set(target "app_${target_suffix}")
   get_filename_component(output_name "${key}" NAME)
   get_filename_component(output_dir "${key}" DIRECTORY)

@@ -11,7 +11,7 @@ normalize_app() {
   app=${app%.cu}
   app=${app%.cpp}
 
-  if [ -n "$app" ] && [[ ! "$app" =~ ^[a-z0-9][a-z0-9/-]*[a-z0-9]$ ]]; then
+  if [ -n "$app" ] && [[ ! "$app" =~ ^[a-z0-9][a-z0-9./-]*[a-z0-9]$ ]]; then
     echo "invalid app: $app" >&2
     return 2
   fi
