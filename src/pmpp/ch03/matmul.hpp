@@ -45,7 +45,9 @@ struct Matmul {
     auto& pool = device_pool();
     const dbuf dev_a{stream, pool, a};
     const dbuf dev_b{stream, pool, b};
-    dbuf dev_c{stream, pool, out.size(), cuda::no_init};
+    // Copy host C (zeros). no_init reuses the pool block the oracle just wrote,
+    // so an empty kernel would memcpy that leftover GEMM and pass verify.
+    dbuf dev_c{stream, pool, out};
     if (!op(dev_a, dev_b, dev_c)) {
       return false;
     }
