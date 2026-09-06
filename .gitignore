@@ -16,6 +16,10 @@ __pycache__/
 .DS_Store
 *.swp
 !.nvim.lua
+# A global ignore drops .idea/; re-include it to track the shared CMake profile.
+!.idea/
+.idea/*
+!.idea/cmake.xml
 # clangd writes its index to .cache/clangd
 .cache/
 
@@ -28,3 +32,4 @@ cmake-build-*/
 .ccache/
 
 .codex/
+compile_commands.json

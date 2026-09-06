@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <!--
+    Shared CMake profile: keeps CLion's tree at build/clion next to build/docker
+    and build/local instead of the default cmake-build-debug.
+    No TOOLCHAIN_NAME or generator: those are per-machine IDE settings and stay
+    in workspace.xml (Docker toolchain on macOS, local toolchain on a GPU host).
+    https://www.jetbrains.com/help/clion/cmake-profile.html#share-profiles
+  -->
+  <component name="CMakeSharedSettings">
+    <configurations>
+      <configuration PROFILE_NAME="clion" ENABLED="true" CONFIG_NAME="Debug" GENERATION_DIR="build/clion" />
+    </configurations>
+  </component>
+</project>

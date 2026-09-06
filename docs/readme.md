@@ -36,9 +36,10 @@ cp .env.example .env
 
 `BUILD_ENV` accepts `auto`, `local`, or `docker`. `auto` builds locally when
 `nvcc` exists and uses Docker otherwise. CMake writes to `build/local` or
-`build/docker`; binaries still land in `bin/`. Fetched dependency sources live
-in `.cache/fetchcontent/`; compiler caches live under the matching build
-directory. Deleting `build/` drops compiler caches but keeps downloaded sources.
+`build/docker`; CLion configures its own tree at `build/clion`. Binaries still
+land in `bin/`. Fetched dependency sources live in `.cache/fetchcontent/`;
+compiler caches live under the matching build directory. Deleting `build/`
+drops compiler caches but keeps downloaded sources.
 `SSH_HOST` independently selects the run host; leave it empty for local
 execution. A non-empty shell value overrides the fallback in `.env`.
 
@@ -107,18 +108,34 @@ indexes against CUDA headers inside the image:
 
 1. Run `mise run dc:up`.
 2. Add a Docker toolchain using the configured `CONTAINER_NAME` image.
-3. Add a CMake profile using that toolchain.
+3. Make it the default toolchain, or pick it in the `clion` profile.
 
 Builds and deployments still use the mise tasks. See the [CLion Docker toolchain
 documentation][clion-docker].
 
 [clion-docker]: https://www.jetbrains.com/help/clion/clion-toolchains-in-docker.html
 
+### Shared CMake profile
+
+[`.idea/cmake.xml`][cmake-xml] is the one tracked `.idea` file: a [shared
+profile][clion-share] named `clion` that generates into `build/clion`, beside
+`build/docker` and `build/local`. A root [global ignore][git-ignore] drops
+`.idea/`, so `.gitignore` re-includes this file alone.
+
+Enable it under **Settings | Build, Execution, Deployment | CMake** and delete
+the local `Debug` profile; a local profile of the same name hides the shared
+one. Toolchain, generator, and build directory of *local* profiles stay in
+`workspace.xml`, which is why only the shared profile can pin the tree.
+
+[cmake-xml]: ../.idea/cmake.xml
+[clion-share]: https://www.jetbrains.com/help/clion/cmake-profile.html#share-profiles
+[git-ignore]: https://git-scm.com/docs/gitignore
+
 ### Format on save
 
 nvim formats `.cu` / `.cuh` / `.cpp` / headers on save with `clang-format` and
 this repo's [`.clang-format`][clang-format-config]. CLion is configured the same
-way via `.idea` (untracked, so redo this on a new machine):
+way via `.idea` (untracked below, so redo this on a new machine):
 
 [clang-format-config]: ../.clang-format
 
