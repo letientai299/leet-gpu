@@ -30,6 +30,8 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
 - Exercise files (`docs/pmpp/chXX-ex.md`): header each as `## Ex 3.1`
   (chapter.exercise) for cross-file links. Leave an `**Answer:**` placeholder.
   Do not fill answers. Do not delete the user's answers.
+- Prefer a list when the content is mostly prose. Use a table only for
+  numerical comparisons.
 
 ## Tooling
 
