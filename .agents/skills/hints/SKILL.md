@@ -42,7 +42,10 @@ same path in one batch; the sentinel keeps that as a single wake.
 
 `--postpone` skips a startup run. `--no-meta` ignores chmod/atime.
 `--emit-events-to=stdio` pipes `kind:path` events to the command's stdin.
-`sort -u` collapses the batch. Keep the debounce at or above `1s`.
+`sort -u` collapses the batch. Keep `--debounce=1s`: that is the wake target and
+also the floor that holds an atomic save's `modify` + `rename` in one batch.
+Below `1s` the two halves split into two wakes and the first reads a
+partially written file.
 
 `--exts` and `--filter` are **OR**. Use `--exts` only on the default roots,
 with no `--filter`. Whenever any `--filter` is set, drop `--exts` or every
@@ -94,11 +97,15 @@ running the matching command from above:
    ```text
    pattern: ^hints-save:
    reason: hints file change
-   debounce_ms: 6000
+   debounce_ms: 5000
    ```
 
    Anchor the pattern and set `debounce_ms`. A pattern that matches every event
    line gets the watcher dropped as noisy. Cursor may expose this route.
+   `debounce_ms` is the minimum gap *between* notifications, not a delay added
+   to each one: an isolated save after an idle stretch wakes as soon as the
+   sentinel line lands. It only bites on back-to-back saves. `5000` is the
+   harness minimum; lower values are silently raised to it.
 3. A shell without output notifications: append `; kill -TERM "$PPID"` inside
    the command string and run it as a foreground long-running call. It forwards
    one batch, terminates itself, and returns the batch as the tool result. Use
@@ -153,8 +160,14 @@ unread now. If the user asks why a save was silent, check the watcher is alive
 and say whether the batch was logged, instead of assuming the unit was a draft.
 
 - `changed` empty → no-op. Do not review. Do not write.
-- Else: **stat mtimes first**. Read **only** those paths (plus kernels newly
-  linked from a changed exercise). Do not re-read unchanged files.
+- Else: read **only** those paths (plus kernels newly linked from a changed
+  exercise). Do not re-read unchanged files.
+
+Spend **one** tool call on the read, batching the paths in a single message. The
+batch line already carries the kind and path, so a separate `stat` for mtimes
+buys nothing and each extra round trip costs more wall clock than both
+debounces combined. Grep for kernels linked from an exercise only the first
+time that exercise is seen.
 
 Inspect the diff versus what you last read. If a path is new to you, the whole
 current contents of the changed unit is in scope — not the entire file.
