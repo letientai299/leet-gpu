@@ -3,3 +3,70 @@
 Back to the [reading checklist][reading-checklist].
 
 [reading-checklist]: ./readme.md#6-performance-considerations
+
+Questions transcribed from the book.
+
+## Ex 6.1
+
+Write a matrix multiplication kernel function that corresponds to the design
+illustrated in Fig. 6.4.
+
+**Answer:**
+
+## Ex 6.2
+
+For tiled matrix multiplication, of the possible range of values for
+`BLOCK_SIZE`, for what values of `BLOCK_SIZE` will the kernel completely avoid
+uncoalesced accesses to global memory? (You need to consider only square
+blocks.)
+
+**Answer:**
+
+## Ex 6.3
+
+Consider the following CUDA kernel:
+
+```c:line-numbers {5,7,10,11}
+__global__ void foo_kernel(float* a, float* b, float* c, float* d, float* e) {
+  unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+  __shared__ float a_s[256];
+  __shared__ float bc_s[4 * 256];
+  a_s[threadIdx.x] = a[i];
+  for (unsigned int j = 0; j < 4; ++j) {
+    bc_s[j * 256 + threadIdx.x] = b[j * blockDim.x * gridDim.x + i] + c[i * 4 + j];
+  }
+  __syncthreads();
+  d[i + 8] = a_s[threadIdx.x];
+  e[i * 8] = bc_s[threadIdx.x * 4];
+}
+```
+
+For each of the following memory accesses, specify whether they are coalesced
+or uncoalesced or coalescing is not applicable:
+
+- a. The access to array `a` of line 05
+- b. The access to array `a_s` of line 05
+- c. The access to array `b` of line 07
+- d. The access to array `c` of line 07
+- e. The access to array `bc_s` of line 07
+- f. The access to array `a_s` of line 10
+- g. The access to array `d` of line 10
+- h. The access to array `bc_s` of line 11
+- i. The access to array `e` of line 11
+
+**Answer:**
+
+## Ex 6.4
+
+What is the floating point to global memory access ratio (in OP/B) of each of
+the following matrix-matrix multiplication kernels?
+
+- a. The simple kernel described in Chapter 3, Multidimensional Grids and Data,
+  without any optimizations applied.
+- b. The kernel described in Chapter 5, Memory Architecture and Data Locality,
+  with shared memory tiling applied using a tile size of $32 \times 32$.
+- c. The kernel described in this chapter with shared memory tiling applied
+  using a tile size of $32 \times 32$ and thread coarsening applied using a
+  coarsening factor of $4$.
+
+**Answer:**

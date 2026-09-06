@@ -3,3 +3,67 @@
 Back to the [reading checklist][reading-checklist].
 
 [reading-checklist]: ./readme.md#11-prefix-sum-scan
+
+Questions transcribed from the book.
+
+## Ex 11.1
+
+Consider the following array: $[4, 6, 7, 1, 2, 8, 5, 2]$. Perform a parallel
+inclusive prefix scan on the array, using the Kogge-Stone algorithm. Report the
+intermediate states of the array after each step.
+
+**Answer:**
+
+## Ex 11.2
+
+Modify the Kogge-Stone parallel scan kernel in Fig. 11.3 to use
+double-buffering instead of a second call to `__syncthreads()` to overcome the
+write-after-read race condition.
+
+**Answer:**
+
+## Ex 11.3
+
+Analyze the Kogge-Stone parallel scan kernel in Fig. 11.3. Show that control
+divergence occurs only in the first warp of each block for stride values up to
+half of the warp size. That is, for warp size $32$, control divergence will
+occur for iterations with stride values $1$, $2$, $4$, $8$, and $16$.
+
+**Answer:**
+
+## Ex 11.4
+
+For the Kogge-Stone scan kernel based on reduction trees, assume that we have
+$2048$ elements. Which of the following gives the closest approximation of how
+many add operations will be performed?
+
+**Answer:**
+
+## Ex 11.5
+
+Consider the following array: $[4, 6, 7, 1, 2, 8, 5, 2]$. Perform a parallel
+inclusive prefix scan on the array, using the Brent-Kung algorithm. Report the
+intermediate states of the array after each step.
+
+**Answer:**
+
+## Ex 11.6
+
+For the Brent-Kung scan kernel, assume that we have $2048$ elements. How many
+add operations will be performed in both the reduction tree phase and the
+inverse reduction tree phase?
+
+**Answer:**
+
+## Ex 11.7
+
+Use the algorithm in Fig. 11.4 to complete an exclusive scan kernel.
+
+**Answer:**
+
+## Ex 11.8
+
+Complete the host code and all three kernels for the segmented parallel scan
+algorithm in Fig. 11.9.
+
+**Answer:**
