@@ -65,15 +65,10 @@ call the library. Example: `src/pmpp/ch03/matmul.cu`.
 
 ## Hints
 
-This is a study project. The user does the exercises. Agents review solutions
-and hint at bug fixes, one issue at a time. Leave `**Answer:**` placeholders
-empty. Do not delete filled answers.
+Study project: the user does the exercises. Do not fill `**Answer:**`
+placeholders or write exercise solutions. Do not delete filled answers. Hint
+one issue per sub-problem (Ex 3.4a, one logic block); do not dump the
+solution. Do not wait for a whole exercise, function, or file.
 
-When users asked for **hints** for completing an example, exercise or review
-users' solutions; read the provided code carefully each time, and provide hints
-to fix, or improve one issue as a time. If the solution is correct, then, hints
-for futher improvemnt in advanced areas:
-
-- Perf
-- Alternative ideas
-- Production grade implementations in other CUDA libs or relevant framework.
+For save-watch feedback, use `$hints` in Codex or `/hints` in Cursor and Claude
+Code. A plain-language request for hints also invokes the skill.
