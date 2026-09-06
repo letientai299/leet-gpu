@@ -24,6 +24,18 @@ __global__ void matmul_col_kernel(
   }
 }
 
+void launch_matmul(const float* a,
+                   const float* b,
+                   float* c,
+                   unsigned height,
+                   unsigned width,
+                   unsigned k,
+                   cudaStream_t stream = nullptr) {
+  constexpr unsigned block = 256;
+  const auto grid = static_cast<unsigned>(cuda::ceil_div(width, block));
+  matmul_col_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);
+}
+
 int run_matmul() {
   // Not a multiple of 256: kernel must bound-check.
   constexpr unsigned height = 67;
@@ -31,15 +43,19 @@ int run_matmul() {
   constexpr unsigned k = 50;
   return Matmul(height, width, k)
       .run([](const dbuf& a, const dbuf& b, dbuf& c, unsigned height, unsigned width, unsigned k) {
-        constexpr unsigned block = 256;
-        const auto grid = static_cast<unsigned>(cuda::ceil_div(width, block));
-        matmul_col_kernel<<<grid, block>>>(a.data(), b.data(), c.data(), height, width, k);
+        launch_matmul(a.data(), b.data(), c.data(), height, width, k);
         return CUDA_CHECK(cudaGetLastError());
       });
 }
 
+void bench_matmul(nvbench::state& state) {
+  benchmark_matmul(state, 67, 33, 50, launch_matmul);
+}
+
+NVBENCH_BENCH(bench_matmul).set_name("matmul");
+
 } // namespace
 
 int main(int argc, char** argv) {
-  return run_host(argc, argv, run_matmul);
+  return run_matmul_app(argc, argv, run_matmul);
 }

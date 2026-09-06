@@ -2,6 +2,7 @@ set(LEET_GPU_DEP_CACHE "${CMAKE_SOURCE_DIR}/.cache/fetchcontent")
 
 set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
 
 # Keep extracted sources outside build/ so wiping the CMake tree skips
 # re-download. Binary dirs stay per-prefix (build/docker vs build/local).
@@ -38,6 +39,15 @@ FetchContent_Declare(
   SOURCE_DIR "${LEET_GPU_DEP_CACHE}/cutlass-src"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
+FetchContent_Declare(
+  nvbench
+  URL
+    https://github.com/NVIDIA/nvbench/archive/410dcdd21c9b48191ecb3d3d77060b1bf4ac6244.tar.gz
+  URL_HASH
+    SHA256=a8565c504462c69913f6c8e1cece76fd013980406694d8899f37aba75b04da19
+  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/nvbench-src"
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
 
 # Header INTERFACE only. CUTLASS still enables tools unless these are off.
 set(CUTLASS_ENABLE_HEADERS_ONLY ON CACHE BOOL "" FORCE)
@@ -49,7 +59,21 @@ set(CUTLASS_ENABLE_PROFILER OFF CACHE BOOL "" FORCE)
 set(CUTLASS_ENABLE_CUBLAS OFF CACHE BOOL "" FORCE)
 set(CUTLASS_ENABLE_CUDNN OFF CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(spdlog lodepng cccl cutlass)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(NVBench_ENABLE_CUPTI OFF CACHE BOOL "" FORCE)
+set(NVBench_ENABLE_EXECUTABLES OFF CACHE BOOL "" FORCE)
+set(NVBench_ENABLE_INSTALL_RULES OFF CACHE BOOL "" FORCE)
+set(NVBench_ENABLE_NVML OFF CACHE BOOL "" FORCE)
+set(NVBench_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(rapids-cmake-sha edc8773f660e15fa2948324df5dc1a1bb7d9d1cc)
+
+FetchContent_MakeAvailable(
+  nvbench
+  spdlog
+  lodepng
+  cccl
+  cutlass
+)
 
 find_package(CUDAToolkit REQUIRED)
 
@@ -63,6 +87,10 @@ target_compile_options(
   leet_gpu_cutlass
   INTERFACE "$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>"
 )
+
+add_library(leet_gpu_nvbench INTERFACE)
+target_compile_definitions(leet_gpu_nvbench INTERFACE LEET_GPU_HAS_NVBENCH)
+target_link_libraries(leet_gpu_nvbench INTERFACE nvbench::nvbench)
 
 add_library(leet_gpu_runtime STATIC log.cpp)
 target_include_directories(

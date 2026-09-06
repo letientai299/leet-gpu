@@ -1,6 +1,7 @@
 # Local env + agent scratch
 .env
 .ai.dump/
+tmp/
 
 # Python
 .venv/

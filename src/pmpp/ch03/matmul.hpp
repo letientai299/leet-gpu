@@ -12,6 +12,11 @@
 #include <utility>
 #include <vector>
 
+#ifdef LEET_GPU_HAS_NVBENCH
+#include <nvbench/main.cuh>
+#include <nvbench/nvbench.cuh>
+#endif
+
 using dbuf = cuda::device_buffer<float>;
 
 // Host driver: random A/B, CUTLASS oracle, then the kernel under test.
@@ -130,3 +135,61 @@ inline bool Matmul::verify() const {
   HOST_LOG("Matrix multiply passed: %zu values", c.size());
   return true;
 }
+
+#ifdef LEET_GPU_HAS_NVBENCH
+template <typename Launch>
+void benchmark_matmul(
+    nvbench::state& state, unsigned height, unsigned width, unsigned k, Launch&& launch) {
+  Matmul matmul(height, width, k);
+  matmul.fill();
+
+  const auto stream = default_stream();
+  auto& pool = device_pool();
+  const dbuf a{stream, pool, matmul.a};
+  const dbuf b{stream, pool, matmul.b};
+  dbuf c{stream, pool, matmul.c};
+  float* const output = c.data();
+  if (!CUDA_CHECK(cudaDeviceSynchronize())) {
+    state.skip("CUDA setup failed");
+    return;
+  }
+
+  const auto outputs = static_cast<std::size_t>(height) * width;
+  const auto reads = outputs * k * 2;
+  state.add_element_count(outputs);
+  state.add_global_memory_reads<float>(reads);
+  state.add_global_memory_writes<float>(outputs);
+#ifdef __clang_analyzer__
+  output[0] = 0.0F;
+  launch(a.data(), b.data(), output, height, width, k, nullptr);
+#else
+  state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& bench) {
+    launch(a.data(), b.data(), output, height, width, k, bench.get_stream());
+  });
+#endif
+}
+
+inline int run_nvbench(int argc, char** argv) try {
+  std::vector<char*> args(argv, argv + argc);
+  args.erase(args.begin() + 1);
+  int const bench_argc = static_cast<int>(args.size());
+  char** const bench_argv = args.data();
+  NVBENCH_MAIN_BODY(bench_argc, bench_argv);
+}
+NVBENCH_MAIN_CATCH_EXCEPTIONS
+
+template <typename Fn> int run_matmul_app(int argc, char** argv, Fn&& body) {
+  if (help_requested(argc, argv)) {
+    std::printf("Usage: %s [--bench [options]]\n", argv[0]);
+    return 0;
+  }
+  const bool bench = argc >= 2 && std::strcmp(argv[1], "--bench") == 0;
+  if (argc != 1 && !bench) {
+    std::printf("Usage: %s [--bench [options]]\n", argv[0]);
+    return 2;
+  }
+
+  const int result = run_host(1, argv, std::forward<Fn>(body));
+  return result != 0 || !bench ? result : run_nvbench(argc, argv);
+}
+#endif

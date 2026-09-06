@@ -10,6 +10,7 @@ RUN yum install -y \
     && yum-config-manager --set-enabled powertools \
     && yum install -y \
     gdb \
+    git \
     ccache \
     ninja-build \
     cmake \
@@ -29,7 +30,9 @@ RUN curl -fsSLo /tmp/clangd.zip \
     && unzip -q /tmp/clangd.zip -d /opt \
     && rm /tmp/clangd.zip
 
-RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore clang-tidy
+RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore \
+    clang-tidy \
+    cmake==3.30.9
 
 ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_CACHE_DIR=/usr/local/share/mise/cache \
