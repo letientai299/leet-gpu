@@ -13,7 +13,6 @@ RUN yum install -y \
     git \
     ccache \
     ninja-build \
-    cmake \
     libstdc++-static \
     python3.12-pip \
     unzip \
@@ -30,9 +29,15 @@ RUN curl -fsSLo /tmp/clangd.zip \
     && unzip -q /tmp/clangd.zip -d /opt \
     && rm /tmp/clangd.zip
 
+# Rocky 8 ships CMake 3.26, below the 3.30.4 this project requires, so pip
+# provides the only cmake. CLion's Docker toolchain probes /usr/bin instead of
+# resolving PATH, and would otherwise report the older one.
 RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore \
     clang-tidy \
-    cmake==3.30.9
+    cmake==3.30.9 \
+    && ln -sf /usr/local/bin/cmake /usr/bin/cmake \
+    && ln -sf /usr/local/bin/ctest /usr/bin/ctest \
+    && ln -sf /usr/local/bin/cpack /usr/bin/cpack
 
 ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_CACHE_DIR=/usr/local/share/mise/cache \
