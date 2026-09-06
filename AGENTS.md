@@ -31,6 +31,18 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
     place where `\\`, `\,`, and other backslash-punctuation survives.
   - Inline `$...$` stays on one line with no padding inside the delimiters, and
     spells braces `\lbrace \rbrace`. `$ x $` and `$\{x\}$` render as literals.
+  - Inline, only `\` plus letters and `\` (backslash-space) reach KaTeX intact;
+    backslash-punctuation loses its backslash. Space a unit with
+    `$100\ \mathrm{ns}$`; `$100\,\mathrm{ns}$` renders as `100,ns`.
+  - Keep `%` out of math entirely. `\%` arrives as a bare `%`, which opens a
+    KaTeX comment and swallows the rest of the expression. Write `$90$%`.
+  - No `\hline`, so no ruled `array`. A row-ending `\\` comes back as `\\\`, and
+    that stray backslash pushes `\hline` off the start of its row, so KaTeX
+    fails with `Misplaced \hline`. Build a boxed row from `\boxed` cells.
+    Mid-line `\\[1em]` is left alone.
+  - Verify by resolving the markdown escapes yourself, then rendering with the
+    `katex` npm package. GitHub's `/markdown` API returns the exact string it
+    hands to KaTeX.
   - Lay multi-matrix figures out with one `\begin{array}`, not an HTML table:
     GitHub hoists math out of `<td>` and drops the rows (see Ex 3.1).
   - Mark cells with `\boxed`. GitHub's KaTeX build drops `\colorbox`, and a
