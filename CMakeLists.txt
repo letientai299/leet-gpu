@@ -57,15 +57,6 @@ set(
   CACHE STRING
   "Default CUDA architectures"
 )
-if(LEET_GPU_CUDA_ARCHITECTURES STREQUAL "86;90;100")
-  set(
-    LEET_GPU_CUDA_ARCHITECTURES
-    "86-real;90-real;100-real"
-    CACHE STRING
-    "Default CUDA architectures"
-    FORCE
-  )
-endif()
 set(
   CMAKE_CUDA_ARCHITECTURES
   "${LEET_GPU_CUDA_ARCHITECTURES}"

@@ -10,12 +10,10 @@ target_link_libraries(
 )
 add_cuda_app(
   pmpp/ch03/matmul
-  EXTENSION cpp
   LIBRARIES leet_gpu_matmul_kernels leet_gpu_nvbench
 )
 add_cuda_app(
   pmpp/ch03/matmul.bench
-  EXTENSION cpp
   LIBRARIES leet_gpu_matmul_kernels leet_gpu_nvbench
 )
 add_cuda_app(pmpp/ch03/matmul.vec LIBRARIES leet_gpu_matmul_kernels)

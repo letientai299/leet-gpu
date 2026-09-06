@@ -1,5 +1,5 @@
 function(add_cuda_app key)
-  cmake_parse_arguments(APP "" "EXTENSION" "LIBRARIES" ${ARGN})
+  cmake_parse_arguments(APP "" "" "LIBRARIES" ${ARGN})
 
   if(NOT key MATCHES "^[a-z0-9][a-z0-9./-]*[a-z0-9]$")
     message(FATAL_ERROR "Invalid app key: ${key}")
@@ -17,11 +17,19 @@ function(add_cuda_app key)
   get_filename_component(output_name "${key}" NAME)
   get_filename_component(output_dir "${key}" DIRECTORY)
 
-  if(NOT APP_EXTENSION)
-    set(APP_EXTENSION cu)
+  set(source_cu "${PROJECT_SOURCE_DIR}/src/${key}.cu")
+  set(source_cpp "${PROJECT_SOURCE_DIR}/src/${key}.cpp")
+  if(EXISTS "${source_cu}" AND EXISTS "${source_cpp}")
+    message(FATAL_ERROR "Ambiguous app source: ${source_cu} and ${source_cpp}")
+  elseif(EXISTS "${source_cu}")
+    set(source "${source_cu}")
+  elseif(EXISTS "${source_cpp}")
+    set(source "${source_cpp}")
+  else()
+    message(FATAL_ERROR "Missing app source: ${source_cu} or ${source_cpp}")
   endif()
 
-  add_executable(${target} "${PROJECT_SOURCE_DIR}/src/${key}.${APP_EXTENSION}")
+  add_executable(${target} "${source}")
   target_link_libraries(
     ${target}
     PRIVATE leet_gpu_runtime CCCL::CCCL ${APP_LIBRARIES}

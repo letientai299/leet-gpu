@@ -1,53 +1,52 @@
 set(LEET_GPU_DEP_CACHE "${CMAKE_SOURCE_DIR}/.cache/fetchcontent")
 
-set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
-set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
-
 # Keep extracted sources outside build/ so wiping the CMake tree skips
 # re-download. Binary dirs stay per-prefix (build/docker vs build/local).
-FetchContent_Declare(
+function(leet_gpu_fetch name)
+  cmake_parse_arguments(DEP "" "URL;HASH" "" ${ARGN})
+  if(NOT DEP_URL OR NOT DEP_HASH OR DEP_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "leet_gpu_fetch(${name}) needs URL and HASH")
+  endif()
+  FetchContent_Declare(
+    ${name}
+    URL "${DEP_URL}"
+    URL_HASH "SHA256=${DEP_HASH}"
+    SOURCE_DIR "${LEET_GPU_DEP_CACHE}/${name}-src"
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  )
+endfunction()
+
+leet_gpu_fetch(
   spdlog
   URL https://github.com/gabime/spdlog/archive/refs/tags/v1.16.0.tar.gz
-  URL_HASH
-    SHA256=8741753e488a78dd0d0024c980e1fb5b5c85888447e309d9cb9d949bdb52aa3e
-  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/spdlog-src"
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  HASH 8741753e488a78dd0d0024c980e1fb5b5c85888447e309d9cb9d949bdb52aa3e
 )
-FetchContent_Declare(
+leet_gpu_fetch(
   lodepng
   URL
     https://github.com/lvandeve/lodepng/archive/ed6fe5825c6a4fbb7f58ab35a4231c7543cd452a.tar.gz
-  URL_HASH
-    SHA256=c2459a3f9145258f901d262576f7a56ca08087d3b3efeee3ae033c0952120803
-  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/lodepng-src"
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  HASH c2459a3f9145258f901d262576f7a56ca08087d3b3efeee3ae033c0952120803
 )
-FetchContent_Declare(
+leet_gpu_fetch(
   cccl
   URL https://github.com/NVIDIA/cccl/archive/refs/tags/v3.4.2.tar.gz
-  URL_HASH
-    SHA256=544f5f14c59cae6cfdad3156aa720f2dd44fbd6feb3556d10bdb4fe6aa3cdf4b
-  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/cccl-src"
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  HASH 544f5f14c59cae6cfdad3156aa720f2dd44fbd6feb3556d10bdb4fe6aa3cdf4b
 )
-FetchContent_Declare(
+leet_gpu_fetch(
   cutlass
   URL https://github.com/NVIDIA/cutlass/archive/refs/tags/v4.7.1.tar.gz
-  URL_HASH
-    SHA256=8290eb914cd5aaf4c665ee4108ba5bd65383cfee1296286a42a7ef711554d365
-  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/cutlass-src"
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  HASH 8290eb914cd5aaf4c665ee4108ba5bd65383cfee1296286a42a7ef711554d365
 )
-FetchContent_Declare(
+leet_gpu_fetch(
   nvbench
   URL
     https://github.com/NVIDIA/nvbench/archive/410dcdd21c9b48191ecb3d3d77060b1bf4ac6244.tar.gz
-  URL_HASH
-    SHA256=a8565c504462c69913f6c8e1cece76fd013980406694d8899f37aba75b04da19
-  SOURCE_DIR "${LEET_GPU_DEP_CACHE}/nvbench-src"
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  HASH a8565c504462c69913f6c8e1cece76fd013980406694d8899f37aba75b04da19
 )
+
+set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
 
 # Header INTERFACE only. CUTLASS still enables tools unless these are off.
 set(CUTLASS_ENABLE_HEADERS_ONLY ON CACHE BOOL "" FORCE)
