@@ -27,7 +27,10 @@ function(add_cuda_app key)
     PRIVATE leet_gpu_runtime CCCL::CCCL ${APP_LIBRARIES}
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_options(${target} PRIVATE -static-libgcc -static-libstdc++)
+    target_link_options(
+      ${target}
+      PRIVATE -static-libgcc -static-libstdc++ -Wl,--gc-sections
+    )
   endif()
   set_target_properties(
     ${target}
@@ -37,11 +40,11 @@ function(add_cuda_app key)
       RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin/${output_dir}"
   )
 
-  if(STRIP_DEPLOY AND CMAKE_STRIP)
+  if(STRIP_DEPLOY AND CMAKE_STRIP AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_custom_command(
       TARGET ${target}
       POST_BUILD
-      COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:${target}>"
+      COMMAND "${CMAKE_STRIP}" --strip-unneeded "$<TARGET_FILE:${target}>"
       COMMENT "Stripping ${key}"
       VERBATIM
     )

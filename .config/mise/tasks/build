@@ -73,7 +73,8 @@ if [ -f "$build_dir/CMakeCache.txt" ] \
 fi
 
 if [ ! -f "$build_dir/CMakeCache.txt" ]; then
-  cmake -S "$root" -B "$build_dir" -G Ninja
+  cmake -S "$root" -B "$build_dir" -G Ninja \
+    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 fi
 
 if [ -z "$app" ]; then
