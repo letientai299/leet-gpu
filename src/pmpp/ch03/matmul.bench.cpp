@@ -109,8 +109,6 @@ void matmul_nvbench(nvbench::state& state, MatmulKernel launch) {
   benchmark_matmul(state, get_device_data(state), launch, true);
 }
 
-#include "matmul.nvbench.hpp"
-
 void release_matmul_benchmark_data() {
   for (auto& [device, data] : device_data) {
     CUDA_CHECK(cudaSetDevice(device));

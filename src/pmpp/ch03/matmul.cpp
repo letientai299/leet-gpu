@@ -1,6 +1,5 @@
 #include "matmul.hpp"
 
-#include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <string_view>

@@ -4,7 +4,6 @@
 #include <array>
 #include <cstdarg>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <spdlog/sinks/stdout_color_sinks.h>

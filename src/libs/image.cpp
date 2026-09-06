@@ -5,7 +5,6 @@
 
 #define LODEPNG_NO_COMPILE_CPP
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <lodepng.h>
 
