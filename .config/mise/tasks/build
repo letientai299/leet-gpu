@@ -81,5 +81,4 @@ if [ -z "$app" ]; then
   exit
 fi
 
-target=app_${app//\//_}
-cmake --build "$build_dir" --parallel "$jobs" --target "$target"
+cmake --build "$build_dir" --parallel "$jobs" --target "$(app_target "$app")"

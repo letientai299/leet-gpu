@@ -18,3 +18,9 @@ normalize_app() {
 
   printf '%s\n' "$app"
 }
+
+# Mirror the target name that add_cuda_app derives in src/cmake/AddCudaApp.cmake.
+app_target() {
+  local suffix=${1//\//_}
+  printf 'app_%s\n' "${suffix//./_}"
+}
