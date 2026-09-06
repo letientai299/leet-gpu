@@ -22,8 +22,8 @@ different matrix-matrix multiplication kernels and compare them.
 
 See (a) [`matmul.row.cu`][mm-row] and (b) [`matmul.col.cu`][mm-col].
 
-For (c), the analysis below is purely from my understanding after completing
-the code, before testing via [nvBench][nvb].
+For (c), the analysis below is purely from my understanding after completing the
+code, before testing via [nvBench][nvb].
 
 <table>
 <tr>
@@ -67,10 +67,10 @@ $$
 </tr>
 </table>
 
-Hardware memory access is fastest with row-major indexing. Hence, accessing
-rows of $A$ is fast, but accessing columns of $B$ is slow. In the CPU world, we
-have the cache-line invalidation problem. I believe GPU VRAM behaves similarly.
-We can't just access a few bytes inside VRAM without locking a larger region.
+Hardware memory access is fastest with row-major indexing. Hence, accessing rows
+of $A$ is fast, but accessing columns of $B$ is slow. In the CPU world, we have
+the cache-line invalidation problem. I believe GPU VRAM behaves similarly. We
+can't just access a few bytes inside VRAM without locking a larger region.
 
 All 3 solutions need $k \times \mathrm{height}$ random accesses for $B$.
 
@@ -94,23 +94,36 @@ not “contention” from many writes to different $C$ cells. Sequential walking
 one thread later is not coalescing across the warp.
 
 - 1 thread / cell: `threadIdx.x` is the column, so neighbors write neighboring
-  $C$ and read neighboring $B$. Thread count is $\mathrm{height}\times
+  $C$ and read neighboring $B$. Thread count is
+  $\mathrm{height}\times
   \mathrm{width}$.
 - `matmul.row`: $\mathrm{height}$ threads; neighbors own neighbor rows → strided
   $A$/$C$ at one inner-loop step. Each thread covers $\mathrm{width}$ cells.
 - `matmul.col`: $\mathrm{width}$ threads; neighbors own neighbor columns →
   adjacent $B$/$C$. Each thread covers $\mathrm{height}$ cells.
 
-“Most parallel ⇒ most contention ⇒ slowest” is backwards. The cell kernel
-should win whenever $\mathrm{height}\times\mathrm{width}$ is large enough to
-occupy the GPU.
+“Most parallel ⇒ most contention ⇒ slowest” is backwards among these naive
+kernels. The cell kernel has $\mathrm{height}\times\mathrm{width}$ threads, so
+it should outrun the other two whenever that grid can occupy the GPU.
 
-Row vs col is a shape trade: occupancy ($\mathrm{height}$ vs $\mathrm{width}$
-threads) against coalescing (col is better for row-major $B$/$C$). Prefer
-`matmul.row` when $C$ is tall and skinny ($\mathrm{height}\gg\mathrm{width}$):
-more threads can outweigh strided accesses. Prefer `matmul.col` when $C$ is
-wide ($\mathrm{width}\gg\mathrm{height}$): more threads *and* coalesced
-neighbors. Near-square, col’s access pattern is the cleaner default; measure.
+Among the two coarsened naive kernels, row vs col is occupancy
+($\mathrm{height}$ vs $\mathrm{width}$ threads) against how the warp maps onto
+**consecutive addresses**. VRAM is not a 2D panel of matrix cells; it serves 1D
+bursts (sectors / DRAM pages). Row-major only means $C[y,x]$ and $C[y,x+1]$ are
+adjacent. `matmul.col` assigns those neighbors to consecutive threads, so one
+instruction is one burst of $B$/$C$. `matmul.row` assigns consecutive threads to
+$C[y,x]$ and $C[y+1,x]$ (stride $\mathrm{width}$), so the same instruction is
+many sectors. One thread later walking a row is CPU-style locality; it is not
+the request the memory system sees.
+
+Shape only shifts that trade. Tall skinny $C$
+($\mathrm{height}\gg\mathrm{width}$): row launches more threads, which can
+outweigh strided accesses. Wide $C$ ($\mathrm{width}\gg\mathrm{height}$): col
+has more threads _and_ a burst-friendly warp. Near-square, burst mapping favors
+col; measure. Column-major arrays would flip which coarsened kernel coalesces.
+
+None of this is a production GEMM (cuBLAS, CUTLASS, DeepGEMM, …): no tiling, no
+shared memory, no tensor cores.
 
 [mm-cell]: ../../src/pmpp/ch03/matmul.cu
 [mm-row]: ../../src/pmpp/ch03/matmul.row.cu
