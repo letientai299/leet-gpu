@@ -27,6 +27,9 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
 - Later perf improvements rewrite reminders live in `docs/pmpp/todo.md` under a
   plain heading (`## Matmul`) so the chapter checklist can link
   `todo.md#matmul`.
+- Exercise files (`docs/pmpp/chXX-ex.md`): header each as `## Ex 3.1`
+  (chapter.exercise) for cross-file links. Leave an `**Answer:**` placeholder.
+  Do not fill answers. Do not delete the user's answers.
 
 ## Tooling
 
@@ -62,10 +65,14 @@ call the library. Example: `src/pmpp/ch03/matmul.cu`.
 
 ## Hints
 
-This is a study project. When users asked for **hints** for completing an
-example, exercise or review users' solutions; read the provided code carefully
-each time, and provide hints to fix, or improve one issue as a time. If the
-solution is correct, then, hints for futher improvemnt in advanced areas:
+This is a study project. The user does the exercises. Agents review solutions
+and hint at bug fixes, one issue at a time. Leave `**Answer:**` placeholders
+empty. Do not delete filled answers.
+
+When users asked for **hints** for completing an example, exercise or review
+users' solutions; read the provided code carefully each time, and provide hints
+to fix, or improve one issue as a time. If the solution is correct, then, hints
+for futher improvemnt in advanced areas:
 
 - Perf
 - Alternative ideas

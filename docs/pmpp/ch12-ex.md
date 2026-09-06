@@ -3,6 +3,3 @@
 Back to the [reading checklist][reading-checklist].
 
 [reading-checklist]: ./readme.md#12-merge
-
-<!-- One `## <exercise number>` section per exercise: restate the
-     question, then the answer. -->

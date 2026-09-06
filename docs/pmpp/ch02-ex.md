@@ -4,10 +4,9 @@ Back to the [reading checklist][reading-checklist].
 
 [reading-checklist]: ./readme.md#2-heterogeneous-data-parallel-computing
 
-Questions transcribed from the book. Answers left blank to fill in while
-reading.
+Questions transcribed from the book.
 
-## 1
+## Ex 2.1
 
 If we want to use each thread in a grid to calculate one output element of a
 vector addition, what would be the expression for mapping the thread/block
@@ -20,7 +19,7 @@ indices to the data index (i)?
 
 **Answer:** C
 
-## 2
+## Ex 2.2
 
 Assume that we want to use each thread to calculate two adjacent elements of a
 vector addition. What would be the expression for mapping the thread/block
@@ -33,7 +32,7 @@ indices to the data index (i) of the first element to be processed by a thread?
 
 **Answer:** C
 
-## 3
+## Ex 2.3
 
 We want to use each thread to calculate two elements of a vector addition. Each
 thread block processes `2*blockDim.x` consecutive elements that form two
@@ -50,7 +49,7 @@ the thread/block indices to data index of the first element?
 
 **Answer:** D
 
-## 4
+## Ex 2.4
 
 For a vector addition, assume that the vector length is 8000, each thread
 calculates one output element, and the thread block size is 1024 threads. The
@@ -64,7 +63,7 @@ to cover all output elements. How many threads will be in the grid?
 
 **Answer:** C
 
-## 5
+## Ex 2.5
 
 If we want to allocate an array of `v` integer elements in the CUDA device
 global memory, what would be an appropriate expression for the second argument
@@ -77,7 +76,7 @@ of the `cudaMalloc` call?
 
 **Answer:** D
 
-## 6
+## Ex 2.6
 
 If we want to allocate an array of `n` floating-point elements and have a
 floating-point pointer variable `A_d` to point to the allocated memory, what
@@ -91,7 +90,7 @@ call?
 
 **Answer:** D
 
-## 7
+## Ex 2.7
 
 If we want to copy 3000 bytes of data from host array `A_h` (`A_h` is a pointer
 to element 0 of the source array) to device array `A_d` (`A_d` is a pointer to
@@ -105,7 +104,7 @@ this data copy in CUDA?
 
 **Answer:** C
 
-## 8
+## Ex 2.8
 
 How would one declare a variable err that can appropriately receive the returned
 value of a CUDA API call?
@@ -117,7 +116,7 @@ value of a CUDA API call?
 
 **Answer:** C
 
-## 9
+## Ex 2.9
 
 Consider the following CUDA kernel and the corresponding host function that
 calls it:
@@ -149,7 +148,7 @@ void foo(float *a_d, float *b_d) {
 - d. $200064$ threads that execute the code on line 02
 - e. $200000$ threads that execute the code on line 04
 
-## 10
+## Ex 2.10
 
 A new summer intern was frustrated with CUDA. He has been complaining that CUDA
 is very tedious. He had to declare many functions that he plans to execute on

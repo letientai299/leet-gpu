@@ -3,6 +3,3 @@
 Back to the [reading checklist][reading-checklist].
 
 [reading-checklist]: ./readme.md#16-deep-learning
-
-<!-- One `## <exercise number>` section per exercise: restate the
-     question, then the answer. -->
