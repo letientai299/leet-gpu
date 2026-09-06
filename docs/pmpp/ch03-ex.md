@@ -25,47 +25,28 @@ See (a) [`launch_matmul_row()`][mm-row] and (b) [`launch_matmul_col()`][mm-col].
 For (c), the analysis below is purely from my understanding after completing the
 code, before testing via [nvBench][nvb].
 
-<table>
-<tr>
-<td></td>
-<td>
-
-$$
-B = \begin{pmatrix}
-b_{11} & b_{12} & \colorbox{lightgray}{$b_{13}$} \\
-b_{21} & b_{22} & \colorbox{lightgray}{$b_{23}$}
+```math
+\begin{array}{cc}
+& B = \begin{pmatrix}
+b_{11} & b_{12} & \boxed{b_{13}} \\
+b_{21} & b_{22} & \boxed{b_{23}}
 \end{pmatrix}_{2\times 3}
-$$
-
-</td>
-</tr>
-<tr>
-<td>
-
-$$
+\\[1em]
 A = \begin{pmatrix}
 a_{11} & a_{12} \\
 a_{21} & a_{22} \\
-\colorbox{lightgray}{$a_{31}$} & \colorbox{lightgray}{$a_{32}$} \\
+\boxed{a_{31}} & \boxed{a_{32}} \\
 a_{41} & a_{42}
 \end{pmatrix}_{4\times 2}
-$$
-
-</td>
-<td>
-
-$$
+&
 C = \begin{pmatrix}
 c_{11} & c_{12} & c_{13} \\
 c_{21} & c_{22} & c_{23} \\
-c_{31} & c_{32} & \colorbox{lightgray}{$c_{33}$} \\
+c_{31} & c_{32} & \boxed{c_{33}} \\
 c_{41} & c_{42} & c_{43}
 \end{pmatrix}_{4\times 3}
-$$
-
-</td>
-</tr>
-</table>
+\end{array}
+```
 
 Hardware memory access is fastest with row-major indexing. Hence, accessing rows
 of $A$ is fast, but accessing columns of $B$ is slow. In the CPU world, we have
@@ -98,9 +79,9 @@ A matrix-vector multiplication takes an input matrix $B$ and a vector $C$ and
 produces one output vector $A$. Each element of the output vector $A$ is the dot
 product of one row of the input matrix $B$ and $C$:
 
-$$
+```math
 A[i] = \sum_j B[i][j] \, C[j]
-$$
+```
 
 For simplicity we will handle only square matrices whose elements are
 single-precision floating-point numbers. Write a matrix-vector multiplication
@@ -142,10 +123,10 @@ void foo(float* a_d, float* b_d) {
 
 **Answer:**
 
-- a. thread per block $ 16 \times 32 = 512$
-- b. threads in grid $ 512 \times 19 \times 5 = 48640 $
+- a. thread per block $16 \times 32 = 512$
+- b. threads in grid $512 \times 19 \times 5 = 48640$
 - c. blocks in grid $19 \times 5 = 95$
-- d. line 5 run count $ 300 \times 150 = 45000$
+- d. line 5 run count $300 \times 150 = 45000$
 
 ## Ex 3.4
 
@@ -170,7 +151,7 @@ $z = 5$.
 
 **Answer:** Index of $A_{10, 20, 5}$ is
 
-$$
+```math
 \begin{array}{rll}
        & 400 \times 500 & \text{Cube layer size}
 \\ \times & 5 & \text{Depth}
@@ -178,4 +159,4 @@ $$
 \\ \hline
 = & 1{,}008{,}010 &
 \end{array}
-$$
+```

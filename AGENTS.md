@@ -23,7 +23,18 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
   definitions below and near the referencing paragraphs.
 - Write math with `$...$` (display math when it helps). Backticks are for code:
   paths, APIs, types, launch config. Example: $C$, $A[\mathrm{row}, i]$,
-  $O(R^2)$, $\{\alpha, \beta\}$ vs `matmul.cu`, `device::Gemm`, `dim3(16, 16)`.
+  $O(R^2)$, $\lbrace \alpha, \beta\rbrace$ vs `matmul.cu`, `device::Gemm`,
+  `dim3(16, 16)`.
+- GitHub runs KaTeX after the markdown pass, so keep math out of the markdown
+  parser's way ([writing math][gh-math]):
+  - Display math goes in a ` ```math ` fence, never `$$`. A fence is the only
+    place where `\\`, `\,`, and other backslash-punctuation survives.
+  - Inline `$...$` stays on one line with no padding inside the delimiters, and
+    spells braces `\lbrace \rbrace`. `$ x $` and `$\{x\}$` render as literals.
+  - Lay multi-matrix figures out with one `\begin{array}`, not an HTML table:
+    GitHub hoists math out of `<td>` and drops the rows (see Ex 3.1).
+  - Mark cells with `\boxed`. GitHub's KaTeX build drops `\colorbox`, and a
+    fixed background color would fight the dark theme anyway.
 - Later perf improvements rewrite reminders live in `docs/pmpp/todo.md` under a
   plain heading (`## Matmul`) so the chapter checklist can link
   `todo.md#matmul`.
@@ -32,6 +43,8 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
   Do not fill answers. Do not delete the user's answers.
 - Prefer a list when the content is mostly prose. Use a table only for
   numerical comparisons.
+
+[gh-math]: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions
 
 ## Tooling
 

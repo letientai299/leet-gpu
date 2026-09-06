@@ -7,11 +7,6 @@ code-blocks = false
 # Rewrap prose paragraphs to the limit instead of only reporting them.
 reflow = true
 
-[MD033]
-# Pipe tables cannot hold display math, so lay those out with HTML tables.
-# GitHub's sanitizer keeps these tags: https://github.com/gjtorikian/html-pipeline
-allowed-elements = ["table", "thead", "tbody", "tr", "th", "td"]
-
 [MD060]
 # Align table cells and delimiter rows.
 enabled = true

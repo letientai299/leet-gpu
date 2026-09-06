@@ -4,9 +4,9 @@ H100 80GB HBM3, 132 SMs, SM clock locked at 1980 MHz (P0), `Clock Scaling`
 100% on every row below. [NVBench][nvbench] settings: 5 warmup runs, min 20
 samples, 1 s batch target, throttle threshold 0.9.
 
-$$
+```math
 \mathrm{GFLOPs/s} = \frac{2MNK}{t_{\mathrm{GPU}}\times 10^9}
-$$
+```
 
 - Cold: isolated launches, one sync per launch. Includes launch overhead.
 - Batch: many launches, total GPU time / count. Launch cost amortized.
@@ -196,10 +196,13 @@ matmul --kernel row --bench \
   --axis 'K=[64,512,2048]'
 ```
 
-Shapes above: aligned $\{2048{\times}128, 512{\times}512, 128{\times}2048\}$
-with $K\in\{64,512,2048\}$, ragged $\{2053{\times}127, 515{\times}509,
-127{\times}2053\}$ with $K\in\{67,509,2053\}$, plus $2048^3$, $2053^3$,
-$4092^3$, and $4096^3$.
+Shapes above:
+
+- aligned $\lbrace 2048{\times}128, 512{\times}512, 128{\times}2048\rbrace$ with
+  $K\in\lbrace 64, 512, 2048\rbrace$
+- ragged $\lbrace 2053{\times}127, 515{\times}509, 127{\times}2053\rbrace$ with
+  $K\in\lbrace 67, 509, 2053\rbrace$
+- cubes $2048^3$, $2053^3$, $4092^3$, and $4096^3$
 
 ## References
 
