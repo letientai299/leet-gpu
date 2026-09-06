@@ -13,14 +13,53 @@ fi
 
 app=$(normalize_app "${1:-}")
 
+# A toolkit install puts nvcc under its own prefix, not on the default PATH, so
+# CMake needs CUDACXX to detect the CUDA compiler.
+# https://cmake.org/cmake/help/latest/envvar/CUDACXX.html
+find_nvcc() {
+  local candidate prefix
+  local -a versioned=()
+
+  for candidate in "${CUDACXX:-}" "$(command -v nvcc || true)"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for prefix in "${CUDA_HOME:-}" "${CUDA_PATH:-}" /usr/local/cuda /opt/cuda; do
+    [ -n "$prefix" ] || continue
+    candidate=$prefix/bin/nvcc
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  # Versioned prefixes stay behind when /usr/local/cuda is missing. Newest wins.
+  shopt -s nullglob
+  versioned=(/usr/local/cuda-*/bin/nvcc /opt/cuda-*/bin/nvcc)
+  shopt -u nullglob
+  [ "${#versioned[@]}" -gt 0 ] || return 1
+
+  while read -r candidate; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done < <(printf '%s\n' "${versioned[@]}" | sort -Vr)
+  return 1
+}
+
 if [ -e /.dockerenv ]; then
   root=/app
   flavor=docker
 else
   root=${MISE_PROJECT_ROOT:-$PWD}
+  nvcc_bin=$(find_nvcc || true)
   build_env=${BUILD_ENV:-auto}
   if [ "$build_env" = auto ]; then
-    if [ "$(uname -s)" = Linux ] || command -v nvcc >/dev/null; then
+    if [ -n "$nvcc_bin" ]; then
       build_env=local
     else
       build_env=docker
@@ -30,6 +69,13 @@ else
   case "$build_env" in
     local)
       flavor=local
+      if [ -z "$nvcc_bin" ]; then
+        echo "nvcc not found; install the CUDA toolkit, set CUDACXX, or use BUILD_ENV=docker" >&2
+        exit 1
+      fi
+      export CUDACXX=$nvcc_bin
+      PATH=$(dirname "$nvcc_bin"):$PATH
+      export PATH
       ;;
     docker)
       : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
@@ -69,6 +115,12 @@ export CMAKE_BUILD_PARALLEL_LEVEL=$jobs
 
 if [ -f "$build_dir/CMakeCache.txt" ] \
   && ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja' "$build_dir/CMakeCache.txt"; then
+  rm -rf "$build_dir"
+fi
+
+# A failed nvcc probe caches CMAKE_CUDA_COMPILER-NOTFOUND and keeps failing.
+if [ -f "$build_dir/CMakeCache.txt" ] \
+  && grep -q '^CMAKE_CUDA_COMPILER:.*NOTFOUND' "$build_dir/CMakeCache.txt"; then
   rm -rf "$build_dir"
 fi
 
