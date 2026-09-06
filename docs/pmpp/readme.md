@@ -71,32 +71,19 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
   - [`../../src/pmpp/ch03/blur.cu`][ch03-blur]
   - Faster blur: after later chapters, see [`todo.md`][blur-todo].
 - [x] 3.4 Matrix multiplication
-  - [`../../src/pmpp/ch03/matmul.cu`][ch03-matmul]
+  - [`../../src/pmpp/ch03/matmul.kernels.cu`][ch03-matmul]
+  - [Benchmark analysis][ch03-matmul-bench]
   - Faster matmul: after later chapters, see [`todo.md`][matmul-todo].
-  - Oracle is CUTLASS 2.x [`device::Gemm`][cutlass-gemm-h], header-only so
-    `deploy` ships one small binary. Same `Arguments` shape as
-    [`00_basic_gemm`][cutlass-basic-gemm]; that sample is column-major, this app
-    is [row-major][cutlass-layout] ($\mathrm{lda} = k$ for $A$, $\mathrm{width}$
-    for $B$ and $C$).
-  - Read the [2.x GEMM API][cutlass-gemm-api] for the template, `{ptr, ld}`
-    tensor refs, $C$/$D$ alias, and $\{\alpha, \beta\}$ epilogue. Default
-    [`OpClassSimt`][cutlass-gemm-defaults] is CUDA-core FFMA (IEEE FP32), not
-    Tensor Core TF32. Status strings: [`CUTLASS_CHECK`][checks].
-- [ ] 3.5 Summary
-- [ ] [Exercises][ch03-exercises]
+- [x] 3.5 Summary
+- [x] [Exercises][ch03-exercises]
 
 [blur-todo]: ./todo.md#blur
 [matmul-todo]: ./todo.md#matmul
 [ch03-blur]: ../../src/pmpp/ch03/blur.cu
 [ch03-exercises]: ./ch03-ex.md
 [ch03-grayscale]: ../../src/pmpp/ch03/grayscale.cu
-[ch03-matmul]: ../../src/pmpp/ch03/matmul.cu
-[checks]: ../../src/libs/checks.hpp
-[cutlass-basic-gemm]: https://github.com/NVIDIA/cutlass/blob/v4.7.1/examples/00_basic_gemm/basic_gemm.cu
-[cutlass-gemm-api]: https://docs.nvidia.com/cutlass/latest/media/docs/cpp/gemm_api.html
-[cutlass-gemm-defaults]: https://github.com/NVIDIA/cutlass/blob/v4.7.1/include/cutlass/gemm/device/default_gemm_configuration.h
-[cutlass-gemm-h]: https://github.com/NVIDIA/cutlass/blob/v4.7.1/include/cutlass/gemm/device/gemm.h
-[cutlass-layout]: https://github.com/NVIDIA/cutlass/blob/v4.7.1/include/cutlass/layout/matrix.h
+[ch03-matmul]: ../../src/pmpp/ch03/matmul.kernels.cu
+[ch03-matmul-bench]: ./ch03-matmul.md
 
 ### 4. Compute architecture and scheduling
 

@@ -28,11 +28,11 @@ Revisit `blur.cu` once ch 7 (and ideally 8) is done. Timing and Nsight:
 
 ## Matmul
 
-[`../../src/pmpp/ch03/matmul.cu`][matmul]. Ch03 kernel: one thread per $C$
-element, inner product over $k$ from global memory. Correct teaching code.
+[`../../src/pmpp/ch03/matmul.kernels.cu`][matmul]. Ch03 kernel: one thread per
+$C$ element, inner product over $k$ from global memory. Correct teaching code.
 Slow GEMM.
 
-[matmul]: ../../src/pmpp/ch03/matmul.cu
+[matmul]: ../../src/pmpp/ch03/matmul.kernels.cu
 
 Bottleneck is DRAM traffic and reuse, not the math. A warp shares a row of
 $A$ (many threads reload the same $A[\mathrm{row}, i]$) while walking a
@@ -46,7 +46,8 @@ Book path:
   conflicts)
 - Later: compare tiled kernel to the CUTLASS oracle, not only the naive one
 
-Revisit `matmul.cu` once ch 5 (and ideally 6) is done. Timing and Nsight:
+Revisit `matmul.kernels.cu` once ch 5 (and ideally 6) is done. Timing and
+Nsight:
 [`../bench/readme.md`][benchmarking].
 
 [benchmarking]: ../bench/readme.md

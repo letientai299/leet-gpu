@@ -6,9 +6,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cuda/buffer>
-#include <cutlass/gemm/device/gemm.h>
-#include <cutlass/layout/matrix.h>
+#include <cuda_runtime_api.h>
+#include <limits>
 #include <random>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -18,6 +19,30 @@
 #endif
 
 using dbuf = cuda::device_buffer<float>;
+using MatmulKernel =
+    void (*)(const float*, const float*, float*, unsigned, unsigned, unsigned, cudaStream_t);
+
+void launch_matmul_cell(const float* a,
+                        const float* b,
+                        float* c,
+                        unsigned height,
+                        unsigned width,
+                        unsigned k,
+                        cudaStream_t stream = nullptr);
+void launch_matmul_row(const float* a,
+                       const float* b,
+                       float* c,
+                       unsigned height,
+                       unsigned width,
+                       unsigned k,
+                       cudaStream_t stream = nullptr);
+void launch_matmul_col(const float* a,
+                       const float* b,
+                       float* c,
+                       unsigned height,
+                       unsigned width,
+                       unsigned k,
+                       cudaStream_t stream = nullptr);
 
 // Host driver: random A/B, CUTLASS oracle, then the kernel under test.
 // C[height, width] = A[height, k] * B[k, width], all row-major.
@@ -79,44 +104,24 @@ struct Matmul {
   }
 };
 
+inline int run_matmul_kernel(unsigned height, unsigned width, unsigned k, MatmulKernel launch) {
+  return Matmul(height, width, k)
+      .run([launch](const dbuf& a, const dbuf& b, dbuf& c, unsigned height, unsigned width,
+                    unsigned k) {
+        launch(a.data(), b.data(), c.data(), height, width, k, nullptr);
+        return CUDA_CHECK(cudaGetLastError());
+      });
+}
+
 inline void Matmul::fill() {
-  // Fresh seed each run; values in [-1, 1].
-  std::mt19937 rng(std::random_device{}());
+  // Stable inputs make correctness and benchmark runs reproducible.
+  std::mt19937 rng(0x4D41544DU); // NOLINT(bugprone-random-generator-seed)
   std::uniform_real_distribution<float> dist(-1.0F, 1.0F);
   const auto next = [&] {
     return dist(rng);
   };
   std::generate(a.begin(), a.end(), next);
   std::generate(b.begin(), b.end(), next);
-}
-
-// CUTLASS 2.x device::Gemm (not 3.x CuTe / GemmUniversalAdapter). Row-major
-// so no A/B swap. Default OpClassSimt is CUDA-core FFMA, not TF32.
-// Links: docs/pmpp/readme.md (3.4).
-using RowMajor = cutlass::layout::RowMajor;
-using OracleGemm = cutlass::gemm::device::Gemm<float, RowMajor, float, RowMajor, float, RowMajor>;
-
-inline bool Matmul::reference() {
-  // Range ctor copies host A/B to device. C is write-only from the GEMM.
-  return on_device(expected, [&](const dbuf& dev_a, const dbuf& dev_b, dbuf& dev_c) {
-    constexpr float alpha = 1.0F;
-    constexpr float beta = 0.0F; // C := A*B, do not add into C
-    // CUTLASS wants int dims. Row-major leading dims: k for A, width for B
-    // and C. C and D alias; beta 0 means C is never read.
-    const auto cols = static_cast<int>(width);
-    const auto rows = static_cast<int>(height);
-    const auto inner = static_cast<int>(k);
-    const OracleGemm::Arguments args({rows, cols, inner}, {dev_a.data(), inner},
-                                     {dev_b.data(), cols}, {dev_c.data(), cols},
-                                     {dev_c.data(), cols}, {alpha, beta});
-#ifdef __clang_analyzer__
-    (void)args;
-    return true;
-#else
-    OracleGemm gemm;
-    return CUTLASS_CHECK(gemm(args));
-#endif
-  });
 }
 
 inline bool Matmul::verify() const {
@@ -137,59 +142,144 @@ inline bool Matmul::verify() const {
 }
 
 #ifdef LEET_GPU_HAS_NVBENCH
-template <typename Launch>
-void benchmark_matmul(
-    nvbench::state& state, unsigned height, unsigned width, unsigned k, Launch&& launch) {
-  Matmul matmul(height, width, k);
-  matmul.fill();
+struct MatmulDeviceData {
+  unsigned height;
+  unsigned width;
+  unsigned k;
+  dbuf a;
+  dbuf b;
+  dbuf c;
 
-  const auto stream = default_stream();
-  auto& pool = device_pool();
-  const dbuf a{stream, pool, matmul.a};
-  const dbuf b{stream, pool, matmul.b};
-  dbuf c{stream, pool, matmul.c};
-  float* const output = c.data();
-  if (!CUDA_CHECK(cudaDeviceSynchronize())) {
+  MatmulDeviceData(const Matmul& matmul, int device)
+      : height(matmul.height), width(matmul.width), k(matmul.k),
+        a(default_stream(), cuda::device_default_memory_pool(cuda::devices[device]), matmul.a),
+        b(default_stream(), cuda::device_default_memory_pool(cuda::devices[device]), matmul.b),
+        c(default_stream(), cuda::device_default_memory_pool(cuda::devices[device]), matmul.c) {
+  }
+};
+
+inline void add_matmul_summary(nvbench::state& state,
+                               std::string tag,
+                               std::string name,
+                               nvbench::int64_t value) {
+  auto& summary = state.add_summary(std::move(tag));
+  summary.set_string("name", std::move(name));
+  summary.set_int64("value", value);
+}
+
+inline void finish_matmul_summaries(nvbench::state& state, std::size_t flops) {
+  double cold_seconds = 0.0;
+  double batch_seconds = 0.0;
+  for (auto& summary : state.get_summaries()) {
+    if (summary.get_tag() == "nv/cold/time/gpu/mean") {
+      cold_seconds = summary.get_float64("value");
+    } else if (summary.get_tag() == "nv/batch/time/gpu/mean") {
+      batch_seconds = summary.get_float64("value");
+    } else if (summary.get_tag() == "nv/cold/sm_clock_rate/mean" ||
+               summary.get_tag() == "nv/cold/sm_clock_rate/scaling/percent") {
+      summary.remove_value("hide");
+    }
+  }
+
+  if (cold_seconds > 0.0) {
+    auto& summary = state.add_summary("matmul/cold/gflops");
+    summary.set_string("name", "Cold GFLOPs/s");
+    summary.set_string("description", "Billions of floating-point operations per cold GPU second");
+    summary.set_float64("value", static_cast<double>(flops) / cold_seconds / 1.0e9);
+  }
+  if (batch_seconds > 0.0) {
+    auto& summary = state.add_summary("matmul/batch/gflops");
+    summary.set_string("name", "Batch GFLOPs/s");
+    summary.set_string("description", "Billions of floating-point operations per batch GPU second");
+    summary.set_float64("value", static_cast<double>(flops) / batch_seconds / 1.0e9);
+  }
+}
+
+inline void benchmark_matmul(nvbench::state& state,
+                             MatmulDeviceData& data,
+                             MatmulKernel launch,
+                             bool report_dimensions = false) {
+  const auto& device = state.get_device();
+  if (!device.has_value()) {
+    state.skip("CUDA device is unavailable");
+    return;
+  }
+  if (!CUDA_CHECK(cudaSetDevice(device.value().get_id())) || !CUDA_CHECK(cudaDeviceSynchronize())) {
     state.skip("CUDA setup failed");
     return;
   }
 
-  const auto outputs = static_cast<std::size_t>(height) * width;
-  const auto reads = outputs * k * 2;
-  state.add_element_count(outputs);
+  const auto outputs = static_cast<std::size_t>(data.height) * data.width;
+  const auto matrix_elements = static_cast<std::size_t>(data.height) * data.k +
+                               static_cast<std::size_t>(data.k) * data.width + outputs;
+  if (outputs > std::numeric_limits<std::size_t>::max() / data.k / 2) {
+    state.skip("FLOP count overflow");
+    return;
+  }
+  const auto flops = outputs * data.k * 2;
+  const auto reads = flops;
+
+  if (report_dimensions) {
+    add_matmul_summary(state, "matmul/height", "Height", data.height);
+    add_matmul_summary(state, "matmul/width", "Width", data.width);
+    add_matmul_summary(state, "matmul/k", "K", data.k);
+  }
+  add_matmul_summary(state, "matmul/flops", "FLOPs", static_cast<nvbench::int64_t>(flops));
+  state.add_buffer_size(matrix_elements * sizeof(float), "matmul/device_memory", "Memory");
   state.add_global_memory_reads<float>(reads);
   state.add_global_memory_writes<float>(outputs);
 #ifdef __clang_analyzer__
-  output[0] = 0.0F;
-  launch(a.data(), b.data(), output, height, width, k, nullptr);
+  data.c.data()[0] = 0.0F;
+  launch(data.a.data(), data.b.data(), data.c.data(), data.height, data.width, data.k, nullptr);
 #else
   state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& bench) {
-    launch(a.data(), b.data(), output, height, width, k, bench.get_stream());
+    launch(data.a.data(), data.b.data(), data.c.data(), data.height, data.width, data.k,
+           bench.get_stream());
   });
+  finish_matmul_summaries(state, flops);
 #endif
 }
 
-inline int run_nvbench(int argc, char** argv) try {
-  std::vector<char*> args(argv, argv + argc);
-  args.erase(args.begin() + 1);
-  int const bench_argc = static_cast<int>(args.size());
-  char** const bench_argv = args.data();
-  NVBENCH_MAIN_BODY(bench_argc, bench_argv);
+inline void benchmark_matmul(
+    nvbench::state& state, unsigned height, unsigned width, unsigned k, MatmulKernel launch) {
+  if (height == 0 || width == 0 || k == 0) {
+    state.skip("matrix dimensions must be positive");
+    return;
+  }
+
+  Matmul matmul(height, width, k);
+  matmul.fill();
+  const auto& selected_device = state.get_device();
+  if (!selected_device.has_value()) {
+    state.skip("CUDA device is unavailable");
+    return;
+  }
+  const int device = selected_device.value().get_id();
+  if (!CUDA_CHECK(cudaSetDevice(device))) {
+    state.skip("CUDA device selection failed");
+    return;
+  }
+  MatmulDeviceData data(matmul, device);
+  benchmark_matmul(state, data, launch);
 }
+
+inline bool
+get_matmul_dimensions(nvbench::state& state, unsigned& height, unsigned& width, unsigned& k) {
+  const auto axis_height = state.get_int64("Height");
+  const auto axis_width = state.get_int64("Width");
+  const auto axis_k = state.get_int64("K");
+  constexpr auto max = static_cast<nvbench::int64_t>(std::numeric_limits<int>::max());
+  if (axis_height <= 0 || axis_width <= 0 || axis_k <= 0 || axis_height > max || axis_width > max ||
+      axis_k > max) {
+    state.skip("matrix dimensions must fit positive unsigned values");
+    return false;
+  }
+  height = static_cast<unsigned>(axis_height);
+  width = static_cast<unsigned>(axis_width);
+  k = static_cast<unsigned>(axis_k);
+  return true;
+}
+
+inline int run_nvbench_args(int argc, char** argv) try { NVBENCH_MAIN_BODY(argc, argv); }
 NVBENCH_MAIN_CATCH_EXCEPTIONS
-
-template <typename Fn> int run_matmul_app(int argc, char** argv, Fn&& body) {
-  if (help_requested(argc, argv)) {
-    std::printf("Usage: %s [--bench [options]]\n", argv[0]);
-    return 0;
-  }
-  const bool bench = argc >= 2 && std::strcmp(argv[1], "--bench") == 0;
-  if (argc != 1 && !bench) {
-    std::printf("Usage: %s [--bench [options]]\n", argv[0]);
-    return 2;
-  }
-
-  const int result = run_host(1, argv, std::forward<Fn>(body));
-  return result != 0 || !bench ? result : run_nvbench(argc, argv);
-}
 #endif

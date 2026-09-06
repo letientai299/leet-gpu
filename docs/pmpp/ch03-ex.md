@@ -20,7 +20,7 @@ different matrix-matrix multiplication kernels and compare them.
 
 **Answer:**
 
-See (a) [`matmul.row.cu`][mm-row] and (b) [`matmul.col.cu`][mm-col].
+See (a) [`launch_matmul_row()`][mm-row] and (b) [`launch_matmul_col()`][mm-col].
 
 For (c), the analysis below is purely from my understanding after completing the
 code, before testing via [nvBench][nvb].
@@ -74,60 +74,22 @@ can't just access a few bytes inside VRAM without locking a larger region.
 
 All 3 solutions need $k \times \mathrm{height}$ random accesses for $B$.
 
-- [1 thread per cell][mm-cell]: needs $\mathrm{width} \times \mathrm{height}$
-  random-order accesses to the $C$ data. Even though this solution is the most
-  parallel, I guess it would hit the most memory contention. Thus, slowest.
+- [`launch_matmul_cell()`][mm-cell]: one thread per cell needs
+  $\mathrm{width} \times \mathrm{height}$ random-order accesses to the $C$ data.
+  Even though this solution is the most parallel, I guess it would hit the most
+  memory contention. Thus, slowest.
 - `matmul.row`: each thread owns a row of $C$, thus reducing contention, and
   because they access a linear region of VRAM, this should be fastest.
 - `matmul.col`: each thread owns a column of $C$, and needs to jump between
   cells, so this is slower than `matmul.row`.
 
-### AI verdict
+> My guess is wrong, see [benchmark analysis][ch03-matmul] for stats and AI
+> assisted analysis.
 
-(a)/(b) kernels match the exercise. The inner-product picture (row of $A$ ×
-column of $B$) is right, as is row-major: a row of $A$/$C$ is contiguous, a
-column of $B$ is strided.
-
-The (c) ranking does not hold. GPU cost is a warp (consecutive threads, same
-instruction) touching scattered addresses, not CPU-style cache-line locks, and
-not “contention” from many writes to different $C$ cells. Sequential walking by
-one thread later is not coalescing across the warp.
-
-- 1 thread / cell: `threadIdx.x` is the column, so neighbors write neighboring
-  $C$ and read neighboring $B$. Thread count is
-  $\mathrm{height}\times
-  \mathrm{width}$.
-- `matmul.row`: $\mathrm{height}$ threads; neighbors own neighbor rows → strided
-  $A$/$C$ at one inner-loop step. Each thread covers $\mathrm{width}$ cells.
-- `matmul.col`: $\mathrm{width}$ threads; neighbors own neighbor columns →
-  adjacent $B$/$C$. Each thread covers $\mathrm{height}$ cells.
-
-“Most parallel ⇒ most contention ⇒ slowest” is backwards among these naive
-kernels. The cell kernel has $\mathrm{height}\times\mathrm{width}$ threads, so
-it should outrun the other two whenever that grid can occupy the GPU.
-
-Among the two coarsened naive kernels, row vs col is occupancy
-($\mathrm{height}$ vs $\mathrm{width}$ threads) against how the warp maps onto
-**consecutive addresses**. VRAM is not a 2D panel of matrix cells; it serves 1D
-bursts (sectors / DRAM pages). Row-major only means $C[y,x]$ and $C[y,x+1]$ are
-adjacent. `matmul.col` assigns those neighbors to consecutive threads, so one
-instruction is one burst of $B$/$C$. `matmul.row` assigns consecutive threads to
-$C[y,x]$ and $C[y+1,x]$ (stride $\mathrm{width}$), so the same instruction is
-many sectors. One thread later walking a row is CPU-style locality; it is not
-the request the memory system sees.
-
-Shape only shifts that trade. Tall skinny $C$
-($\mathrm{height}\gg\mathrm{width}$): row launches more threads, which can
-outweigh strided accesses. Wide $C$ ($\mathrm{width}\gg\mathrm{height}$): col
-has more threads _and_ a burst-friendly warp. Near-square, burst mapping favors
-col; measure. Column-major arrays would flip which coarsened kernel coalesces.
-
-None of this is a production GEMM (cuBLAS, CUTLASS, DeepGEMM, …): no tiling, no
-shared memory, no tensor cores.
-
-[mm-cell]: ../../src/pmpp/ch03/matmul.cu
-[mm-row]: ../../src/pmpp/ch03/matmul.row.cu
-[mm-col]: ../../src/pmpp/ch03/matmul.col.cu
+[ch03-matmul]: ./ch03-matmul.md
+[mm-cell]: ../../src/pmpp/ch03/matmul.hpp
+[mm-row]: ../../src/pmpp/ch03/matmul.hpp
+[mm-col]: ../../src/pmpp/ch03/matmul.hpp
 [nvb]: https://github.com/NVIDIA/nvbench
 
 ## Ex 3.2
