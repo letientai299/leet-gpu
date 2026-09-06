@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#ifdef LEET_GPU_HAS_NVBENCH
+#ifdef LG_HAS_NVBENCH
 #include <nvbench/main.cuh>
 #include <nvbench/nvbench.cuh>
 #endif
@@ -146,7 +146,7 @@ inline bool Matmul::verify() const {
   return true;
 }
 
-#ifdef LEET_GPU_HAS_NVBENCH
+#ifdef LG_HAS_NVBENCH
 struct MatmulDeviceData {
   unsigned height;
   unsigned width;

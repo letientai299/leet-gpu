@@ -52,14 +52,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # `86` also embeds PTX (`86-virtual`). Cubin-only keeps the three SASS
 # images the deploy hosts actually run.
 set(
-  LEET_GPU_CUDA_ARCHITECTURES
+  LG_CUDA_ARCHITECTURES
   "86-real;90-real;100-real"
   CACHE STRING
   "Default CUDA architectures"
 )
 set(
   CMAKE_CUDA_ARCHITECTURES
-  "${LEET_GPU_CUDA_ARCHITECTURES}"
+  "${LG_CUDA_ARCHITECTURES}"
   CACHE STRING
   "CUDA architectures"
   FORCE

@@ -1,43 +1,43 @@
-set(LEET_GPU_DEP_CACHE "${CMAKE_SOURCE_DIR}/.cache/fetchcontent")
+set(LG_DEP_CACHE "${CMAKE_SOURCE_DIR}/.cache/fetchcontent")
 
 # Keep extracted sources outside build/ so wiping the CMake tree skips
 # re-download. Binary dirs stay per-prefix (build/docker vs build/local).
-function(leet_gpu_fetch name)
+function(lg_fetch name)
   cmake_parse_arguments(DEP "" "URL;HASH" "" ${ARGN})
   if(NOT DEP_URL OR NOT DEP_HASH OR DEP_UNPARSED_ARGUMENTS)
-    message(FATAL_ERROR "leet_gpu_fetch(${name}) needs URL and HASH")
+    message(FATAL_ERROR "lg_fetch(${name}) needs URL and HASH")
   endif()
   FetchContent_Declare(
     ${name}
     URL "${DEP_URL}"
     URL_HASH "SHA256=${DEP_HASH}"
-    SOURCE_DIR "${LEET_GPU_DEP_CACHE}/${name}-src"
+    SOURCE_DIR "${LG_DEP_CACHE}/${name}-src"
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   )
 endfunction()
 
-leet_gpu_fetch(
+lg_fetch(
   spdlog
   URL https://github.com/gabime/spdlog/archive/refs/tags/v1.16.0.tar.gz
   HASH 8741753e488a78dd0d0024c980e1fb5b5c85888447e309d9cb9d949bdb52aa3e
 )
-leet_gpu_fetch(
+lg_fetch(
   lodepng
   URL
     https://github.com/lvandeve/lodepng/archive/ed6fe5825c6a4fbb7f58ab35a4231c7543cd452a.tar.gz
   HASH c2459a3f9145258f901d262576f7a56ca08087d3b3efeee3ae033c0952120803
 )
-leet_gpu_fetch(
+lg_fetch(
   cccl
   URL https://github.com/NVIDIA/cccl/archive/refs/tags/v3.4.2.tar.gz
   HASH 544f5f14c59cae6cfdad3156aa720f2dd44fbd6feb3556d10bdb4fe6aa3cdf4b
 )
-leet_gpu_fetch(
+lg_fetch(
   cutlass
   URL https://github.com/NVIDIA/cutlass/archive/refs/tags/v4.7.1.tar.gz
   HASH 8290eb914cd5aaf4c665ee4108ba5bd65383cfee1296286a42a7ef711554d365
 )
-leet_gpu_fetch(
+lg_fetch(
   nvbench
   URL
     https://github.com/NVIDIA/nvbench/archive/410dcdd21c9b48191ecb3d3d77060b1bf4ac6244.tar.gz
@@ -78,33 +78,30 @@ find_package(CUDAToolkit REQUIRED)
 
 # Oracle GEMM. Header-only: one instantiated kernel instead of the ~280 MB of
 # precompiled kernels cuBLAS links in.
-add_library(leet_gpu_cutlass INTERFACE)
-target_compile_definitions(leet_gpu_cutlass INTERFACE LEET_GPU_HAS_CUTLASS)
-target_link_libraries(leet_gpu_cutlass INTERFACE nvidia::cutlass::cutlass)
+add_library(lg_cutlass INTERFACE)
+target_compile_definitions(lg_cutlass INTERFACE LG_HAS_CUTLASS)
+target_link_libraries(lg_cutlass INTERFACE nvidia::cutlass::cutlass)
 # CUTLASS's CMake puts this on its own apps, not on nvidia::cutlass::cutlass.
 target_compile_options(
-  leet_gpu_cutlass
+  lg_cutlass
   INTERFACE "$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>"
 )
 
-add_library(leet_gpu_nvbench INTERFACE)
-target_compile_definitions(leet_gpu_nvbench INTERFACE LEET_GPU_HAS_NVBENCH)
-target_link_libraries(leet_gpu_nvbench INTERFACE nvbench::nvbench)
+add_library(lg_nvbench INTERFACE)
+target_compile_definitions(lg_nvbench INTERFACE LG_HAS_NVBENCH)
+target_link_libraries(lg_nvbench INTERFACE nvbench::nvbench)
 
-add_library(leet_gpu_runtime STATIC log.cpp)
-target_include_directories(
-  leet_gpu_runtime
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-)
-target_link_libraries(leet_gpu_runtime PUBLIC spdlog::spdlog)
+add_library(lg_runtime STATIC log.cpp)
+target_include_directories(lg_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(lg_runtime PUBLIC spdlog::spdlog)
 
 add_library(lodepng STATIC "${lodepng_SOURCE_DIR}/lodepng.cpp")
 target_include_directories(lodepng PUBLIC "${lodepng_SOURCE_DIR}")
 
-add_library(leet_gpu_image STATIC image.cpp)
-target_include_directories(leet_gpu_image PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+add_library(lg_image STATIC image.cpp)
+target_include_directories(lg_image PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(
-  leet_gpu_image
-  PUBLIC leet_gpu_runtime CUDA::cudart_static CCCL::CCCL
+  lg_image
+  PUBLIC lg_runtime CUDA::cudart_static CCCL::CCCL
   PRIVATE lodepng
 )

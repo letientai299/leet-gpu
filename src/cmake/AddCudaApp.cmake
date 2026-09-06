@@ -32,7 +32,7 @@ function(add_cuda_app key)
   add_executable(${target} "${source}")
   target_link_libraries(
     ${target}
-    PRIVATE leet_gpu_runtime CCCL::CCCL ${APP_LIBRARIES}
+    PRIVATE lg_runtime CCCL::CCCL ${APP_LIBRARIES}
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(

@@ -20,7 +20,7 @@ def cuda_args(args: list[str]) -> list[str]:
         if (
             arg == "-forward-unknown-to-host-compiler"
             or arg == "--expt-relaxed-constexpr"
-            or arg.startswith(("--generate-code=", "-arch="))
+            or arg.startswith(("--generate-code=", "-arch=", "--compress-mode="))
             or (arg.startswith("-t") and arg[2:].isdigit())
         ):
             index += 1

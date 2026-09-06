@@ -23,7 +23,7 @@ inline bool cuda_check(cudaError_t error, const char* file, int line) {
 
 #define CUDA_CHECK(expression) cuda_check((expression), __FILE__, __LINE__)
 
-#ifdef LEET_GPU_HAS_CUTLASS
+#ifdef LG_HAS_CUTLASS
 #include <cutlass/cutlass.h>
 
 inline bool cutlass_check(cutlass::Status status, const char* file, int line) {
