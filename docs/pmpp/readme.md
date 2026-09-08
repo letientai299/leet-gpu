@@ -94,11 +94,13 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 - [ ] 4.5 Control divergence
 - [ ] 4.6 Warp scheduling and latency tolerance
 - [ ] 4.7 Resource partitioning and occupancy
-- [ ] 4.8 Querying device properties
+- [x] 4.8 Querying device properties
+  - [`../../src/pmpp/ch04/limits.cpp`][ch04-limits]
 - [ ] 4.9 Summary
 - [ ] [Exercises][ch04-exercises]
 
 [ch04-exercises]: ./ch04-ex.md
+[ch04-limits]: ../../src/pmpp/ch04/limits.cpp
 
 ### 5. Memory architecture and data locality
 

@@ -76,6 +76,12 @@ FetchContent_MakeAvailable(
 
 find_package(CUDAToolkit REQUIRED)
 
+add_library(lg_cuda_runtime INTERFACE)
+target_link_libraries(
+  lg_cuda_runtime
+  INTERFACE CUDA::cudart_static ${CMAKE_DL_LIBS}
+)
+
 # Oracle GEMM. Header-only: one instantiated kernel instead of the ~280 MB of
 # precompiled kernels cuBLAS links in.
 add_library(lg_cutlass INTERFACE)

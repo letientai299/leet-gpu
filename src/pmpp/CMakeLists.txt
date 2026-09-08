@@ -11,3 +11,4 @@ target_link_libraries(
 add_cuda_app(pmpp/ch03/matmul LIBRARIES lg_matmul_kernels lg_nvbench)
 add_cuda_app(pmpp/ch03/matmul.bench LIBRARIES lg_matmul_kernels lg_nvbench)
 add_cuda_app(pmpp/ch03/matmul.vec LIBRARIES lg_matmul_kernels)
+add_cuda_app(pmpp/ch04/limits LIBRARIES lg_cuda_runtime)
