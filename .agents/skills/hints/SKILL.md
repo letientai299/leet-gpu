@@ -80,7 +80,7 @@ one, and `--exts` is omitted.
 Output is one line per batch:
 
 ```text
-hints-save: modify:/abs/path/matmul.row.cu remove:/abs/path/ch03-ex.md
+hints-save: modify:/abs/path/matmul.row.cu remove:/abs/path/ch03.md
 ```
 
 ## Select the monitor

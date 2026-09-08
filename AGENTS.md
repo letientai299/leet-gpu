@@ -16,11 +16,13 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
 
 ### Docs
 
-- When adding a kernel under `src/`, link it from the matching section in
-  `docs/pmpp/readme.md` (see 2.3 / 3.2). Do not catalog apps in the root
-  `readme.md`. Keep setup, workflow, and editor notes in `docs/readme.md`.
+- When adding a kernel under `src/`, link it from the matching chapter file in
+  `docs/pmpp/chNN.md` (see 2.3 / 3.2). Keep `docs/pmpp/readme.md` as an index.
+  Do not catalog apps in the root `readme.md`. Keep setup, workflow, and editor
+  notes in `docs/readme.md`.
 - Use ref style links in markdown files to prevent broken prose lines. Keep link
-  definitions below and near the referencing paragraphs.
+  definitions below and near the referencing paragraphs. Use inline links for
+  the short relative routes in `docs/pmpp/readme.md`.
 - Write math with `$...$` (display math when it helps). Backticks are for code:
   paths, APIs, types, launch config. Example: $C$, $A[\mathrm{row}, i]$,
   $O(R^2)$, $\lbrace \alpha, \beta\rbrace$ vs `matmul.cu`, `device::Gemm`,
@@ -50,7 +52,7 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
 - Later perf improvements rewrite reminders live in `docs/pmpp/todo.md` under a
   plain heading (`## Matmul`) so the chapter checklist can link
   `todo.md#matmul`.
-- Exercise files (`docs/pmpp/chXX-ex.md`): header each as `## Ex 3.1`
+- Exercise sections in `docs/pmpp/chNN.md`: header each as `## Ex 3.1`
   (chapter.exercise) for cross-file links. Leave an `**Answer:**` placeholder.
   Do not fill answers. Do not delete the user's answers.
 - Prefer a list when the content is mostly prose. Use a table only for
@@ -82,7 +84,7 @@ call the library. Example: `src/pmpp/ch03/matmul.cu`.
 - For GEMM, instantiate CUTLASS 2.x `cutlass::gemm::device::Gemm`, not 3.x CuTe
   / `GemmUniversalAdapter`. Use row-major to match the kernel (`lda` is $k$ for
   $A$, width for $B$ and $C$). Default `OpClassSimt` is CUDA-core FFMA (IEEE
-  FP32), not Tensor Core TF32. Keep learner API links in `docs/pmpp/readme.md`
+  FP32), not Tensor Core TF32. Keep learner API links in `docs/pmpp/ch03.md`
   §3.4, not as a URL dump in the `.cu`.
 - Match the naive kernel's precision and layout. Vendor defaults may use reduced
   precision or a different memory order. For floats, compare with atol/rtol, not

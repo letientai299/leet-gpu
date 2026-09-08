@@ -1,5 +1,0 @@
-# Chapter 20 exercises — Programming a heterogeneous computing cluster
-
-Back to the [reading checklist][reading-checklist].
-
-[reading-checklist]: ./readme.md#20-programming-a-heterogeneous-computing-cluster

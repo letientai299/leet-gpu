@@ -1,5 +1,0 @@
-# Chapter 16 exercises — Deep learning
-
-Back to the [reading checklist][reading-checklist].
-
-[reading-checklist]: ./readme.md#16-deep-learning

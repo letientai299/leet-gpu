@@ -1,5 +1,0 @@
-# Chapter 14 exercises — Sparse matrix computation
-
-Back to the [reading checklist][reading-checklist].
-
-[reading-checklist]: ./readme.md#14-sparse-matrix-computation
