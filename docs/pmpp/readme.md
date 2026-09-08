@@ -87,16 +87,91 @@ Hwu, Kirk & El Hajj (2022). Reading-progress checklist.
 
 ### 4. Compute architecture and scheduling
 
-- [ ] 4.1 Architecture of a modern GPU
-- [ ] 4.2 Block scheduling
-- [ ] 4.3 Synchronization and transparent scalability
-- [ ] 4.4 Warps and SIMD hardware
-- [ ] 4.5 Control divergence
-- [ ] 4.6 Warp scheduling and latency tolerance
-- [ ] 4.7 Resource partitioning and occupancy
+- [x] 4.1 Architecture of a modern GPU
+  - Hardware, physical side:
+    - Global Mem: historically DRAM, now HBM/HBM2
+    - Many SM (Streaming Multiprocessors), each contains:
+      - A controlller for scheduling logic
+      - Many Streaming Processor, e.g. core
+      - A low-latency, shared memory area
+- [x] 4.2 Block scheduling
+  - Grid, block and thread are the logical side:
+    - Grid cover the whole data shape.
+    - Block cover part of the data, could be scheduled on an SM. Many blocks
+      could go to 1 SM simulataneously.
+    - **All threads in a same block** run on the same SM, thus, can share mem
+      and can **communicate with each other**.
+    - New GPU: cluster is a group of blocks, probably support other form of
+      synchronization.
+- [x] 4.3 Synchronization and transparent scalability
+  - `__syncthreads()`:
+    - barrier, all threads in a block must wait when reaching `__syncthreads`.
+    - when used, must make sure all threads can reach it, otherwise, undefined
+      behavior or deadlock.
+- [x] 4.4 Warps and SIMD hardware
+  - Kernel correctness shouldn't depends on threads sync without barrier
+  - **Warp**: 32-thread SIMD unit (size can change on future GPUs). Prefer block
+    size to be 32x. Warp exists so the SM can:
+    - Warp is the SM scheduling unit; cores are grouped into processing blocks
+      that share fetch/dispatch (A100: 4×16).
+    - Switch to another warp when one stalls (DRAM and other long ops)
+    - Confine `if`/`else` divergence to 32 threads, not the whole SM
+    - Coalesce 32 consecutive threads into few memory transactions
+  - Block is divided into warps, threads are linearized into 1D array for warp
+    partitioning.
+  - SM runs warps in SIMD model: fetch 1 instruction, run it for all threads in
+    a warp
+  - von Neumann Model, adapted for GPU
+
+  ```mermaid
+  flowchart TB
+    subgraph Proc["Processor (Processing Block in SM)"]
+      SMEM[Shared Memory]
+      subgraph PUs["Processing Unit(s)"]
+        direction TB
+        ALU[/"ALU (Arithmetic logic unit)"\]
+        RF[Register File]
+      end
+      subgraph CU["Control Unit"]
+        direction TB
+        PC["PC (Program counter)"]
+        IR["IR (Instruction Register)"]
+      end
+    end
+
+    Mem[Memory]
+    IO[I/O]
+
+    Mem <--> IO
+    Mem <-.-> IO
+    Mem <--> PUs
+    SMEM <--> PUs
+    Mem --> IR
+
+    PC -.-> Mem
+    CU -.-> PUs
+    CU -.-> SMEM
+
+  ```
+
+- [x] 4.5 Control divergence
+  - _Control divergence_: threads in a warp follow different path.
+  - _Independent thread scheduling_: from Volta (Nvidia whitepaper, 2017)
+    architecture onward, different passes (of control flow paths) might be
+    executed concurrently.
+  - There is `__syncwarp()`
+- [x] 4.6 Warp scheduling and latency tolerance
+- [x] 4.7 Resource partitioning and occupancy
+  - **Performance cliff**: increase resources usage per thread slightly could
+    reduce perf greatly.
+  - **Occupancy**: ratio of active resident warps vs max warps per SM.
+  - SM use dynamic partitioning.
+  - SM has limited shared mem, thead-block slots, threads slots, total registers
+    count, named barrier slots, cluster counts, per block max threads, ... All
+    of them could affects occupancy.
 - [x] 4.8 Querying device properties
   - [`../../src/pmpp/ch04/limits.cpp`][ch04-limits]
-- [ ] 4.9 Summary
+- [x] 4.9 Summary
 - [ ] [Exercises][ch04-exercises]
 
 [ch04-exercises]: ./ch04-ex.md
