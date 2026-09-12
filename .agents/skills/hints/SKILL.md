@@ -2,9 +2,10 @@
 name: hints
 description: >-
   Monitor example code and exercise files for saves, then hint one issue on a
-  complete unit of work. Use when the user invokes $hints or /hints, asks for
-  hints or save monitoring, or works on PMPP exercises or kernels as a study
-  session.
+  complete unit of work. Use only when the user invokes $hints or /hints, or
+  explicitly asks to watch saves or start hint monitoring. Do not use when the
+  user asks to check, grade, validate, or review filled exercise answers, or
+  merely because they are working on PMPP exercises.
 metadata:
   compatibility: Codex, Cursor, and Claude Code; requires watchexec.
 ---
@@ -30,8 +31,9 @@ Local IDE/CLI only. Cloud timers cannot watch the filesystem.
   Named directory: `-w` that directory. Named file: `-w` its parent and
   `--filter` the exact repo-relative path. Never `-w` the file itself.
 - `$hints stop` or `/hints stop` — stop the tracked monitor; do not re-arm.
-- A plain-language request to monitor exercises or provide hints follows the
-  same flow without requiring explicit invocation syntax.
+- Explicit "watch saves" / "start hint monitoring" wording follows the same
+  flow without `$hints` / `/hints`. Do not arm this skill to check, grade,
+  validate, or review filled answers.
 
 ## The watcher command
 

@@ -95,9 +95,14 @@ call the library. Example: `src/pmpp/ch03/matmul.cu`.
 ## Hints
 
 Study project: the user does the exercises. Do not fill `**Answer:**`
-placeholders or write exercise solutions. Do not delete filled answers. Hint
-one issue per sub-problem (Ex 3.4a, one logic block); do not dump the
-solution. Do not wait for a whole exercise, function, or file.
+placeholders or write solutions into their files. Do not delete filled
+answers.
 
-For save-watch feedback, use `$hints` in Codex or `/hints` in Cursor and Claude
-Code. A plain-language request for hints also invokes the skill.
+Save-watch is `$hints` (Codex) or `/hints` (Cursor, Claude Code), or an
+explicit request to watch saves for hints. Then hint one issue per complete
+sub-problem (Ex 3.4a, one logic block); do not dump the solution. Do not wait
+for a whole exercise, function, or file.
+
+A request to check, grade, validate, or review filled answers is not this
+skill. Review those answers in full. Do not start the watcher because the
+user mentioned exercises.
