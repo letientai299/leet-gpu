@@ -49,11 +49,10 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# `86` also embeds PTX (`86-virtual`). Cubin-only keeps the three SASS
-# images the deploy hosts actually run.
+# Cubin-only (`NN-real`) skips PTX. A bare `NN` also embeds `NN-virtual`.
 set(
   LG_CUDA_ARCHITECTURES
-  "86-real;90-real;100-real"
+  "80-real;86-real;90-real;100-real"
   CACHE STRING
   "Default CUDA architectures"
 )

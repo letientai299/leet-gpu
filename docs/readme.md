@@ -18,11 +18,14 @@ NVIDIA driver, CUDA toolkit (`nvcc`), CMake 3.22+, Ninja, and ccache. With
 `BUILD_ENV=auto` and empty `SSH_HOST`, build and run locally. `build` looks for
 `nvcc` on `PATH`, then under `CUDACXX`, `CUDA_HOME`, `CUDA_PATH`, and a toolkit
 prefix such as `/usr/local/cuda`, and exports `CUDACXX` for CMake; point
-`CUDACXX` at any other install. Default CUDA architectures are cubin-only 86,
-90, and 100 (no PTX fallback). `mise build` configures Release, compresses
-fatbins, GC-sections unused host objects, and strips symbols. Binaries from
-Docker use CUDA 13.3 and a static runtime; the host driver must load them
-(CUDA 12.4+ for `--compress-mode=size`).
+`CUDACXX` at any other install. Set
+[`LG_CUDA_ARCHITECTURES`][cmake-lists] to cubin-only targets for the GPUs you
+run on; a bare number also embeds PTX. `mise build` configures Release,
+compresses fatbins, GC-sections unused host objects, and strips symbols.
+Binaries from Docker use CUDA 13.3 and a static runtime; the host driver must
+load them (CUDA 12.4+ for `--compress-mode=size`).
+
+[cmake-lists]: ../CMakeLists.txt
 
 `deploy` copies only the binary, so an app must not need a CUDA shared library
 at run time. The run host has its own toolkit, and its version rarely matches

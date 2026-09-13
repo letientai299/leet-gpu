@@ -111,3 +111,20 @@ target_link_libraries(
   PUBLIC lg_runtime CUDA::cudart_static CCCL::CCCL
   PRIVATE lodepng
 )
+
+add_library(
+  lg_matmul
+  STATIC
+  matmul/app.cpp
+  matmul/correctness.cu
+  matmul/matrix.cpp
+)
+target_include_directories(lg_matmul PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(
+  lg_matmul
+  PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL
+  PRIVATE lg_cutlass
+)
+
+add_library(lg_matmul_nvbench STATIC matmul/benchmark.cu)
+target_link_libraries(lg_matmul_nvbench PUBLIC lg_matmul lg_nvbench)

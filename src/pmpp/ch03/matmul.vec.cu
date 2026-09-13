@@ -1,8 +1,11 @@
-#include "matmul.hpp"
+#include "checks.hpp"
+#include "matmul/correctness.hpp"
 
 #include <cuda/cmath>
 
 namespace {
+
+namespace mm = lg::matmul;
 
 // Ex 3.2: A[i] = sum_j B[i][j] * C[j]. One thread per output element.
 // a: output vector n, b: row-major n*n matrix, c: input vector n.
@@ -18,20 +21,26 @@ __global__ void matvec_kernel(float* a, const float* b, const float* c, unsigned
 }
 
 /// Host stub: one thread per output vector element.
-void matvec(float* a, const float* b, const float* c, unsigned n) {
+void matvec(float* a, const float* b, const float* c, unsigned n, cudaStream_t stream) {
   constexpr unsigned block = 256;
   const auto grid = static_cast<unsigned>(cuda::ceil_div(n, block));
-  matvec_kernel<<<grid, block>>>(a, b, c, n);
+  matvec_kernel<<<grid, block, 0, stream>>>(a, b, c, n);
+}
+
+void launch_matvec(const float* matrix,
+                   const float* vec_in,
+                   float* vec_out,
+                   const mm::GemmShape& shape,
+                   cudaStream_t stream) {
+  matvec(vec_out, matrix, vec_in, shape.m(), stream);
 }
 
 int run_matvec() {
-  // Square GEMM with width 1. Not a multiple of 256: kernel must bound-check.
+  // Square GEMM with one output column.
   constexpr unsigned n = 67;
-  return Matmul(n, 1, n).run(
-      [](const dbuf& matrix, const dbuf& vec_in, dbuf& vec_out, unsigned n, unsigned, unsigned) {
-        matvec(vec_out.data(), matrix.data(), vec_in.data(), n);
-        return CUDA_CHECK(cudaGetLastError());
-      });
+  mm::Problem problem(mm::GemmShape(n, 1, n));
+  mm::fill_random(problem);
+  return mm::check(problem, {"matmul.vec", launch_matvec});
 }
 
 } // namespace

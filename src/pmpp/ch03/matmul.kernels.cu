@@ -1,8 +1,6 @@
 #include "matmul.hpp"
 
 #include <cuda/cmath>
-#include <cutlass/gemm/device/gemm.h>
-#include <cutlass/layout/matrix.h>
 
 namespace {
 
@@ -60,36 +58,14 @@ __global__ void matmul_col_kernel(
 
 } // namespace
 
-bool Matmul::reference() {
-  // CUTLASS 2.x uses SIMT FP32 and row-major layouts as the teaching kernels do.
-  using RowMajor = cutlass::layout::RowMajor;
-  using Gemm = cutlass::gemm::device::Gemm<float, RowMajor, float, RowMajor, float, RowMajor>;
-
-  return on_device(expected, [&](const dbuf& dev_a, const dbuf& dev_b, dbuf& dev_c) {
-    constexpr float alpha = 1.0F;
-    constexpr float beta = 0.0F;
-    const auto cols = static_cast<int>(width);
-    const auto rows = static_cast<int>(height);
-    const auto inner = static_cast<int>(k);
-    const Gemm::Arguments args({rows, cols, inner}, {dev_a.data(), inner}, {dev_b.data(), cols},
-                               {dev_c.data(), cols}, {dev_c.data(), cols}, {alpha, beta});
-#ifdef __clang_analyzer__
-    (void)args;
-    return true;
-#else
-    Gemm gemm;
-    return CUTLASS_CHECK(gemm(args));
-#endif
-  });
-}
-
 void launch_matmul_cell(const float* a,
                         const float* b,
                         float* c,
-                        unsigned height,
-                        unsigned width,
-                        unsigned k,
+                        const lg::matmul::GemmShape& shape,
                         cudaStream_t stream) {
+  const unsigned height = shape.m();
+  const unsigned width = shape.n();
+  const unsigned k = shape.k();
   const dim3 block(16, 16);
   const dim3 grid(cuda::ceil_div(width, block.x), cuda::ceil_div(height, block.y));
   matmul_cell_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);
@@ -98,10 +74,11 @@ void launch_matmul_cell(const float* a,
 void launch_matmul_row(const float* a,
                        const float* b,
                        float* c,
-                       unsigned height,
-                       unsigned width,
-                       unsigned k,
+                       const lg::matmul::GemmShape& shape,
                        cudaStream_t stream) {
+  const unsigned height = shape.m();
+  const unsigned width = shape.n();
+  const unsigned k = shape.k();
   constexpr unsigned block = 256;
   const auto grid = static_cast<unsigned>(cuda::ceil_div(height, block));
   matmul_row_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);
@@ -110,10 +87,11 @@ void launch_matmul_row(const float* a,
 void launch_matmul_col(const float* a,
                        const float* b,
                        float* c,
-                       unsigned height,
-                       unsigned width,
-                       unsigned k,
+                       const lg::matmul::GemmShape& shape,
                        cudaStream_t stream) {
+  const unsigned height = shape.m();
+  const unsigned width = shape.n();
+  const unsigned k = shape.k();
   constexpr unsigned block = 256;
   const auto grid = static_cast<unsigned>(cuda::ceil_div(width, block));
   matmul_col_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);

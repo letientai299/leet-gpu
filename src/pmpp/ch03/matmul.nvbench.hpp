@@ -1,23 +1,24 @@
 #pragma once
 
 #include "matmul.hpp"
+#include "matmul/benchmark.hpp"
 
 #ifndef MATMUL_NVBENCH_AXES
 #define MATMUL_NVBENCH_AXES()
 #endif
 
-void matmul_nvbench(nvbench::state& state, MatmulKernel launch);
+void matmul_nvbench(nvbench::state& state, lg::matmul::Kernel kernel);
 
 inline void bench_matmul_cell(nvbench::state& state) {
-  matmul_nvbench(state, launch_matmul_cell);
+  matmul_nvbench(state, kMatmulCell);
 }
 
 inline void bench_matmul_row(nvbench::state& state) {
-  matmul_nvbench(state, launch_matmul_row);
+  matmul_nvbench(state, kMatmulRow);
 }
 
 inline void bench_matmul_col(nvbench::state& state) {
-  matmul_nvbench(state, launch_matmul_col);
+  matmul_nvbench(state, kMatmulCol);
 }
 
 #define MATMUL_BENCHMARK(name, function)                                                           \
