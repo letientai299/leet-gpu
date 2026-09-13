@@ -1,5 +1,13 @@
 # Project Agent Rules
 
+## Answering questions
+
+**This is a study project**. Most code and note here are based on users
+understanding, and might be incorrect. Don't waste time and token reading them
+unless users explicitly asked. Answer users' questions base on the books,
+official CUDA guides, publicly and verified knowledge instead. Users local
+content might be wrong, or incomplete most of the time.
+
 ## Writing
 
 Keep comments, commit bodies, and docs short, concise, direct, imperative.
@@ -55,10 +63,11 @@ Keep comments, commit bodies, and docs short, concise, direct, imperative.
 - Exercise sections in `docs/pmpp/chNN.md`: header each as `## Ex 3.1`
   (chapter.exercise) for cross-file links. Leave an `**Answer:**` placeholder.
   Do not fill answers. Do not delete the user's answers.
-- Prefer a list when the content is mostly prose. Use a table only for
-  numerical comparisons.
+- Prefer a list when the content is mostly prose. Use a table only for numerical
+  comparisons.
 
-[gh-math]: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions
+[gh-math]:
+  <https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions>
 
 ## Tooling
 
@@ -95,14 +104,13 @@ call the library. Example: `src/pmpp/ch03/matmul.cu`.
 ## Hints
 
 Study project: the user does the exercises. Do not fill `**Answer:**`
-placeholders or write solutions into their files. Do not delete filled
-answers.
+placeholders or write solutions into their files. Do not delete filled answers.
 
-Save-watch is `$hints` (Codex) or `/hints` (Cursor, Claude Code), or an
-explicit request to watch saves for hints. Then hint one issue per complete
-sub-problem (Ex 3.4a, one logic block); do not dump the solution. Do not wait
-for a whole exercise, function, or file.
+Save-watch is `$hints` (Codex) or `/hints` (Cursor, Claude Code), or an explicit
+request to watch saves for hints. Then hint one issue per complete sub-problem
+(Ex 3.4a, one logic block); do not dump the solution. Do not wait for a whole
+exercise, function, or file.
 
-A request to check, grade, validate, or review filled answers is not this
-skill. Review those answers in full. Do not start the watcher because the
-user mentioned exercises.
+A request to check, grade, validate, or review filled answers is not this skill.
+Review those answers in full. Do not start the watcher because the user
+mentioned exercises.
