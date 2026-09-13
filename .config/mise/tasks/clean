@@ -1,17 +1,50 @@
 #!/usr/bin/env bash
-#MISE description="Stop the development container and remove generated directories"
+#MISE description="Reset first-party build outputs"
 set -euo pipefail
 
 root=${MISE_PROJECT_ROOT:-$PWD}
+root=$(cd -- "$root" && pwd -P)
+mode=${1:-code}
 
-if [ -n "${CONTAINER_NAME:-}" ] \
-  && [ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)" = true ]; then
-  docker stop "$CONTAINER_NAME" >/dev/null
+if [ "$#" -gt 1 ] || { [ "$mode" != code ] && [ "$mode" != --all ]; }; then
+  echo "usage: mise clean" >&2
+  exit 2
+fi
+
+if [ "$mode" = --all ]; then
+  if [ -n "${CONTAINER_NAME:-}" ] \
+    && [ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)" = true ]; then
+    docker stop "$CONTAINER_NAME" >/dev/null
+  fi
+
+  rm -rf -- \
+    "${root:?}/build" \
+    "${root:?}/bin" \
+    "${root:?}/.cache" \
+    "${root:?}/.ruff_cache" \
+    "${root:?}/.rumdl_cache"
+  exit
 fi
 
 rm -rf -- \
-  "${root:?}/build" \
   "${root:?}/bin" \
-  "${root:?}/.cache" \
+  "${root:?}/.cache/clangd" \
   "${root:?}/.ruff_cache" \
   "${root:?}/.rumdl_cache"
+
+for build_dir in "${root:?}/build"/*; do
+  [ -d "$build_dir" ] || continue
+
+  rm -rf -- \
+    "$build_dir/CMakeCache.txt" \
+    "$build_dir/CMakeFiles" \
+    "$build_dir/src/pmpp"
+
+  libs_dir=$build_dir/src/libs
+  [ -d "$libs_dir" ] || continue
+  if [ -d "$libs_dir/CMakeFiles" ]; then
+    find "$libs_dir/CMakeFiles" -mindepth 1 -maxdepth 1 -type d -name 'lg_*' \
+      -exec rm -rf -- {} +
+  fi
+  find "$libs_dir" -maxdepth 1 -type f -name 'liblg_*' -delete
+done

@@ -22,3 +22,7 @@ run = 'eval "cmd=($usage_cmd)"; docker exec -it "$CONTAINER_NAME" "${cmd[@]}"'
 [tasks."dc:down"]
 description = "Stop the container"
 run = 'docker stop "$CONTAINER_NAME"'
+
+[tasks."clean:all"]
+description = "Remove all generated outputs and dependencies"
+run = ".config/mise/tasks/clean --all"

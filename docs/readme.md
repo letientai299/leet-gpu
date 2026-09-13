@@ -41,8 +41,9 @@ cp .env.example .env
 `nvcc` exists and uses Docker otherwise. CMake writes to `build/local` or
 `build/docker`; CLion configures its own tree at `build/clion`. Binaries still
 land in `bin/`. Fetched dependency sources live in `.cache/fetchcontent/`;
-compiler caches live under the matching build directory. Deleting `build/`
-drops compiler caches but keeps downloaded sources.
+compiler caches live under the matching build directory. `mise clean` resets
+first-party CMake state, objects, and binaries while retaining fetched and built
+dependencies and compiler caches. `mise clean:all` removes all generated state.
 `SSH_HOST` independently selects the run host; leave it empty for local
 execution. A non-empty shell value overrides the fallback in `.env`.
 
