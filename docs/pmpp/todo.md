@@ -25,39 +25,62 @@ Revisit `blur.cu` once ch 7 (and ideally 8) is done. Timing and Nsight:
 [`../bench/readme.md`][benchmarking].
 
 [blur]: ../../src/pmpp/ch03/blur.cu
+[benchmarking]: ../bench/readme.md
 
 ## Matmul
 
-[`../../src/pmpp/ch03/matmul.kernels.cu`][matmul]. Ch03 kernel: one thread per
-$C$ element, inner product over $k$ from global memory. Correct teaching code.
+[`../../src/pmpp/ch03/matmul.kernels.cu`][matmul]. Ch03 `cell`: one thread per
+$C$ element, inner product over $k$ from global memory. Coalesced along $B$.
 Slow GEMM.
 
-[matmul]: ../../src/pmpp/ch03/matmul.kernels.cu
+[`../../src/pmpp/ch05/matmul.tile.cpp`][matmul-tile]. Ch5 Fig. 5.9:
+$16\times 16$ shared tiles, one $C$ element per thread.
 
-Bottleneck is DRAM traffic and reuse, not the math. A warp shares a row of $A$
-(many threads reload the same $A[\mathrm{row}, i]$) while walking a row of $B$
-($B[i, \mathrm{col}]$ is coalesced). No tile stays in shared memory, so each
-inner step hits global again.
+[matmul]: ../../src/pmpp/ch03/matmul.kernels.cu
+[matmul-tile]: ../../src/pmpp/ch05/matmul.tile.cpp
+
+Bottleneck for `cell` is reuse, not the FMA. A warp shares a row of $A$
+($A[\mathrm{row}, i]$) and walks $B$ coalesced. Ampere L1/L2 already capture
+much of that, so Fig. 5.9 is not $T\times$ wall-clock for tile width $T$.
+
+Ch 5 (book vs timer):
+
+- Ex 5.2 / 5.5 / 5.8: algorithmic global loads drop by $T$. Access count, not
+  runtime.
+- Expect about $1.5\times$ vs coalesced `cell` and a few TFLOP/s, not $T\times$
+  and not peak FP32.
+- Same step as [Siboehm][gemm-worklog] kernel 2 (coalesced GMEM, $\sim 1986$
+  GFLOP/s) to kernel 3 (SMEM tile, $\sim 2980$ GFLOP/s) on RTX A6000.
+- Other Fig. 5.9-style runs: [Holt][holt-tiled] $\sim 2$–$3\times$ on A40;
+  student dumps often $\sim 1.1$–$1.8\times$.
+- nvbench `BWUtil` $\gg 100$% counts $2mnk$ float loads against DRAM peak. Use
+  Nsight `dram__bytes` for DRAM.
+
+To raise $t_{\mathrm{cell}}/t_{\mathrm{tile}}$: grow $m,n,k$ (especially $k$)
+so `cell` misses L2; try `kTileWidth` $32$. Smaller matrices make the ratio
+worse. Still do not expect $T\times$ time.
 
 Book path:
 
-- Ch 5: tiled multiply in [`../../src/pmpp/ch05/matmul.tile.cpp`][matmul-tile]
-- Ch 6: more GEMM tuning (thread coarsening, avoiding shared-memory bank
-  conflicts)
-- Later: compare tiled kernel to the CUTLASS oracle, not only the naive one
+- Ch 6.3: 1D thread coarsening on the tiled kernel (Siboehm kernel 4)
+- Later chapters reuse coarsening and tiling on other patterns, not the rest of
+  that SGEMM list
+- After 6.3, [Siboehm][gemm-worklog] kernels 5–11 and [CUTLASS efficient
+  GEMM][cutlass-gemm] for 2D register tiles, vector loads, SMEM swizzle, warp
+  tiles, double buffering. Ch 16 is conv-as-GEMM + cuDNN, not handwritten SGEMM
+- Compare to the CUTLASS oracle, not only `cell`
 
-[matmul-tile]: ../../src/pmpp/ch05/matmul.tile.cpp
-
-Revisit `matmul.kernels.cu` once ch 5 (and ideally 6) is done. Timing and
-Nsight: [`../bench/readme.md`][benchmarking].
-
-[benchmarking]: ../bench/readme.md
+Revisit `matmul.kernels.cu` after ch 6.3. Timing and Nsight:
+[`../bench/readme.md`][benchmarking].
 
 See also:
 
 - [Anatomy of a CUDA GEMM][gemm-anatomy]
 - [How to Optimize a CUDA Matmul Kernel][gemm-worklog]
 
+[cutlass-gemm]:
+  <https://docs.nvidia.com/cutlass/latest/media/docs/cpp/efficient_gemm.html>
 [gemm-anatomy]:
   <https://medium.com/@emmanuelalo52/anatomy-of-a-cuda-gemm-from-naive-kernels-to-outperforming-cublas-on-blackwell-c394b04b5995>
 [gemm-worklog]: https://siboehm.com/articles/22/CUDA-MMM
+[holt-tiled]: https://andreasholt.com/posts/shared-tiled-matmul/
