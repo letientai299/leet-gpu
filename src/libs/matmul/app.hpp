@@ -14,6 +14,9 @@ struct AppArgs {
   unsigned height = kDefaultHeight;
   unsigned width = kDefaultWidth;
   unsigned k = kDefaultK;
+  bool has_height = false;
+  bool has_width = false;
+  bool has_k = false;
   bool bench = false;
   bool help = false;
   std::vector<char*> remaining;

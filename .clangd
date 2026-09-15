@@ -28,10 +28,17 @@ CompileFlags:
     - -arch=*
     - -t0
     - --expt-relaxed-constexpr
+    - --compress-mode=*
 
 ---
 If:
   PathMatch: ^src/.*\.(cuh|h|hpp)$
+CompileFlags:
+  Add: -xcuda
+
+---
+If:
+  PathMatch: ^src/pmpp/ch05/matmul\.tile\.cpp$
 CompileFlags:
   Add: -xcuda
 

@@ -18,6 +18,9 @@ void launch_matmul_col(const float* a,
                        const lg::matmul::GemmShape& shape,
                        cudaStream_t stream = nullptr);
 
-inline const lg::matmul::Kernel kMatmulCell{"matmul.cell", launch_matmul_cell};
-inline const lg::matmul::Kernel kMatmulRow{"matmul.row", launch_matmul_row};
-inline const lg::matmul::Kernel kMatmulCol{"matmul.col", launch_matmul_col};
+inline const lg::matmul::Kernel kMatmulCell{"matmul.cell", launch_matmul_cell,
+                                            lg::matmul::cell_traffic};
+inline const lg::matmul::Kernel kMatmulRow{"matmul.row", launch_matmul_row,
+                                           lg::matmul::cell_traffic};
+inline const lg::matmul::Kernel kMatmulCol{"matmul.col", launch_matmul_col,
+                                           lg::matmul::cell_traffic};

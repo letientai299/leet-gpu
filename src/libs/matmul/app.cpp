@@ -48,18 +48,21 @@ bool parse_args(int argc, char** argv, AppArgs& args) {
       if (!parse_value(index, argc, argv, args.height)) {
         return false;
       }
+      args.has_height = true;
       continue;
     }
     if (arg == "--width") {
       if (!parse_value(index, argc, argv, args.width)) {
         return false;
       }
+      args.has_width = true;
       continue;
     }
     if (arg == "--k") {
       if (!parse_value(index, argc, argv, args.k)) {
         return false;
       }
+      args.has_k = true;
       continue;
     }
 
@@ -70,14 +73,17 @@ bool parse_args(int argc, char** argv, AppArgs& args) {
       if (!parse_dimension(arg.substr(height_prefix.size()), args.height)) {
         return false;
       }
+      args.has_height = true;
     } else if (arg.rfind(width_prefix, 0) == 0) {
       if (!parse_dimension(arg.substr(width_prefix.size()), args.width)) {
         return false;
       }
+      args.has_width = true;
     } else if (arg.rfind(k_prefix, 0) == 0) {
       if (!parse_dimension(arg.substr(k_prefix.size()), args.k)) {
         return false;
       }
+      args.has_k = true;
     } else {
       args.remaining.push_back(argv[index]);
     }

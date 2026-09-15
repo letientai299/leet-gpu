@@ -50,7 +50,11 @@ def main() -> None:
         if not str(file).startswith("/app/src/"):
             continue
         args = command.get("arguments") or shlex.split(command["command"])
-        if file.suffix == ".cu":
+        is_cuda = file.suffix == ".cu" or any(
+            args[index] == "-x" and args[index + 1] == "cu"
+            for index in range(len(args) - 1)
+        )
+        if is_cuda:
             args = cuda_args(args)
         result.append(
             {"directory": command["directory"], "file": str(file), "arguments": args}

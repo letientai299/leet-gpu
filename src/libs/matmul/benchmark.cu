@@ -118,8 +118,15 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
 
   add_summary(state, "matmul/flops", "FLOPs", static_cast<nvbench::int64_t>(flops));
   state.add_buffer_size(elements * sizeof(float), "matmul/device_memory", "Memory");
-  state.add_global_memory_reads<float>(flops);
-  state.add_global_memory_writes<float>(outputs);
+  if (kernel.traffic != nullptr) {
+    Traffic traffic;
+    if (!kernel.traffic(data.shape, traffic)) {
+      state.skip("matmul traffic overflow");
+      return;
+    }
+    state.add_global_memory_reads<float>(traffic.global_reads);
+    state.add_global_memory_writes<float>(traffic.global_writes);
+  }
 #ifdef __clang_analyzer__
   data.c.data()[0] = 0.0F;
   kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, nullptr);
