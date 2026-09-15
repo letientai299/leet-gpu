@@ -34,20 +34,30 @@ Slow GEMM.
 
 [matmul]: ../../src/pmpp/ch03/matmul.kernels.cu
 
-Bottleneck is DRAM traffic and reuse, not the math. A warp shares a row of
-$A$ (many threads reload the same $A[\mathrm{row}, i]$) while walking a
-row of $B$ ($B[i, \mathrm{col}]$ is coalesced). No tile stays in shared
-memory, so each inner step hits global again.
+Bottleneck is DRAM traffic and reuse, not the math. A warp shares a row of $A$
+(many threads reload the same $A[\mathrm{row}, i]$) while walking a row of $B$
+($B[i, \mathrm{col}]$ is coalesced). No tile stays in shared memory, so each
+inner step hits global again.
 
 Book path:
 
-- Ch 5: tiled multiply, coalescing, shared-memory tiles of $A$ and $B$
+- Ch 5: tiled multiply in [`../../src/pmpp/ch05/matmul.tile.cpp`][matmul-tile]
 - Ch 6: more GEMM tuning (thread coarsening, avoiding shared-memory bank
   conflicts)
 - Later: compare tiled kernel to the CUTLASS oracle, not only the naive one
 
+[matmul-tile]: ../../src/pmpp/ch05/matmul.tile.cpp
+
 Revisit `matmul.kernels.cu` once ch 5 (and ideally 6) is done. Timing and
-Nsight:
-[`../bench/readme.md`][benchmarking].
+Nsight: [`../bench/readme.md`][benchmarking].
 
 [benchmarking]: ../bench/readme.md
+
+See also:
+
+- [Anatomy of a CUDA GEMM][gemm-anatomy]
+- [How to Optimize a CUDA Matmul Kernel][gemm-worklog]
+
+[gemm-anatomy]:
+  <https://medium.com/@emmanuelalo52/anatomy-of-a-cuda-gemm-from-naive-kernels-to-outperforming-cublas-on-blackwell-c394b04b5995>
+[gemm-worklog]: https://siboehm.com/articles/22/CUDA-MMM
