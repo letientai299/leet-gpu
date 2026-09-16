@@ -21,10 +21,15 @@ Keep comments, commit bodies, and docs short, concise, direct, and imperative.
 - Use reference-style links in Markdown files to prevent broken prose lines.
   Keep link definitions below and near the referencing paragraphs. Use inline
   links for the short relative routes in `docs/pmpp/readme.md`.
-- Write math with `$...$` and use display math when it helps. Backticks are for
-  code: paths, APIs, types, and launch configuration. Example:
-  $C$, $A[\mathrm{row}, i]$, $O(R^2)$, $\lbrace \alpha, \beta\rbrace$ versus
-  `matmul.cu`, `device::Gemm`, and `dim3(16, 16)`.
+- Use normal text unless mathematical typesetting improves clarity. Keep basic
+  numbers, quantities, units, counts, percentages, arithmetic, and comparisons
+  out of math syntax. Examples: `2048 threads/SM`, `32 blocks/SM`,
+  `64K (65,536) registers/SM`, `96 KB`, `10 / 24 = 0.417 OP/B`, and `90%`.
+- Write variables and expressions that need math typography with `$...$`. Use
+  display math when it helps. Backticks are for code: paths, APIs, types, and
+  launch configuration. Example: $C$, $A[\mathrm{row}, i]$, $O(R^2)$,
+  $\lbrace \alpha, \beta\rbrace$ versus `matmul.cu`, `device::Gemm`, and
+  `dim3(16, 16)`.
 - GitHub runs KaTeX after the Markdown pass, so keep math out of the Markdown
   parser's way ([writing math][gh-math]):
   - Put display math in a ` ```math ` fence, never `$$`. A fence is the only
@@ -56,5 +61,4 @@ Keep comments, commit bodies, and docs short, concise, direct, and imperative.
 - Prefer a list when the content is mostly prose. Use a table only for numerical
   comparisons.
 
-[gh-math]:
-  <https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions>
+[gh-math]: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions

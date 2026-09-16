@@ -22,6 +22,9 @@ the user's files.
   every issue. Do not give the solution.
 - **Check** (`review`, `check`, `validate`): Say **Correct** or **Wrong**
   immediately, then give the solution.
+- For multiple labeled subquestions, mark every subquestion **Correct** or
+  **Wrong**. If an answer contains any error, mark it **Wrong**, then identify
+  its correct and incorrect parts.
 
 ### Other rules
 
