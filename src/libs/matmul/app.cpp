@@ -5,32 +5,61 @@
 
 #include <charconv>
 #include <cstdio>
-#include <limits>
 #include <string_view>
 
 namespace lg::matmul {
 namespace {
 
-bool parse_dimension(std::string_view text, unsigned& value) {
+using DimensionField = std::optional<unsigned> AppArgs::*;
+
+struct DimensionOption {
+  std::string_view flag;
+  DimensionField field;
+};
+
+constexpr DimensionOption kDimensions[] = {
+    {"--height", &AppArgs::height},
+    {"--width", &AppArgs::width},
+    {"--k", &AppArgs::k},
+};
+
+/// std::string_view::starts_with is C++20; this file targets C++17.
+bool starts_with(std::string_view text, std::string_view prefix) {
+  return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
+}
+
+bool parse_dimension(std::string_view text, std::optional<unsigned>& value) {
   unsigned parsed = 0;
-  const auto result = std::from_chars(text.data(), text.data() + text.size(), parsed);
-  if (result.ec != std::errc{} || result.ptr != text.data() + text.size() || parsed == 0 ||
-      parsed > static_cast<unsigned>(std::numeric_limits<int>::max())) {
+  const auto* first = text.data();
+  const auto* last = first + text.size();
+  const auto result = std::from_chars(first, last, parsed);
+  if (result.ec != std::errc{} || result.ptr != last || parsed == 0 || parsed > kMaxDimension) {
     return false;
   }
   value = parsed;
   return true;
 }
 
-bool parse_value(int& index, int argc, char** argv, unsigned& value) {
-  ++index;
-  return index < argc && parse_dimension(argv[index], value);
+/// Consumes `--flag value` or `--flag=value`. Returns nullopt when `arg` is not a dimension.
+std::optional<bool>
+parse_dimension_arg(std::string_view arg, int& index, int argc, char** argv, AppArgs& args) {
+  for (const auto& option : kDimensions) {
+    if (arg == option.flag) {
+      ++index;
+      return index < argc && parse_dimension(argv[index], args.*option.field);
+    }
+    if (starts_with(arg, option.flag) && arg[option.flag.size()] == '=') {
+      return parse_dimension(arg.substr(option.flag.size() + 1), args.*option.field);
+    }
+  }
+  return std::nullopt;
 }
 
 } // namespace
 
-GemmShape AppArgs::shape() const {
-  return GemmShape(height, width, k);
+GemmShape AppArgs::shape(const GemmShape& fallback) const {
+  return GemmShape(height.value_or(fallback.m()), width.value_or(fallback.n()),
+                   k.value_or(fallback.k()));
 }
 
 bool parse_args(int argc, char** argv, AppArgs& args) {
@@ -39,52 +68,12 @@ bool parse_args(int argc, char** argv, AppArgs& args) {
     const std::string_view arg = argv[index];
     if (arg == "--bench") {
       args.bench = true;
-      continue;
-    }
-    if (arg == "--help" || arg == "-h") {
+    } else if (arg == "--help" || arg == "-h") {
       args.help = true;
-      continue;
-    }
-    if (arg == "--height") {
-      if (!parse_value(index, argc, argv, args.height)) {
+    } else if (const auto parsed = parse_dimension_arg(arg, index, argc, argv, args)) {
+      if (!*parsed) {
         return false;
       }
-      args.has_height = true;
-      continue;
-    }
-    if (arg == "--width") {
-      if (!parse_value(index, argc, argv, args.width)) {
-        return false;
-      }
-      args.has_width = true;
-      continue;
-    }
-    if (arg == "--k") {
-      if (!parse_value(index, argc, argv, args.k)) {
-        return false;
-      }
-      args.has_k = true;
-      continue;
-    }
-
-    constexpr std::string_view height_prefix = "--height=";
-    constexpr std::string_view width_prefix = "--width=";
-    constexpr std::string_view k_prefix = "--k=";
-    if (arg.rfind(height_prefix, 0) == 0) {
-      if (!parse_dimension(arg.substr(height_prefix.size()), args.height)) {
-        return false;
-      }
-      args.has_height = true;
-    } else if (arg.rfind(width_prefix, 0) == 0) {
-      if (!parse_dimension(arg.substr(width_prefix.size()), args.width)) {
-        return false;
-      }
-      args.has_width = true;
-    } else if (arg.rfind(k_prefix, 0) == 0) {
-      if (!parse_dimension(arg.substr(k_prefix.size()), args.k)) {
-        return false;
-      }
-      args.has_k = true;
     } else {
       args.remaining.push_back(argv[index]);
     }

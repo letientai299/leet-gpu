@@ -2,10 +2,17 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace lg::matmul {
 
+// Every dimension is validated to fit in an int, so on a 64-bit size_t any
+// product of two of them fits without overflow.
+inline constexpr auto kMaxDimension = static_cast<unsigned>(std::numeric_limits<int>::max());
+static_assert(sizeof(std::size_t) >= 8, "dimension products assume a 64-bit size_t");
+
+/// Row-major C[m,n] = A[m,k] * B[k,n] extents.
 class GemmShape {
 public:
   GemmShape(unsigned m, unsigned n, unsigned k);
@@ -19,9 +26,15 @@ public:
   [[nodiscard]] unsigned k() const {
     return k_;
   }
-  [[nodiscard]] std::size_t a_size() const;
-  [[nodiscard]] std::size_t b_size() const;
-  [[nodiscard]] std::size_t c_size() const;
+  [[nodiscard]] std::size_t a_size() const {
+    return std::size_t{m_} * k_;
+  }
+  [[nodiscard]] std::size_t b_size() const {
+    return std::size_t{k_} * n_;
+  }
+  [[nodiscard]] std::size_t c_size() const {
+    return std::size_t{m_} * n_;
+  }
 
 private:
   unsigned m_;
@@ -52,8 +65,8 @@ public:
     return values_.data();
   }
 
-  [[nodiscard]] float& operator()(unsigned row, unsigned col);
-  [[nodiscard]] const float& operator()(unsigned row, unsigned col) const;
+  float& operator()(unsigned row, unsigned col);
+  const float& operator()(unsigned row, unsigned col) const;
 
   [[nodiscard]] auto begin() {
     return values_.begin();

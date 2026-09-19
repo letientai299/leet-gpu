@@ -4,13 +4,13 @@
 
 #include <initializer_list>
 #include <memory>
-#include <nvbench/main.cuh>
 #include <nvbench/nvbench.cuh>
 #include <optional>
 #include <string_view>
 
 namespace lg::matmul {
 
+/// Keeps one device copy of a problem alive across every NVBench state.
 class Benchmark {
 public:
   explicit Benchmark(Problem problem);
@@ -29,12 +29,14 @@ private:
   std::unique_ptr<Impl> impl_;
 };
 
+/// One kernel measured against a baseline at a fixed shape.
 struct AppConfig {
   Kernel kernel;
   Kernel baseline;
   GemmShape bench_shape;
 };
 
+/// One kernel picked by `--kernel <option>`.
 struct KernelChoice {
   std::string_view option;
   Kernel kernel;

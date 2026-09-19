@@ -7,9 +7,11 @@
 #include <cstring>
 #include <cuda/devices>
 #include <cuda/memory_pool>
+#include <cuda/std/span>
 #include <cuda/stream>
 #include <cuda_runtime.h>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 inline bool cuda_check(cudaError_t error, const char* file, int line) {
@@ -46,6 +48,27 @@ inline auto& device_pool() {
   return cuda::device_default_memory_pool(cuda::devices[0]);
 }
 
+// Shared device-to-host readback. cuda::copy_bytes would be the CCCL-idiomatic
+// call, but it fails with "invalid argument" on CCCL 3.4.2 + CTK 13.4, so this
+// stays on the runtime API.
+// https://nvidia.github.io/cccl/libcudacxx/extended_api/algorithms/copy_bytes.html
+template <typename Source, typename Destination>
+bool copy_checked(const Source& source, Destination& destination, const char* file, int line) {
+  using Element = std::remove_pointer_t<decltype(destination.data())>;
+  static_assert(std::is_trivially_copyable_v<Element>, "readback needs a trivially copyable type");
+  if (source.size() > destination.size()) {
+    write_log("CUDA", file, line, "copy destination holds %zu of %zu elements",
+              static_cast<std::size_t>(destination.size()),
+              static_cast<std::size_t>(source.size()));
+    return false;
+  }
+  return cuda_check(cudaMemcpy(destination.data(), source.data(), source.size() * sizeof(Element),
+                               cudaMemcpyDeviceToHost),
+                    file, line);
+}
+
+#define COPY_CHECK(source, destination) copy_checked((source), (destination), __FILE__, __LINE__)
+
 [[noreturn]] inline __host__ __device__ void not_implemented() {
 #ifdef __CUDA_ARCH__
   __trap();
@@ -57,7 +80,9 @@ inline auto& device_pool() {
 inline bool init_cuda() {
   int device_id = 0;
   cudaDeviceProp device{};
-  if (!CUDA_CHECK(cudaGetDevice(&device_id)) || !CUDA_CHECK(cudaFree(nullptr)) ||
+  // cudaFree(nullptr) forces primary-context creation before anything queries it.
+  // https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html
+  if (!CUDA_CHECK(cudaFree(nullptr)) || !CUDA_CHECK(cudaGetDevice(&device_id)) ||
       !CUDA_CHECK(cudaGetDeviceProperties(&device, device_id))) {
     return false;
   }

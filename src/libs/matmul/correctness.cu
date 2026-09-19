@@ -13,6 +13,7 @@ namespace {
 
 using DeviceMatrix = cuda::device_buffer<float>;
 
+/// Uploads A and B, runs `operation`, reads the result back into `output`.
 template <typename Operation>
 bool on_device(Problem& problem, Matrix& output, Operation&& operation) {
   const auto stream = default_stream();
@@ -20,11 +21,7 @@ bool on_device(Problem& problem, Matrix& output, Operation&& operation) {
   const DeviceMatrix device_a{stream, pool, problem.a};
   const DeviceMatrix device_b{stream, pool, problem.b};
   DeviceMatrix device_c{stream, pool, output};
-  if (!operation(device_a, device_b, device_c)) {
-    return false;
-  }
-  return CUDA_CHECK(
-      cudaMemcpy(output.data(), device_c.data(), output.bytes(), cudaMemcpyDeviceToHost));
+  return operation(device_a, device_b, device_c) && COPY_CHECK(device_c, output);
 }
 
 } // namespace
@@ -40,6 +37,7 @@ bool run_reference(Problem& problem) {
                      const int m = static_cast<int>(problem.shape.m());
                      const int n = static_cast<int>(problem.shape.n());
                      const int k = static_cast<int>(problem.shape.k());
+                     // Row-major leading dimensions: lda = k, ldb = ldc = n.
                      const Gemm::Arguments args({m, n, k}, {a.data(), k}, {b.data(), n},
                                                 {c.data(), n}, {c.data(), n}, {alpha, beta});
 #ifdef __clang_analyzer__
@@ -57,27 +55,30 @@ bool run_kernel(Problem& problem, Kernel kernel) {
     HOST_LOG("Kernel callback is null");
     return false;
   }
+  // Zero first so a kernel that skips elements shows up as a mismatch.
   std::fill(problem.result.begin(), problem.result.end(), 0.0F);
   return on_device(problem, problem.result,
                    [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
+                     cudaGetLastError(); // Drop any error left over from an earlier launch.
                      kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr);
                      return CUDA_CHECK(cudaGetLastError());
                    });
 }
 
 bool verify(const Problem& problem) {
-  for (std::size_t index = 0; index < problem.result.size(); ++index) {
-    const float actual = problem.result.data()[index];
+  const Matrix& result = problem.result;
+  for (std::size_t index = 0; index < result.size(); ++index) {
+    const float actual = result.data()[index];
     const float expected = problem.expected.data()[index];
     const float diff = std::fabs(actual - expected);
     const float tolerance = kAbsoluteTolerance + kRelativeTolerance * std::fabs(expected);
     if (!std::isfinite(actual) || diff > tolerance) {
-      HOST_LOG("Mismatch at %zu: %g vs %g (diff %g, tol %g)", index, actual, expected, diff,
-               tolerance);
+      HOST_LOG("Mismatch at [%zu,%zu]: %g vs %g (diff %g, tol %g)", index / result.cols(),
+               index % result.cols(), actual, expected, diff, tolerance);
       return false;
     }
   }
-  HOST_LOG("Matrix multiply passed: %zu values", problem.result.size());
+  HOST_LOG("Matrix multiply passed: %zu values", result.size());
   return true;
 }
 

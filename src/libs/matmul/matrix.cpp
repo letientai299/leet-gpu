@@ -1,63 +1,67 @@
 #include "matmul/matrix.hpp"
 
 #include <algorithm>
-#include <limits>
+#include <initializer_list>
 #include <random>
 #include <stdexcept>
 
 namespace lg::matmul {
 namespace {
 
-std::size_t checked_size(unsigned rows, unsigned cols) {
-  if (rows == 0 || cols == 0) {
-    throw std::invalid_argument("matrix dimensions must be positive");
+void validate_dimensions(std::initializer_list<unsigned> dimensions) {
+  for (const unsigned dimension : dimensions) {
+    if (dimension == 0) {
+      throw std::invalid_argument("matrix dimensions must be positive");
+    }
+    if (dimension > kMaxDimension) {
+      throw std::invalid_argument("matrix dimensions exceed INT_MAX");
+    }
   }
-  if (rows > std::numeric_limits<std::size_t>::max() / cols) {
-    throw std::length_error("matrix size overflow");
-  }
-  return static_cast<std::size_t>(rows) * cols;
 }
 
-void validate_fill(RandomFill config) {
-  if (config.minimum > config.maximum) {
-    throw std::invalid_argument("random range is reversed");
+/// Deterministic uniform floats; every matrix of a problem draws from one stream.
+class RandomValues {
+public:
+  // rng_ initializes first, so validate() runs before dist_ sees the range.
+  explicit RandomValues(RandomFill config)
+      : rng_(validate(config).seed), dist_(config.minimum, config.maximum) {
   }
-}
+
+  void fill(Matrix& matrix) {
+    std::generate(matrix.begin(), matrix.end(), [this] {
+      return dist_(rng_);
+    });
+  }
+
+private:
+  static RandomFill validate(RandomFill config) {
+    if (config.minimum > config.maximum) {
+      throw std::invalid_argument("random range is reversed");
+    }
+    return config;
+  }
+
+  std::mt19937 rng_; // NOLINT(bugprone-random-generator-seed)
+  std::uniform_real_distribution<float> dist_;
+};
 
 } // namespace
 
 GemmShape::GemmShape(unsigned m, unsigned n, unsigned k) : m_(m), n_(n), k_(k) {
-  constexpr auto maximum = static_cast<unsigned>(std::numeric_limits<int>::max());
-  if (m > maximum || n > maximum || k > maximum) {
-    throw std::invalid_argument("matrix dimensions exceed INT_MAX");
-  }
-  (void)a_size();
-  (void)b_size();
-  (void)c_size();
+  validate_dimensions({m, n, k});
 }
 
-std::size_t GemmShape::a_size() const {
-  return checked_size(m_, k_);
-}
-
-std::size_t GemmShape::b_size() const {
-  return checked_size(k_, n_);
-}
-
-std::size_t GemmShape::c_size() const {
-  return checked_size(m_, n_);
-}
-
-Matrix::Matrix(unsigned rows, unsigned cols)
-    : rows_(rows), cols_(cols), values_(checked_size(rows, cols)) {
+Matrix::Matrix(unsigned rows, unsigned cols) : rows_(rows), cols_(cols) {
+  validate_dimensions({rows, cols});
+  values_.assign(std::size_t{rows} * cols, 0.0F);
 }
 
 float& Matrix::operator()(unsigned row, unsigned col) {
-  return values_.at(static_cast<std::size_t>(row) * cols_ + col);
+  return values_.at(std::size_t{row} * cols_ + col);
 }
 
 const float& Matrix::operator()(unsigned row, unsigned col) const {
-  return values_.at(static_cast<std::size_t>(row) * cols_ + col);
+  return values_.at(std::size_t{row} * cols_ + col);
 }
 
 Problem::Problem(GemmShape problem_shape)
@@ -66,23 +70,13 @@ Problem::Problem(GemmShape problem_shape)
 }
 
 void fill_random(Matrix& matrix, RandomFill config) {
-  validate_fill(config);
-  std::mt19937 rng(config.seed); // NOLINT(bugprone-random-generator-seed)
-  std::uniform_real_distribution<float> dist(config.minimum, config.maximum);
-  std::generate(matrix.begin(), matrix.end(), [&] {
-    return dist(rng);
-  });
+  RandomValues(config).fill(matrix);
 }
 
 void fill_random(Problem& problem, RandomFill config) {
-  validate_fill(config);
-  std::mt19937 rng(config.seed); // NOLINT(bugprone-random-generator-seed)
-  std::uniform_real_distribution<float> dist(config.minimum, config.maximum);
-  const auto next = [&] {
-    return dist(rng);
-  };
-  std::generate(problem.a.begin(), problem.a.end(), next);
-  std::generate(problem.b.begin(), problem.b.end(), next);
+  RandomValues values(config);
+  values.fill(problem.a);
+  values.fill(problem.b);
 }
 
 } // namespace lg::matmul

@@ -3,30 +3,51 @@
 #include "checks.hpp"
 
 #include <cstddef>
+#include <cstdlib>
 #include <cuda/buffer>
+#include <cuda/std/span>
+#include <memory>
 
 using ImageByte = unsigned char;
 
+/// lodepng hands back malloc'd pixels, so the deleter must be free.
+/// https://en.cppreference.com/w/cpp/memory/unique_ptr
+struct FreeDeleter {
+  void operator()(ImageByte* pointer) const {
+    std::free(pointer);
+  }
+};
+
+using ImageBuffer = std::unique_ptr<ImageByte[], FreeDeleter>;
+
 struct Image {
-  ImageByte* pixels = nullptr;
+  ImageBuffer pixels;
   unsigned width = 0;
   unsigned height = 0;
   std::size_t size = 0;
 
-  Image() = default;
-  Image(const Image&) = delete;
-  Image& operator=(const Image&) = delete;
-  ~Image();
-
-  [[nodiscard]] std::size_t pixel_count() const;
+  [[nodiscard]] std::size_t pixel_count() const {
+    return static_cast<std::size_t>(width) * height;
+  }
+  [[nodiscard]] std::size_t channels() const {
+    const auto pixels_count = pixel_count();
+    return pixels_count == 0 ? 0 : size / pixels_count;
+  }
+  [[nodiscard]] cuda::std::span<ImageByte> bytes() const {
+    return {pixels.get(), size};
+  }
 };
 
 class ImageBytes {
 public:
   bool upload(const Image& input, std::size_t output_size);
   bool download(Image& output, unsigned width, unsigned height) const;
-  [[nodiscard]] const ImageByte* input() const;
-  [[nodiscard]] ImageByte* output();
+  [[nodiscard]] const ImageByte* input() const {
+    return input_.data();
+  }
+  [[nodiscard]] ImageByte* output() {
+    return output_.data();
+  }
 
 private:
   cuda::device_buffer<ImageByte> input_{default_stream(), device_pool()};
