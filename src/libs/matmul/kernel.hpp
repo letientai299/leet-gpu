@@ -12,7 +12,7 @@ namespace lg::matmul {
 
 using KernelCallback = void (*)(const float*, const float*, float*, const GemmShape&, cudaStream_t);
 
-/// Saturating helpers: counts derived from a shape can exceed size_t.
+/// Multiplies counts without overflow.
 inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
   if (right != 0 && left > std::numeric_limits<std::size_t>::max() / right) {
     return std::nullopt;
@@ -20,6 +20,7 @@ inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t righ
   return left * right;
 }
 
+/// Adds counts without overflow.
 inline std::optional<std::size_t> checked_add(std::size_t left, std::size_t right) {
   if (left > std::numeric_limits<std::size_t>::max() - right) {
     return std::nullopt;
@@ -35,7 +36,7 @@ struct Traffic {
 
 using TrafficCallback = bool (*)(const GemmShape&, Traffic&);
 
-/// One thread per output element: each reads a full A row and B column.
+/// Estimates naive per-cell memory traffic.
 inline bool cell_traffic(const GemmShape& shape, Traffic& traffic) {
   const auto reads = checked_mul(shape.c_size(), std::size_t{shape.k()} * 2);
   if (!reads) {
