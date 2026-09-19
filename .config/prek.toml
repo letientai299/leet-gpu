@@ -6,10 +6,14 @@
 # Keep rev aligned with mise config.
 [[repos]]
 repo = "https://github.com/pre-commit/mirrors-clang-format"
-rev = "v22.1.8"
+rev = "v23.1.1"
 hooks = [{ id = "clang-format" }]
 
 # Run pinned gersemi, rumdl, ruff, shfmt, and shellcheck directly.
+# shfmt and shellcheck match shell by path, not `types = ["shell"]`: mise file
+# tasks carry no extension, so type detection falls back to the shebang, and
+# that only runs on files with the executable bit. Matching the task
+# directories keeps a task covered even if it loses +x.
 [[repos]]
 repo = "local"
 hooks = [
@@ -18,6 +22,6 @@ hooks = [
   { id = "rumdl", name = "rumdl (Markdown)", entry = "mise exec -- rumdl check --fix", language = "system", types = ["markdown"] },
   { id = "ruff", name = "ruff (Python)", entry = "mise exec -- ruff check --fix", language = "system", types = ["python"] },
   { id = "ruff-format", name = "ruff format (Python)", entry = "mise exec -- ruff format", language = "system", types = ["python"] },
-  { id = "shfmt", name = "shfmt", entry = "mise exec -- shfmt -i 2 -ci -bn -w", language = "system", types = ["shell"], exclude = '(^|/)\.nvim/' },
-  { id = "shellcheck", name = "shellcheck", entry = "mise exec -- shellcheck --rcfile .config/shellcheckrc", language = "system", types = ["shell"], exclude = '(^|/)\.nvim/' },
+  { id = "shfmt", name = "shfmt", entry = "mise exec -- shfmt -i 2 -ci -bn -w", language = "system", files = '\.(sh|bash)$|^\.config/mise/(lib|tasks)/', exclude = '(^|/)\.nvim/' },
+  { id = "shellcheck", name = "shellcheck", entry = "mise exec -- shellcheck --rcfile .config/shellcheckrc", language = "system", files = '\.(sh|bash)$|^\.config/mise/(lib|tasks)/', exclude = '(^|/)\.nvim/' },
 ]
