@@ -13,12 +13,21 @@ constexpr unsigned kTileWidth = 16;
 constexpr unsigned kBenchSize = 4096;
 
 // PMPP 4e Fig. 6.4.
-// Tile/coarse load row-major B directly.
+// Same scalar-per-thread body as ch05 matmul.tile.
+// Isolates corner turning; no thread coarsening.
+// Tile kernel loads row-major B directly.
 // Corner turning coalesces column-major B loads.
+// Helps when B is naturally column-major (e.g. a
+// transposed operand), avoiding a strided global load.
+// Not needed when both operands are already row-major.
 __global__ void
 matmul_corner_kernel(const float* a, const float* b, float* c, unsigned m, unsigned n, unsigned k) {
+  // Same aTile layout and load as matmul.tile; A is unaffected.
   __shared__ float aTile[kTileWidth][kTileWidth];
-  // Pad transposed writes against bank conflicts.
+  // Pad so a warp's tx-strided writes span all 32 banks, not 2.
+  // Tile kernel needs no pad: its bTile write is tx-contiguous.
+  // Not from PMPP Fig. 6.4; general bank-conflict fix, see:
+  // https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#shared-memory-and-memory-banks
   __shared__ float bTile[kTileWidth][kTileWidth + 1];
 
   const auto gx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -32,9 +41,12 @@ matmul_corner_kernel(const float* a, const float* b, float* c, unsigned m, unsig
     const auto aCol = tile * kTileWidth + tx;
     aTile[ty][tx] = gy < m && aCol < k ? a[gy * k + aCol] : 0.0F;
 
+    // Tile kernel: bGy = ty + i*W, reads b[bGy*n + gx].
+    // Here B is pre-transposed to column-major by column_major().
     const auto bRow = tile * kTileWidth + tx;
     const auto bCol = blockIdx.x * kTileWidth + ty;
-    // Swap thread roles while loading B.
+    // Swap thread roles so the column-major load of B stays coalesced.
+    // Read: consecutive tx -> consecutive bRow -> unit stride in memory.
     bTile[tx][ty] = bRow < k && bCol < n ? b[bCol * k + bRow] : 0.0F;
     __syncthreads();
 
@@ -56,6 +68,7 @@ void launch_matmul_corner(
   matmul_corner_kernel<<<grid, block, 0, stream>>>(a, b, c, shape.m(), shape.n(), shape.k());
 }
 
+// Host-side transpose; tile kernel takes B row-major, untransformed.
 mm::Matrix column_major(const mm::Matrix& input) {
   mm::Matrix output(input.cols(), input.rows());
   for (auto row = 0U; row < input.rows(); ++row) {
