@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#MISE description="Compare two kernels in one NVBench JSON run"
+#USAGE arg "<run.json>" help="NVBench --jsonbin output"
+#USAGE arg "[baseline]" help="Benchmark name to treat as reference"
+#USAGE arg "[candidate]" help="Benchmark name to compare against it"
+set -euo pipefail
+
+run=${1:-}
+if [ -z "$run" ] || [ ! -f "$run" ]; then
+  echo "usage: mise run bench-compare <run.json> [baseline] [candidate]" >&2
+  exit 2
+fi
+shift
+
+names=()
+while IFS= read -r name; do
+  names+=("$name")
+done < <(jq -r '.benchmarks[].name' "$run")
+
+baseline=${1:-${names[0]:-}}
+candidate=${2:-${names[1]:-}}
+if [ -z "$baseline" ] || [ -z "$candidate" ] || [ "$baseline" = "$candidate" ]; then
+  echo "need two distinct benchmark names; found: ${names[*]-none}" >&2
+  exit 2
+fi
+
+# nvbench-compare-robust pairs benchmarks by name, so two differently named
+# kernels never match. Rename both to a common name in two split files.
+# Keep the splits beside the source: bulk sample paths inside the JSON are
+# relative to its directory.
+run_dir=$(cd -- "$(dirname -- "$run")" && pwd -P)
+ref=$run_dir/.compare-ref.json
+cmp=$run_dir/.compare-cmp.json
+trap 'rm -f "$ref" "$cmp"' EXIT
+
+select_one() {
+  jq --arg want "$1" \
+    '.benchmarks |= [.[] | select(.name == $want) | .name = "matmul"]' \
+    "$run" >"$2"
+}
+select_one "$baseline" "$ref"
+select_one "$candidate" "$cmp"
+
+echo "baseline=$baseline candidate=$candidate"
+
+# The compare tools are Python entry points of the vendored nvbench wheel, not
+# build targets. uv supplies their dependencies without installing anything.
+# https://github.com/NVIDIA/nvbench/blob/main/docs/nvbench_compare_robust.md
+script=.cache/fetchcontent/nvbench-src/python/scripts/nvbench_compare_robust.py
+if [ ! -f "$script" ]; then
+  echo "nvbench sources missing; run mise build first" >&2
+  exit 1
+fi
+
+exec uv run --no-project --quiet --with numpy --with tabulate \
+  python "$script" --no-color --display explain "$ref" "$cmp"

@@ -89,6 +89,44 @@ loop.
 
 Every binary supports `--help` without initializing CUDA.
 
+Run a benchmark under a prepared GPU, on the GPU host itself:
+
+```sh
+mise run bench -- src/pmpp/ch05/matmul.tile --bench
+```
+
+`bench` pins the process to one GPU, waits for an idle thermal state, and locks
+the SM clock below the point where the power cap throttles, so repeated runs
+compare at the same clock. Every change is reverted when the run ends, including
+on failure or `Ctrl-C`. Locking needs root; without it the run continues and
+warns. `BENCH_GPU`, `BENCH_CLOCK`, and `BENCH_IDLE_TEMP` override the defaults,
+and `BENCH_CLOCK=off` skips locking entirely.
+
+Comparing two kernels by eye does not account for clock drift. Record one run,
+then let NVBench classify the gap:
+
+```sh
+mise run bench -- src/pmpp/ch05/matmul.tile --bench --jsonbin .ai/bench/run.json
+mise run bench-compare -- .ai/bench/run.json
+```
+
+`bench-compare` renames both kernels to a common name so
+[`nvbench-compare-robust`][nvbench-compare] will pair them — it matches
+benchmarks by name and silently skips anything unpaired — and reports
+`SAME`/`FAST`/`SLOW`/`AMBG`. A `FAST` verdict is only issued when the gap also
+holds in cycle space, which is what makes it survive a throttled run. The tool
+is a Python script shipped in the NVBench sources, not a build target; `uv`
+supplies its dependencies per invocation and installs nothing.
+
+[nvbench-compare]: https://github.com/NVIDIA/nvbench/blob/main/docs/nvbench_compare_robust.md
+
+The `Model Bytes` and `Model FLOP/B` columns come from each kernel's traffic
+callback, not from hardware counters. They describe the traffic a cache-less
+machine would move, which is what PMPP ch. 5 reasons about. For measured cache
+and DRAM numbers, profile with [`ncu`][ncu].
+
+[ncu]: https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html
+
 Fix or check C++ and CUDA sources. Python is linted and formatted with ruff:
 
 ```sh

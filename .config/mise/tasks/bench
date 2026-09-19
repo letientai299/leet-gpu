@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+#MISE description="Run one app under a restored-on-exit GPU benchmark setup"
+set -euo pipefail
+
+task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=.config/mise/lib/app.sh
+source "$task_dir/../lib/app.sh"
+
+gpu=${BENCH_GPU:-0}
+# Sustained clock under the power cap, not the boost clock nvbench compares
+# against. "auto" picks the highest supported clock at or below this fraction
+# of the maximum; "off" skips locking.
+clock=${BENCH_CLOCK:-auto}
+clock_fraction=${BENCH_CLOCK_FRACTION:-85}
+idle_watts=${BENCH_IDLE_WATTS:-120}
+idle_temp=${BENCH_IDLE_TEMP:-45}
+idle_timeout=${BENCH_IDLE_TIMEOUT:-180}
+
+app=${APP:-}
+if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
+  app=$1
+  shift
+fi
+if [ -z "$app" ]; then
+  echo "app missing; pass one or set APP" >&2
+  exit 2
+fi
+app=$(normalize_app "$app")
+
+binary=bin/$app
+if [ ! -x "$binary" ]; then
+  echo "app not built: $app" >&2
+  exit 1
+fi
+
+target=${SSH_HOST:-local}
+if [ "$target" != local ] && [ "$target" != localhost ]; then
+  # Clocks would be locked on the wrong machine.
+  echo "SSH_HOST=$target: run this task on the GPU host itself" >&2
+  exit 2
+fi
+
+# Trim the padding nvidia-smi adds, without eating spaces inside a value.
+query() {
+  nvidia-smi -i "$gpu" --query-gpu="$1" --format=csv,noheader,nounits \
+    | sed 's/^ *//; s/ *$//'
+}
+
+# nvidia-smi write operations need root. Try unprivileged first so a machine
+# that grants the capability directly does not prompt.
+gpu_admin() {
+  if nvidia-smi -i "$gpu" "$@" >/dev/null 2>&1; then
+    return 0
+  fi
+  if sudo -n nvidia-smi -i "$gpu" "$@" >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+locked=0
+persistence_restore=
+
+# Runs on success, failure, and Ctrl-C, so the card never keeps a benchmark
+# setting. Each branch undoes only what this script actually changed.
+restore() {
+  local status=$?
+  trap - EXIT INT TERM
+  if [ "$locked" = 1 ]; then
+    gpu_admin -rgc && echo "bench: GPU $gpu clocks reset" \
+      || echo "bench: GPU $gpu clock reset FAILED; run: sudo nvidia-smi -i $gpu -rgc" >&2
+  fi
+  if [ -n "$persistence_restore" ]; then
+    gpu_admin -pm "$persistence_restore" \
+      || echo "bench: GPU $gpu persistence restore FAILED" >&2
+  fi
+  exit "$status"
+}
+
+busy=$(nvidia-smi -i "$gpu" --query-compute-apps=pid --format=csv,noheader | wc -l)
+if [ "$busy" -gt 0 ] && [ "${BENCH_FORCE:-0}" != 1 ]; then
+  echo "bench: GPU $gpu has $busy compute process(es); set BENCH_FORCE=1 to run anyway" >&2
+  exit 1
+fi
+
+trap restore EXIT INT TERM
+
+if [ "$clock" = auto ]; then
+  max_clock=$(query clocks.max.sm)
+  target_clock=$((max_clock * clock_fraction / 100))
+  # Supported clocks are descending, so the first at or below target is the
+  # highest one that fits.
+  clock=$(nvidia-smi -i "$gpu" --query-supported-clocks=gr --format=csv,noheader,nounits \
+    | tr -d ' ' | awk -v t="$target_clock" '$1 <= t {print $1; exit}')
+  if [ -z "$clock" ]; then
+    clock=off
+  fi
+fi
+
+if [ "$clock" != off ]; then
+  previous_persistence=$(query persistence_mode)
+  if [ "$previous_persistence" = Disabled ]; then
+    # Without persistence the driver may unload between runs and drop the lock.
+    if gpu_admin -pm 1; then
+      persistence_restore=0
+    fi
+  fi
+  if gpu_admin -lgc "$clock"; then
+    locked=1
+    echo "bench: GPU $gpu locked to ${clock} MHz"
+    # NVBench compares the live clock against the boost clock, so a locked card
+    # looks permanently throttled and every trial gets discarded. Track the lock
+    # with a small margin, which still flags a genuine anomaly.
+    # https://github.com/NVIDIA/nvbench/blob/main/docs/cli_help.md
+    if [[ " $* " != *" --throttle-threshold "* ]]; then
+      threshold=$((clock * 100 / $(query clocks.max.sm) - 2))
+      set -- "$@" --throttle-threshold "$threshold"
+      echo "bench: throttle threshold set to ${threshold}%"
+    fi
+  else
+    echo "bench: cannot lock GPU $gpu clocks (needs root); results will vary with boost" >&2
+    echo "bench: grant access with: sudo nvidia-smi -i $gpu -lgc $clock" >&2
+  fi
+fi
+
+# Start every run from the same thermal and power state.
+deadline=$((SECONDS + idle_timeout))
+while true; do
+  watts=$(query power.draw | cut -d. -f1)
+  temp=$(query temperature.gpu)
+  if [ "$watts" -le "$idle_watts" ] && [ "$temp" -le "$idle_temp" ]; then
+    break
+  fi
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    echo "bench: GPU $gpu still at ${watts}W/${temp}C after ${idle_timeout}s; continuing" >&2
+    break
+  fi
+  sleep 5
+done
+
+echo "bench: GPU $gpu $(query name) driver $(query driver_version) at $(query temperature.gpu)C"
+
+# Hide the other GPUs from the process instead of relying on a CLI flag, so any
+# app benchmarks the card this script prepared.
+export CUDA_VISIBLE_DEVICES=$gpu
+
+"$binary" "$@"
