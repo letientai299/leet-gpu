@@ -19,9 +19,15 @@ repo = "local"
 hooks = [
   { id = "clang-tidy", name = "clang-tidy (C++/CUDA)", entry = "mise run lint --", language = "system", files = '\.(cc|cpp|cu|cuh|h|hpp)$' },
   { id = "gersemi", name = "gersemi (CMake)", entry = "mise exec -- gersemi --config .config/gersemi/config.yaml -i", language = "system", files = '(^|/)CMakeLists\.txt$|\.cmake$', exclude = "/build/" },
-  { id = "rumdl", name = "rumdl (Markdown)", entry = "mise exec -- rumdl check --fix", language = "system", types = ["markdown"] },
-  { id = "ruff", name = "ruff (Python)", entry = "mise exec -- ruff check --fix", language = "system", types = ["python"] },
-  { id = "ruff-format", name = "ruff format (Python)", entry = "mise exec -- ruff format", language = "system", types = ["python"] },
+  { id = "rumdl", name = "rumdl (Markdown)", entry = "mise exec -- rumdl check --fix", language = "system", types = [
+    "markdown",
+  ] },
+  { id = "ruff", name = "ruff (Python)", entry = "mise exec -- ruff check --fix", language = "system", types = [
+    "python",
+  ] },
+  { id = "ruff-format", name = "ruff format (Python)", entry = "mise exec -- ruff format", language = "system", types = [
+    "python",
+  ] },
   { id = "shfmt", name = "shfmt", entry = "mise exec -- shfmt -i 2 -ci -bn -w", language = "system", files = '\.(sh|bash)$|^\.config/mise/(lib|tasks)/', exclude = '(^|/)\.nvim/' },
   { id = "shellcheck", name = "shellcheck", entry = "mise exec -- shellcheck --rcfile .config/shellcheckrc", language = "system", files = '\.(sh|bash)$|^\.config/mise/(lib|tasks)/', exclude = '(^|/)\.nvim/' },
 ]
