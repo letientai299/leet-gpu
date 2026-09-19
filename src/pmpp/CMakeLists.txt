@@ -20,6 +20,14 @@ set_source_files_properties(
   PROPERTIES LANGUAGE CUDA
 )
 add_cuda_app(
+  pmpp/ch06/matmul.corner
+  LIBRARIES lg_matmul_kernels lg_matmul_nvbench
+)
+set_source_files_properties(
+  "${CMAKE_CURRENT_SOURCE_DIR}/ch06/matmul.corner.cpp"
+  PROPERTIES LANGUAGE CUDA
+)
+add_cuda_app(
   pmpp/ch06/matmul.coarse
   LIBRARIES lg_matmul_kernels lg_matmul_nvbench
 )

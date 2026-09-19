@@ -9,8 +9,8 @@
 #include <cstdio>
 #include <cuda/buffer>
 #include <fmt/format.h>
+#include <iterator>
 #include <limits>
-#include <map>
 #include <memory>
 #include <nvbench/benchmark.cuh>
 #include <nvbench/benchmark_manager.cuh>
@@ -156,19 +156,20 @@ bool parse_choice_args(int argc,
 
 struct DeviceData {
   GemmShape shape;
+  KernelInputs inputs;
   DeviceMatrix a;
   DeviceMatrix b;
   DeviceMatrix c;
 
-  DeviceData(const Problem& problem, int device)
-      : DeviceData(problem, cuda::device_default_memory_pool(cuda::devices[device])) {
+  DeviceData(const Problem& problem, InputTransforms transforms, int device)
+      : DeviceData(problem, transforms, cuda::device_default_memory_pool(cuda::devices[device])) {
   }
 
 private:
   template <typename Pool>
-  DeviceData(const Problem& problem, Pool& pool)
-      : shape(problem.shape), a(default_stream(), pool, problem.a),
-        b(default_stream(), pool, problem.b), c(default_stream(), pool, problem.result) {
+  DeviceData(const Problem& problem, InputTransforms transforms, Pool& pool)
+      : shape(problem.shape), inputs(problem, transforms), a(default_stream(), pool, inputs.a()),
+        b(default_stream(), pool, inputs.b()), c(default_stream(), pool, problem.result) {
   }
 };
 
@@ -375,13 +376,19 @@ void log_shape(const GemmShape& shape) {
 } // namespace
 
 struct Benchmark::Impl {
+  struct DeviceEntry {
+    int device;
+    InputTransforms inputs;
+    std::unique_ptr<DeviceData> data;
+  };
+
   explicit Impl(Problem problem) : host(std::move(problem)) {
   }
 
   ~Impl() {
-    for (auto& [device, data] : devices) {
-      CUDA_CHECK(cudaSetDevice(device));
-      data.reset();
+    for (auto& entry : devices) {
+      CUDA_CHECK(cudaSetDevice(entry.device));
+      entry.data.reset();
     }
   }
 
@@ -391,24 +398,28 @@ struct Benchmark::Impl {
   Impl& operator=(Impl&&) = delete;
 
   /// Uploads once per device, then hands the same buffers to every state.
-  DeviceData& get(nvbench::state& state) {
+  DeviceData& get(nvbench::state& state, Kernel kernel) {
     const auto& selected_device = state.get_device();
     if (!selected_device.has_value()) {
       throw std::runtime_error("CUDA device is unavailable");
     }
     const int device = selected_device.value().get_id();
-    auto found = devices.find(device);
+    auto found = std::find_if(devices.begin(), devices.end(), [&](const auto& entry) {
+      return entry.device == device && entry.inputs == kernel.inputs;
+    });
     if (found == devices.end()) {
       if (!CUDA_CHECK(cudaSetDevice(device))) {
         throw std::runtime_error("CUDA device selection failed");
       }
-      found = devices.emplace(device, std::make_unique<DeviceData>(host, device)).first;
+      devices.push_back(DeviceEntry{device, kernel.inputs,
+                                    std::make_unique<DeviceData>(host, kernel.inputs, device)});
+      found = std::prev(devices.end());
     }
-    return *found->second;
+    return *found->data;
   }
 
   Problem host;
-  std::map<int, std::unique_ptr<DeviceData>> devices;
+  std::vector<DeviceEntry> devices;
 };
 
 Benchmark::Benchmark(Problem problem) : impl_(std::make_unique<Impl>(std::move(problem))) {
@@ -421,11 +432,11 @@ Benchmark::Benchmark(Benchmark&&) noexcept = default;
 Benchmark& Benchmark::operator=(Benchmark&&) noexcept = default;
 
 void Benchmark::run(nvbench::state& state, Kernel kernel) {
-  run_benchmark(state, impl_->get(state), kernel);
+  run_benchmark(state, impl_->get(state, kernel), kernel);
 }
 
 void Benchmark::run_with_shape(nvbench::state& state, Kernel kernel) {
-  auto& data = impl_->get(state);
+  auto& data = impl_->get(state, kernel);
   add_shape(state, data.shape);
   run_benchmark(state, data, kernel);
 }

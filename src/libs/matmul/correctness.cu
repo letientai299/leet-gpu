@@ -15,11 +15,11 @@ using DeviceMatrix = cuda::device_buffer<float>;
 
 /// Uploads A and B, runs `operation`, reads the result back into `output`.
 template <typename Operation>
-bool on_device(Problem& problem, Matrix& output, Operation&& operation) {
+bool on_device(const Matrix& a, const Matrix& b, Matrix& output, Operation&& operation) {
   const auto stream = default_stream();
   auto& pool = device_pool();
-  const DeviceMatrix device_a{stream, pool, problem.a};
-  const DeviceMatrix device_b{stream, pool, problem.b};
+  const DeviceMatrix device_a{stream, pool, a};
+  const DeviceMatrix device_b{stream, pool, b};
   DeviceMatrix device_c{stream, pool, output};
   return operation(device_a, device_b, device_c) && COPY_CHECK(device_c, output);
 }
@@ -30,7 +30,7 @@ bool run_reference(Problem& problem) {
   using RowMajor = cutlass::layout::RowMajor;
   using Gemm = cutlass::gemm::device::Gemm<float, RowMajor, float, RowMajor, float, RowMajor>;
 
-  return on_device(problem, problem.expected,
+  return on_device(problem.a, problem.b, problem.expected,
                    [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
                      constexpr float alpha = 1.0F;
                      constexpr float beta = 0.0F;
@@ -57,7 +57,8 @@ bool run_kernel(Problem& problem, Kernel kernel) {
   }
   // Zero first so a kernel that skips elements shows up as a mismatch.
   std::fill(problem.result.begin(), problem.result.end(), 0.0F);
-  return on_device(problem, problem.result,
+  const KernelInputs inputs(problem, kernel.inputs);
+  return on_device(inputs.a(), inputs.b(), problem.result,
                    [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
                      cudaGetLastError(); // Drop any error left over from an earlier launch.
                      kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr);
