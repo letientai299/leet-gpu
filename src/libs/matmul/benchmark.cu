@@ -5,8 +5,10 @@
 #include "matmul/correctness.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cuda/buffer>
+#include <fmt/format.h>
 #include <limits>
 #include <map>
 #include <memory>
@@ -46,6 +48,21 @@ struct ShapeRunner {
   }
 };
 
+// NVBench compares the live SM clock against the boost clock. A power-capped
+// card never holds boost under a sustained GEMM, so a threshold near 1.0
+// rejects the card's own steady state and mixes boost with throttled samples.
+// This is NVBench's own default; the measured sustained ratio here is 0.896.
+inline constexpr nvbench::float32_t kThrottleThreshold = 0.75F;
+
+// Long enough for the stopping criterion to converge rather than the clock
+// cutting the run short. NVBench's 15 s default truncated every measurement,
+// which made the sample count depend on how busy the machine was.
+inline constexpr nvbench::float64_t kTimeoutSeconds = 90.0;
+
+// The card idles at 210 MHz. Without a wall-clock warmup NVBench samples during
+// the clock ramp, discards the trial, pauses, and lets the clock fall again.
+inline constexpr nvbench::float64_t kWarmupSeconds = 1.0;
+
 template <typename Runner> nvbench::benchmark_base& add_benchmark(Kernel kernel, Runner runner) {
   auto entry = std::make_unique<nvbench::benchmark<Runner>>(std::move(runner));
   return nvbench::benchmark_manager::get()
@@ -53,8 +70,10 @@ template <typename Runner> nvbench::benchmark_base& add_benchmark(Kernel kernel,
       .set_name(std::string(kernel.name))
       .set_min_samples(20)
       .set_cold_warmup_runs(5)
+      .set_cold_max_warmup_walltime(kWarmupSeconds)
       .set_batch_target_time(1.0)
-      .set_throttle_threshold(0.9F)
+      .set_timeout(kTimeoutSeconds)
+      .set_throttle_threshold(kThrottleThreshold)
       .set_throttle_recovery_delay(0.1F);
 }
 
@@ -174,16 +193,48 @@ void add_rate(nvbench::state& state,
   summary.set_float64("value", static_cast<double>(flops) / seconds / 1.0e9);
 }
 
+/// NVBench has no public "timed out" flag, so compare the measurement's own
+/// walltime against the timeout the way measure_cold does internally.
+void add_status(nvbench::state& state, double walltime, double noise, nvbench::int64_t samples) {
+  const auto params = state.get_criterion_params();
+  const double max_noise = params.has_value("max-noise") ? params.get_float64("max-noise") : 0.0;
+  std::string status;
+  if (walltime > state.get_timeout() * 1.001) {
+    status = fmt::format("TIMED OUT {:.0f}s", walltime);
+  } else if (!std::isfinite(noise)) {
+    // measure_cold stores an infinite sentinel when it cannot estimate noise.
+    status = "converged, noise n/a";
+  } else if (noise < max_noise) {
+    status = "converged";
+  } else {
+    // stdrel also stops once the noise estimate itself stabilises.
+    status = "converged, noise plateaued";
+  }
+  auto& summary = state.add_summary("matmul/cold/status");
+  summary.set_string("name", "Status");
+  summary.set_string("description", "Whether the stopping criterion converged or the timeout hit");
+  summary.set_string("value", fmt::format("{} ({}x)", status, samples));
+}
+
 /// NVBench hides clock columns by default; GEMM throughput is meaningless without them.
 void finish_summaries(nvbench::state& state, std::size_t flops) {
   double cold_seconds = 0.0;
   double batch_seconds = 0.0;
+  double walltime = 0.0;
+  double noise = std::numeric_limits<double>::infinity();
+  nvbench::int64_t samples = 0;
   for (auto& summary : state.get_summaries()) {
     const auto tag = summary.get_tag();
     if (tag == "nv/cold/time/gpu/mean") {
       cold_seconds = summary.get_float64("value");
     } else if (tag == "nv/batch/time/gpu/mean") {
       batch_seconds = summary.get_float64("value");
+    } else if (tag == "nv/cold/walltime") {
+      walltime = summary.get_float64("value");
+    } else if (tag == "nv/cold/time/gpu/stdev/relative") {
+      noise = summary.get_float64("value");
+    } else if (tag == "nv/cold/sample_size") {
+      samples = summary.get_int64("value");
     } else if (tag == "nv/cold/sm_clock_rate/mean" ||
                tag == "nv/cold/sm_clock_rate/scaling/percent") {
       summary.remove_value("hide");
@@ -194,6 +245,7 @@ void finish_summaries(nvbench::state& state, std::size_t flops) {
            "Billions of floating-point operations per cold GPU second", flops, cold_seconds);
   add_rate(state, "matmul/batch/gflops", "Batch GFLOPs/s",
            "Billions of floating-point operations per batch GPU second", flops, batch_seconds);
+  add_status(state, walltime, noise, samples);
 }
 
 struct Counts {
@@ -214,6 +266,27 @@ std::optional<Counts> get_counts(const GemmShape& shape) {
     return std::nullopt;
   }
   return Counts{*elements, *flops};
+}
+
+/// PMPP counts the traffic a cache-less machine would move, which is the whole
+/// point of tiling. It is NOT DRAM traffic, so it must not go to
+/// add_global_memory_reads: NVBench divides that by DRAM peak and reported 456%
+/// bandwidth utilisation. Reported as a model instead, so the column never
+/// claims to be measured. https://en.wikipedia.org/wiki/Roofline_model
+void add_model_traffic(nvbench::state& state, const Traffic& traffic, std::size_t flops) {
+  const auto elements = checked_add(traffic.global_reads, traffic.global_writes);
+  if (!elements) {
+    return;
+  }
+  const auto bytes = checked_mul(*elements, sizeof(float));
+  if (!bytes || *bytes == 0) {
+    return;
+  }
+  add_summary(state, "matmul/model/bytes", "Model Bytes", static_cast<nvbench::int64_t>(*bytes));
+  auto& summary = state.add_summary("matmul/model/intensity");
+  summary.set_string("name", "Model FLOP/B");
+  summary.set_string("description", "Arithmetic intensity of the cache-less traffic model");
+  summary.set_float64("value", static_cast<double>(flops) / static_cast<double>(*bytes));
 }
 
 void add_shape(nvbench::state& state, const GemmShape& shape) {
@@ -251,8 +324,7 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
       state.skip("matmul traffic overflow");
       return;
     }
-    state.add_global_memory_reads<float>(traffic.global_reads);
-    state.add_global_memory_writes<float>(traffic.global_writes);
+    add_model_traffic(state, traffic, counts->flops);
   }
 #ifdef __clang_analyzer__
   data.c.data()[0] = 0.0F;
