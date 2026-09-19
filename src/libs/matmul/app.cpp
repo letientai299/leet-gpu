@@ -1,6 +1,7 @@
 #include "matmul/app.hpp"
 
 #include "checks.hpp"
+#include "matmul/correctness.hpp"
 
 #include <charconv>
 #include <cstdio>
@@ -93,6 +94,14 @@ bool parse_args(int argc, char** argv, AppArgs& args) {
 
 bool start() {
   return init_host();
+}
+
+int run_check(int argc, char** argv, Kernel kernel, GemmShape shape) {
+  return run_host(argc, argv, [&] {
+    Problem problem(shape);
+    fill_random(problem);
+    return check(problem, kernel);
+  });
 }
 
 void print_shape_usage(const char* app) {

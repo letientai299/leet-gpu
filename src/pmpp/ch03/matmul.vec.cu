@@ -1,5 +1,4 @@
-#include "checks.hpp"
-#include "matmul/correctness.hpp"
+#include "matmul/app.hpp"
 
 #include <cuda/cmath>
 
@@ -35,16 +34,9 @@ void launch_matvec(const float* matrix,
   matvec(vec_out, matrix, vec_in, shape.m(), stream);
 }
 
-int run_matvec() {
-  // Square GEMM with one output column.
-  constexpr unsigned n = 67;
-  mm::Problem problem(mm::GemmShape(n, 1, n));
-  mm::fill_random(problem);
-  return mm::check(problem, {"matmul.vec", launch_matvec});
-}
-
 } // namespace
 
 int main(int argc, char** argv) {
-  return run_host(argc, argv, run_matvec);
+  constexpr unsigned n = 67;
+  return mm::run_check(argc, argv, {"matmul.vec", launch_matvec}, mm::GemmShape(n, 1, n));
 }

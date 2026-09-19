@@ -1,6 +1,6 @@
 #pragma once
 
-#include "matmul/matrix.hpp"
+#include "matmul/kernel.hpp"
 
 #include <vector>
 
@@ -26,6 +26,7 @@ struct AppArgs {
 
 bool parse_args(int argc, char** argv, AppArgs& args);
 bool start();
+int run_check(int argc, char** argv, Kernel kernel, GemmShape shape);
 void print_shape_usage(const char* app);
 void print_bench_usage(const char* app);
 

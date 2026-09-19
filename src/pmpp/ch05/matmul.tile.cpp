@@ -1,17 +1,10 @@
 #include "../ch03/matmul.hpp"
 
-#include "log.hpp"
-#include "matmul/app.hpp"
 #include "matmul/benchmark.hpp"
-#include "matmul/correctness.hpp"
 #include "matmul/kernel.hpp"
 
-#include <cstdio>
 #include <cuda/cmath>
-#include <exception>
 #include <limits>
-#include <memory>
-#include <utility>
 
 namespace {
 
@@ -19,10 +12,7 @@ namespace mm = lg::matmul;
 
 // PMPP 4e Fig. 5.9 uses 16.
 constexpr unsigned kTileWidth = 16;
-constexpr unsigned Size = 4096;
-constexpr unsigned kBenchHeight = Size;
-constexpr unsigned kBenchWidth = Size;
-constexpr unsigned kBenchK = Size;
+constexpr unsigned kBenchSize = 4096;
 
 // PMPP 4e Fig. 5.9, §5.4–5.5.
 __global__ void
@@ -89,87 +79,9 @@ bool tile_traffic(const mm::GemmShape& shape, mm::Traffic& traffic) {
 
 const mm::Kernel kMatmulTile{"matmul.tile", launch_matmul_tile, tile_traffic};
 
-std::unique_ptr<mm::Benchmark> harness;
-
-void apply_bench_shape(mm::AppArgs& args) {
-  if (!args.has_height) {
-    args.height = kBenchHeight;
-  }
-  if (!args.has_width) {
-    args.width = kBenchWidth;
-  }
-  if (!args.has_k) {
-    args.k = kBenchK;
-  }
-}
-
-void print_usage(const char* app) {
-  std::printf("Usage: %s [--height N] [--width N] [--k N] [--bench [options]]\n", app);
-  std::printf("Check defaults: --height %u --width %u --k %u\n", mm::kDefaultHeight,
-              mm::kDefaultWidth, mm::kDefaultK);
-  std::printf("Bench defaults: --height %u --width %u --k %u\n", kBenchHeight, kBenchWidth,
-              kBenchK);
-}
-
 } // namespace
 
-void bench_matmul_cell(nvbench::state& state) {
-  harness->run_with_shape(state, kMatmulCell);
-}
-
-void bench_matmul_tile(nvbench::state& state) {
-  harness->run_with_shape(state, kMatmulTile);
-}
-
-#define MATMUL_BENCHMARK(name, function)                                                           \
-  NVBENCH_BENCH(function)                                                                          \
-      .set_name(name)                                                                              \
-      .set_min_samples(20)                                                                         \
-      .set_cold_warmup_runs(5)                                                                     \
-      .set_batch_target_time(1.0)                                                                  \
-      .set_throttle_threshold(0.9F)                                                                \
-      .set_throttle_recovery_delay(0.1F)
-
-MATMUL_BENCHMARK("matmul.cell", bench_matmul_cell);
-MATMUL_BENCHMARK("matmul.tile", bench_matmul_tile);
-
-#undef MATMUL_BENCHMARK
-
-int main(int argc, char** argv) try {
-  mm::AppArgs args;
-  if (!mm::parse_args(argc, argv, args) || (!args.bench && args.remaining.size() != 1)) {
-    print_usage(argv[0]);
-    return 2;
-  }
-  if (args.help) {
-    print_usage(argv[0]);
-    return 0;
-  }
-
-  if (!mm::start()) {
-    return 1;
-  }
-
-  const mm::GemmShape check_shape =
-      args.bench ? mm::GemmShape(mm::kDefaultHeight, mm::kDefaultWidth, mm::kDefaultK)
-                 : args.shape();
-  mm::Problem check_problem(check_shape);
-  mm::fill_random(check_problem);
-  const int result = mm::check(check_problem, kMatmulTile);
-  if (result != 0 || !args.bench) {
-    return result;
-  }
-
-  apply_bench_shape(args);
-  mm::Problem bench_problem(args.shape());
-  mm::fill_random(bench_problem);
-  harness = std::make_unique<mm::Benchmark>(std::move(bench_problem));
-  HOST_LOG("Benchmark shape: height %u, width %u, k %u", args.height, args.width, args.k);
-  const int bench_result =
-      mm::run_nvbench_args(static_cast<int>(args.remaining.size()), args.remaining.data());
-  harness.reset();
-  return bench_result;
-} catch (const std::exception& error) {
-  std::fprintf(stderr, "%s\n", error.what());
-  return 1;
+int main(int argc, char** argv) {
+  return mm::run_app(argc, argv,
+                     {kMatmulTile, kMatmulCell, mm::GemmShape(kBenchSize, kBenchSize, kBenchSize)});
 }
