@@ -32,13 +32,10 @@ CompileFlags:
 
 ---
 If:
-  PathMatch: ^src/.*\.(cuh|h|hpp)$
-CompileFlags:
-  Add: -xcuda
-
----
-If:
-  PathMatch: ^src/pmpp/ch05/matmul\.tile\.cpp$
+  PathMatch:
+    - ^src/.*\.(cuh|h|hpp)$
+    # CUDA apps from chapter 5 onward.
+    - ^src/pmpp/ch(0[5-9]|[1-9][0-9]*)/.*\.cpp$
 CompileFlags:
   Add: -xcuda
 
