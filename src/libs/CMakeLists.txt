@@ -82,6 +82,10 @@ target_link_libraries(
   INTERFACE CUDA::cudart_static ${CMAKE_DL_LIBS}
 )
 
+add_library(lg_npp INTERFACE)
+target_compile_definitions(lg_npp INTERFACE LG_HAS_NPP)
+target_link_libraries(lg_npp INTERFACE CUDA::nppif_static)
+
 # Oracle GEMM. Header-only: one instantiated kernel instead of the ~280 MB of
 # precompiled kernels cuBLAS links in.
 add_library(lg_cutlass INTERFACE)
@@ -110,6 +114,19 @@ target_link_libraries(
   lg_image
   PUBLIC lg_runtime CUDA::cudart_static CCCL::CCCL
   PRIVATE lodepng
+)
+
+add_library(
+  lg_convolution
+  STATIC
+  convolution/app.cpp
+  convolution/correctness.cu
+)
+target_include_directories(lg_convolution PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(
+  lg_convolution
+  PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL
+  PRIVATE lg_npp
 )
 
 add_library(

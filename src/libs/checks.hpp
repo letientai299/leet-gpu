@@ -25,6 +25,21 @@ inline bool cuda_check(cudaError_t error, const char* file, int line) {
 
 #define CUDA_CHECK(expression) cuda_check((expression), __FILE__, __LINE__)
 
+#ifdef LG_HAS_NPP
+#include <nppdefs.h>
+
+inline bool npp_check(NppStatus status, const char* file, int line) {
+  if (status == NPP_SUCCESS) {
+    return true;
+  }
+
+  write_log("NPP", file, line, "status %d", static_cast<int>(status));
+  return false;
+}
+
+#define NPP_CHECK(expression) npp_check((expression), __FILE__, __LINE__)
+#endif
+
 #ifdef LG_HAS_CUTLASS
 #include <cutlass/cutlass.h>
 
