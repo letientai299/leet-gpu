@@ -101,6 +101,15 @@ add_library(lg_nvbench INTERFACE)
 target_compile_definitions(lg_nvbench INTERFACE LG_HAS_NVBENCH)
 target_link_libraries(lg_nvbench INTERFACE nvbench::nvbench)
 
+add_library(lg_benchmark STATIC benchmark/format.cpp benchmark/runner.cu)
+target_include_directories(lg_benchmark PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(
+  lg_benchmark
+  SYSTEM
+  PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
+)
+target_link_libraries(lg_benchmark PUBLIC lg_nvbench fmt::fmt)
+
 add_library(lg_runtime STATIC log.cpp)
 target_include_directories(lg_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(lg_runtime PUBLIC spdlog::spdlog)
@@ -129,6 +138,9 @@ target_link_libraries(
   PRIVATE lg_npp
 )
 
+add_library(lg_convolution_nvbench STATIC convolution/benchmark.cu)
+target_link_libraries(lg_convolution_nvbench PUBLIC lg_convolution lg_benchmark)
+
 add_library(
   lg_matmul
   STATIC
@@ -144,4 +156,4 @@ target_link_libraries(
 )
 
 add_library(lg_matmul_nvbench STATIC matmul/benchmark.cu)
-target_link_libraries(lg_matmul_nvbench PUBLIC lg_matmul lg_nvbench)
+target_link_libraries(lg_matmul_nvbench PUBLIC lg_matmul lg_benchmark)

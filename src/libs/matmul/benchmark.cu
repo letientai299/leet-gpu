@@ -1,3 +1,4 @@
+#include "benchmark/runner.hpp"
 #include "checks.hpp"
 #include "log.hpp"
 #include "matmul/app.hpp"
@@ -5,16 +6,10 @@
 #include "matmul/correctness.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdio>
 #include <cuda/buffer>
-#include <fmt/format.h>
 #include <iterator>
-#include <limits>
 #include <memory>
-#include <nvbench/benchmark.cuh>
-#include <nvbench/benchmark_manager.cuh>
-#include <nvbench/main.cuh>
 #include <nvbench/type_list.cuh>
 #include <stdexcept>
 #include <string>
@@ -48,33 +43,8 @@ struct ShapeRunner {
   }
 };
 
-// NVBench compares the live SM clock against the boost clock. A power-capped
-// card never holds boost under a sustained GEMM, so a threshold near 1.0
-// rejects the card's own steady state and mixes boost with throttled samples.
-// This is NVBench's own default; the measured sustained ratio here is 0.896.
-inline constexpr nvbench::float32_t kThrottleThreshold = 0.75F;
-
-// Long enough for the stopping criterion to converge rather than the clock
-// cutting the run short. NVBench's 15 s default truncated every measurement,
-// which made the sample count depend on how busy the machine was.
-inline constexpr nvbench::float64_t kTimeoutSeconds = 90.0;
-
-// The card idles at 210 MHz. Without a wall-clock warmup NVBench samples during
-// the clock ramp, discards the trial, pauses, and lets the clock fall again.
-inline constexpr nvbench::float64_t kWarmupSeconds = 1.0;
-
 template <typename Runner> nvbench::benchmark_base& add_benchmark(Kernel kernel, Runner runner) {
-  auto entry = std::make_unique<nvbench::benchmark<Runner>>(std::move(runner));
-  return nvbench::benchmark_manager::get()
-      .add(std::move(entry))
-      .set_name(std::string(kernel.name))
-      .set_min_samples(20)
-      .set_cold_warmup_runs(5)
-      .set_cold_max_warmup_walltime(kWarmupSeconds)
-      .set_batch_target_time(1.0)
-      .set_timeout(kTimeoutSeconds)
-      .set_throttle_threshold(kThrottleThreshold)
-      .set_throttle_recovery_delay(0.1F);
+  return benchmark::add(kernel.name, std::move(runner));
 }
 
 void add_fixed(Benchmark& harness, Kernel kernel) {
@@ -173,82 +143,6 @@ private:
   }
 };
 
-void add_summary(nvbench::state& state, std::string tag, std::string name, nvbench::int64_t value) {
-  auto& summary = state.add_summary(std::move(tag));
-  summary.set_string("name", std::move(name));
-  summary.set_int64("value", value);
-}
-
-void add_rate(nvbench::state& state,
-              const char* tag,
-              const char* name,
-              const char* description,
-              std::size_t flops,
-              double seconds) {
-  if (seconds <= 0.0) {
-    return;
-  }
-  auto& summary = state.add_summary(tag);
-  summary.set_string("name", name);
-  summary.set_string("description", description);
-  summary.set_float64("value", static_cast<double>(flops) / seconds / 1.0e9);
-}
-
-/// NVBench has no public "timed out" flag, so compare the measurement's own
-/// walltime against the timeout the way measure_cold does internally.
-void add_status(nvbench::state& state, double walltime, double noise, nvbench::int64_t samples) {
-  const auto params = state.get_criterion_params();
-  const double max_noise = params.has_value("max-noise") ? params.get_float64("max-noise") : 0.0;
-  std::string status;
-  if (walltime > state.get_timeout() * 1.001) {
-    status = fmt::format("TIMED OUT {:.0f}s", walltime);
-  } else if (!std::isfinite(noise)) {
-    // measure_cold stores an infinite sentinel when it cannot estimate noise.
-    status = "converged, noise n/a";
-  } else if (noise < max_noise) {
-    status = "converged";
-  } else {
-    // stdrel also stops once the noise estimate itself stabilises.
-    status = "converged, noise plateaued";
-  }
-  auto& summary = state.add_summary("matmul/cold/status");
-  summary.set_string("name", "Status");
-  summary.set_string("description", "Whether the stopping criterion converged or the timeout hit");
-  summary.set_string("value", fmt::format("{} ({}x)", status, samples));
-}
-
-/// NVBench hides clock columns by default; GEMM throughput is meaningless without them.
-void finish_summaries(nvbench::state& state, std::size_t flops) {
-  double cold_seconds = 0.0;
-  double batch_seconds = 0.0;
-  double walltime = 0.0;
-  double noise = std::numeric_limits<double>::infinity();
-  nvbench::int64_t samples = 0;
-  for (auto& summary : state.get_summaries()) {
-    const auto tag = summary.get_tag();
-    if (tag == "nv/cold/time/gpu/mean") {
-      cold_seconds = summary.get_float64("value");
-    } else if (tag == "nv/batch/time/gpu/mean") {
-      batch_seconds = summary.get_float64("value");
-    } else if (tag == "nv/cold/walltime") {
-      walltime = summary.get_float64("value");
-    } else if (tag == "nv/cold/time/gpu/stdev/relative") {
-      noise = summary.get_float64("value");
-    } else if (tag == "nv/cold/sample_size") {
-      samples = summary.get_int64("value");
-    } else if (tag == "nv/cold/sm_clock_rate/mean" ||
-               tag == "nv/cold/sm_clock_rate/scaling/percent") {
-      summary.remove_value("hide");
-    }
-  }
-
-  add_rate(state, "matmul/cold/gflops", "Cold GFLOPs/s",
-           "Billions of floating-point operations per cold GPU second", flops, cold_seconds);
-  add_rate(state, "matmul/batch/gflops", "Batch GFLOPs/s",
-           "Billions of floating-point operations per batch GPU second", flops, batch_seconds);
-  add_status(state, walltime, noise, samples);
-}
-
 struct Counts {
   std::size_t elements = 0;
   std::size_t flops = 0;
@@ -283,7 +177,8 @@ void add_model_traffic(nvbench::state& state, const Traffic& traffic, std::size_
   if (!bytes || *bytes == 0) {
     return;
   }
-  add_summary(state, "matmul/model/bytes", "Model Bytes", static_cast<nvbench::int64_t>(*bytes));
+  benchmark::add_summary(state, "matmul/model/bytes", "Model Bytes",
+                         static_cast<nvbench::int64_t>(*bytes), "bytes");
   auto& summary = state.add_summary("matmul/model/intensity");
   summary.set_string("name", "Model FLOP/B");
   summary.set_string("description", "Arithmetic intensity of the cache-less traffic model");
@@ -291,9 +186,9 @@ void add_model_traffic(nvbench::state& state, const Traffic& traffic, std::size_
 }
 
 void add_shape(nvbench::state& state, const GemmShape& shape) {
-  add_summary(state, "matmul/height", "Height", shape.m());
-  add_summary(state, "matmul/width", "Width", shape.n());
-  add_summary(state, "matmul/k", "K", shape.k());
+  benchmark::add_summary(state, "matmul/height", "Height", shape.m());
+  benchmark::add_summary(state, "matmul/width", "Width", shape.n());
+  benchmark::add_summary(state, "matmul/k", "K", shape.k());
 }
 
 void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
@@ -317,7 +212,8 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     return;
   }
 
-  add_summary(state, "matmul/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops));
+  benchmark::add_summary(state, "matmul/flops", "FLOPs",
+                         static_cast<nvbench::int64_t>(counts->flops), "flops");
   state.add_buffer_size(counts->elements * sizeof(float), "matmul/device_memory", "Memory");
   if (kernel.traffic != nullptr) {
     Traffic traffic;
@@ -334,7 +230,7 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
   state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& launch) {
     kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, launch.get_stream());
   });
-  finish_summaries(state, counts->flops);
+  benchmark::finish_summaries(state, "matmul", counts->flops);
 #endif
 }
 
@@ -366,7 +262,7 @@ template <typename Body> int guarded(Body&& body) try {
 }
 
 int launch_nvbench(std::vector<char*>& argv) {
-  return run_nvbench_args(static_cast<int>(argv.size()), argv.data());
+  return benchmark::run_args(static_cast<int>(argv.size()), argv.data());
 }
 
 void log_shape(const GemmShape& shape) {
@@ -463,11 +359,8 @@ std::optional<GemmShape> get_shape(nvbench::state& state) {
                    static_cast<unsigned>(k));
 }
 
-inline int run_nvbench_impl(int argc, char** argv) try { NVBENCH_MAIN_BODY(argc, argv); }
-NVBENCH_MAIN_CATCH_EXCEPTIONS
-
 int run_nvbench_args(int argc, char** argv) {
-  return run_nvbench_impl(argc, argv);
+  return benchmark::run_args(argc, argv);
 }
 
 int run_app(int argc, char** argv, const AppConfig& config) {

@@ -1,5 +1,5 @@
 #include "checks.hpp"
-#include "convolution/app.hpp"
+#include "convolution/benchmark.hpp"
 
 #include <cuda/cmath>
 
@@ -25,5 +25,5 @@ void launch_cached(const float* input,
 } // namespace
 
 int main(int argc, char** argv) {
-  return conv::run_check(argc, argv, {"conv.cached", launch_cached});
+  return conv::run_app(argc, argv, {"conv.cached", launch_cached});
 }

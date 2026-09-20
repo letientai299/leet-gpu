@@ -1,4 +1,4 @@
-#include "convolution/app.hpp"
+#include "convolution/benchmark.hpp"
 
 #include <cuda/cmath>
 
@@ -48,5 +48,5 @@ void launch_basic(const float* input,
 } // namespace
 
 int main(int argc, char** argv) {
-  return conv::run_check(argc, argv, {"conv.basic", launch_basic});
+  return conv::run_app(argc, argv, {"conv.basic", launch_basic, conv::basic_traffic});
 }
