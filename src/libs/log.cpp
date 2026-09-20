@@ -48,10 +48,9 @@ void append_column(std::string& output, std::string_view value, std::size_t widt
   output.push_back(' ');
 }
 
-void append_colored(std::string& output,
-                    std::string_view value,
-                    std::size_t width,
-                    const char* tint) {
+void append_colored(
+  std::string& output, std::string_view value, std::size_t width, const char* tint
+) {
   if (!color_enabled) {
     append_column(output, value, width);
     return;
@@ -86,8 +85,9 @@ add_metadata(std::string_view kind, std::string_view file, int line, std::string
   const auto slash = file.find_last_of('/');
   const auto basename = slash == std::string_view::npos ? file : file.substr(slash + 1);
   std::string output;
-  append_colored(output, std::string(basename) + ":" + std::to_string(line), source_width,
-                 color::source);
+  append_colored(
+    output, std::string(basename) + ":" + std::to_string(line), source_width, color::source
+  );
   append_colored(output, kind, kind_width, kind_color(kind));
   output.append(message);
   return output;
@@ -102,7 +102,7 @@ void init_log() {
   color_enabled = std::getenv("NO_COLOR") == nullptr;
   auto logger = spdlog::stdout_color_mt("cuda");
   const std::string stamp =
-      color_enabled ? std::string(color::time) + "%T.%e" + color::reset : std::string("%T.%e");
+    color_enabled ? std::string(color::time) + "%T.%e" + color::reset : std::string("%T.%e");
   logger->set_pattern(stamp + " %v");
   spdlog::set_default_logger(std::move(logger));
 }
@@ -121,6 +121,7 @@ void write_log(const char* kind, const char* file, int line, const char* format,
   va_start(args, format);
   const auto message = format_message(format, args);
   va_end(args);
-  spdlog::default_logger_raw()->log({file, line, ""}, spdlog::level::info,
-                                    add_metadata(kind, file, line, message));
+  spdlog::default_logger_raw()->log(
+    {file, line, ""}, spdlog::level::info, add_metadata(kind, file, line, message)
+  );
 }

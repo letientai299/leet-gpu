@@ -40,10 +40,9 @@ bool make_npp_context(NppStreamContext& context) {
   return true;
 }
 
-bool run_reference(const Shape& shape,
-                   const DeviceBuffer& input,
-                   const DeviceBuffer& filter,
-                   DeviceBuffer& output) {
+bool run_reference(
+  const Shape& shape, const DeviceBuffer& input, const DeviceBuffer& filter, DeviceBuffer& output
+) {
   const int width = shape.width;
   const int height = shape.height;
   const int radius = shape.radius;
@@ -57,25 +56,29 @@ bool run_reference(const Shape& shape,
                       static_cast<std::size_t>(padded_width) * padded_height, cuda::no_init};
 
   if (!CUDA_CHECK(cudaMemset2DAsync(padded.data(), padded_step, 0, padded_step, padded_height)) ||
-      !CUDA_CHECK(cudaMemcpy2DAsync(padded.data() + source_offset, padded_step, input.data(),
-                                    input_step, input_step, height, cudaMemcpyDeviceToDevice))) {
+      !CUDA_CHECK(cudaMemcpy2DAsync(
+        padded.data() + source_offset, padded_step, input.data(), input_step, input_step, height,
+        cudaMemcpyDeviceToDevice
+      ))) {
     return false;
   }
 
   NppStreamContext context{};
   const auto* source = padded.data() + source_offset;
   return make_npp_context(context) &&
-         NPP_CHECK(nppiFilter_32f_C1R_Ctx(source, static_cast<int>(padded_step), output.data(),
-                                          static_cast<int>(input_step), {width, height},
-                                          filter.data(), {filter_width, filter_width},
-                                          {radius, radius}, context));
+         NPP_CHECK(nppiFilter_32f_C1R_Ctx(
+           source, static_cast<int>(padded_step), output.data(), static_cast<int>(input_step),
+           {width, height}, filter.data(), {filter_width, filter_width}, {radius, radius}, context
+         ));
 }
 
-bool run_kernel(const Problem& problem,
-                Kernel kernel,
-                const DeviceBuffer& input,
-                const DeviceBuffer& filter,
-                DeviceBuffer& output) {
+bool run_kernel(
+  const Problem& problem,
+  Kernel kernel,
+  const DeviceBuffer& input,
+  const DeviceBuffer& filter,
+  DeviceBuffer& output
+) {
   if (kernel.launch == nullptr) {
     HOST_LOG("Kernel callback is null");
     return false;
@@ -138,9 +141,9 @@ int check(Problem& problem, Kernel kernel) {
     return 1;
   }
   return run_kernel(problem, kernel, input, filter, result) && COPY_CHECK(result, problem.result) &&
-                 verify(problem, kernel)
-             ? 0
-             : 1;
+             verify(problem, kernel)
+           ? 0
+           : 1;
 }
 
 } // namespace lg::convolution

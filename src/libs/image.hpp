@@ -71,8 +71,8 @@ struct ImageThread {
 
 __device__ inline ImageThread image_thread() {
   return {
-      blockIdx.x * blockDim.x + threadIdx.x,
-      blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
   };
 }
 #endif

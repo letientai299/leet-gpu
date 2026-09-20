@@ -76,8 +76,8 @@ struct Traffic {
 };
 
 using TrafficCallback = bool (*)(const GemmShape&, Traffic&);
-using ResourcesCallback = cudaError_t (*)(const GemmShape&,
-                                          lg::benchmark::KernelResources& resources);
+using ResourcesCallback =
+  cudaError_t (*)(const GemmShape&, lg::benchmark::KernelResources& resources);
 
 /// Estimates naive per-cell memory traffic.
 inline bool cell_traffic(const GemmShape& shape, Traffic& traffic) {

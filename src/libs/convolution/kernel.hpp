@@ -26,7 +26,8 @@ struct Shape {
 };
 
 using Launch = void (*)(
-    const float* input, const float* filter, float* output, Shape shape, cudaStream_t stream);
+  const float* input, const float* filter, float* output, Shape shape, cudaStream_t stream
+);
 
 /// Logical global-memory operations performed by a kernel.
 struct Traffic {
@@ -59,8 +60,9 @@ inline std::size_t valid_axis_pairs(int length, int radius) {
 
 /// Estimates the basic kernel's logical GMEM traffic.
 inline bool basic_traffic(Shape shape, Traffic& traffic) {
-  const auto taps = checked_mul(valid_axis_pairs(shape.width, shape.radius),
-                                valid_axis_pairs(shape.height, shape.radius));
+  const auto taps = checked_mul(
+    valid_axis_pairs(shape.width, shape.radius), valid_axis_pairs(shape.height, shape.radius)
+  );
   const auto reads = taps ? checked_mul(*taps, std::size_t{2}) : std::nullopt;
   if (!reads) {
     return false;

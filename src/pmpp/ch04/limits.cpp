@@ -25,26 +25,26 @@ struct LinkInfo {
 };
 
 constexpr std::array links{
-    LinkInfo{"CUDA Runtime device management",
-             "https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html"},
-    LinkInfo{"CUDA device properties",
-             "https://docs.nvidia.com/cuda/cuda-runtime-api/structcudaDeviceProp.html"},
-    LinkInfo{"CUDA occupancy", "https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/"
-                               "writing-cuda-kernels.html"},
-    LinkInfo{"CUDA compute capabilities",
-             "https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/"
-             "compute-capabilities.html"},
-    LinkInfo{"CUDA programming model",
-             "https://docs.nvidia.com/cuda/cuda-programming-guide/01-introduction/"
-             "programming-model.html"},
-    LinkInfo{"CUDA Runtime types",
-             "https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html"},
-    LinkInfo{"CUDA Driver device management",
-             "https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html"},
-    LinkInfo{"CUDA binary utilities", "https://docs.nvidia.com/cuda/cuda-binary-utilities/"},
-    LinkInfo{"NVCC", "https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/"},
-    LinkInfo{"Nsight Compute", "https://docs.nvidia.com/nsight-compute/"},
-    LinkInfo{"nvidia-smi", "https://docs.nvidia.com/deploy/nvidia-smi/"},
+  LinkInfo{"CUDA Runtime device management",
+           "https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html"},
+  LinkInfo{"CUDA device properties",
+           "https://docs.nvidia.com/cuda/cuda-runtime-api/structcudaDeviceProp.html"},
+  LinkInfo{"CUDA occupancy", "https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/"
+                             "writing-cuda-kernels.html"},
+  LinkInfo{"CUDA compute capabilities",
+           "https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/"
+           "compute-capabilities.html"},
+  LinkInfo{"CUDA programming model",
+           "https://docs.nvidia.com/cuda/cuda-programming-guide/01-introduction/"
+           "programming-model.html"},
+  LinkInfo{"CUDA Runtime types",
+           "https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html"},
+  LinkInfo{"CUDA Driver device management",
+           "https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html"},
+  LinkInfo{"CUDA binary utilities", "https://docs.nvidia.com/cuda/cuda-binary-utilities/"},
+  LinkInfo{"NVCC", "https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/"},
+  LinkInfo{"Nsight Compute", "https://docs.nvidia.com/nsight-compute/"},
+  LinkInfo{"nvidia-smi", "https://docs.nvidia.com/deploy/nvidia-smi/"},
 };
 
 #ifdef _WIN32
@@ -182,8 +182,10 @@ std::string format_number(int value) {
 
 std::string format_bytes(std::size_t value) {
   std::array<char, 64> output{};
-  std::snprintf(output.data(), output.size(), "%zu bytes (%.2f MiB)", value,
-                static_cast<double>(value) / bytes_per_mib);
+  std::snprintf(
+    output.data(), output.size(), "%zu bytes (%.2f MiB)", value,
+    static_cast<double>(value) / bytes_per_mib
+  );
   return output.data();
 }
 
@@ -192,8 +194,9 @@ std::string format_version(int version) {
     return "not installed";
   }
   std::array<char, 32> output{};
-  std::snprintf(output.data(), output.size(), "%d.%d (%d)", version / 1000, version % 1000 / 10,
-                version);
+  std::snprintf(
+    output.data(), output.size(), "%d.%d (%d)", version / 1000, version % 1000 / 10, version
+  );
   return output.data();
 }
 
@@ -246,16 +249,17 @@ template <std::size_t Size> std::string format_dims(const int (&values)[Size]) {
 std::string format_uuid(const cudaUUID_t& uuid) {
   std::array<char, 37> output{};
   std::snprintf(
-      output.data(), output.size(),
-      "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-      static_cast<unsigned char>(uuid.bytes[0]), static_cast<unsigned char>(uuid.bytes[1]),
-      static_cast<unsigned char>(uuid.bytes[2]), static_cast<unsigned char>(uuid.bytes[3]),
-      static_cast<unsigned char>(uuid.bytes[4]), static_cast<unsigned char>(uuid.bytes[5]),
-      static_cast<unsigned char>(uuid.bytes[6]), static_cast<unsigned char>(uuid.bytes[7]),
-      static_cast<unsigned char>(uuid.bytes[8]), static_cast<unsigned char>(uuid.bytes[9]),
-      static_cast<unsigned char>(uuid.bytes[10]), static_cast<unsigned char>(uuid.bytes[11]),
-      static_cast<unsigned char>(uuid.bytes[12]), static_cast<unsigned char>(uuid.bytes[13]),
-      static_cast<unsigned char>(uuid.bytes[14]), static_cast<unsigned char>(uuid.bytes[15]));
+    output.data(), output.size(),
+    "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+    static_cast<unsigned char>(uuid.bytes[0]), static_cast<unsigned char>(uuid.bytes[1]),
+    static_cast<unsigned char>(uuid.bytes[2]), static_cast<unsigned char>(uuid.bytes[3]),
+    static_cast<unsigned char>(uuid.bytes[4]), static_cast<unsigned char>(uuid.bytes[5]),
+    static_cast<unsigned char>(uuid.bytes[6]), static_cast<unsigned char>(uuid.bytes[7]),
+    static_cast<unsigned char>(uuid.bytes[8]), static_cast<unsigned char>(uuid.bytes[9]),
+    static_cast<unsigned char>(uuid.bytes[10]), static_cast<unsigned char>(uuid.bytes[11]),
+    static_cast<unsigned char>(uuid.bytes[12]), static_cast<unsigned char>(uuid.bytes[13]),
+    static_cast<unsigned char>(uuid.bytes[14]), static_cast<unsigned char>(uuid.bytes[15])
+  );
   return output.data();
 }
 
@@ -289,62 +293,62 @@ struct DriverAttribute {
 };
 
 constexpr std::array driver_attributes{
-    DriverAttribute{"Virtual memory management",
-                    CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED},
-    DriverAttribute{"Generic memory compression",
-                    CU_DEVICE_ATTRIBUTE_GENERIC_COMPRESSION_SUPPORTED},
-    DriverAttribute{"GPUDirect RDMA with VMM",
-                    CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED},
-    DriverAttribute{"64-bit stream memory ops", CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS},
-    DriverAttribute{"Stream wait-value NOR", CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_WAIT_VALUE_NOR},
-    DriverAttribute{"Memory sync domains", CU_DEVICE_ATTRIBUTE_MEM_SYNC_DOMAIN_COUNT,
-                    format_number},
-    DriverAttribute{"Tensor Map access", CU_DEVICE_ATTRIBUTE_TENSOR_MAP_ACCESS_SUPPORTED},
-    DriverAttribute{"Fabric memory handles", CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED},
-    DriverAttribute{"Multicast operations", CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED},
-    DriverAttribute{"Memory decompression algorithms",
-                    CU_DEVICE_ATTRIBUTE_MEM_DECOMPRESS_ALGORITHM_MASK, format_mask},
-    DriverAttribute{"Maximum decompression length",
-                    CU_DEVICE_ATTRIBUTE_MEM_DECOMPRESS_MAXIMUM_LENGTH, format_int_bytes},
-    DriverAttribute{"Host NUMA virtual memory",
-                    CU_DEVICE_ATTRIBUTE_HOST_NUMA_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED},
-    DriverAttribute{"Host NUMA memory pools", CU_DEVICE_ATTRIBUTE_HOST_NUMA_MEMORY_POOLS_SUPPORTED},
-    DriverAttribute{"Host memory pools", CU_DEVICE_ATTRIBUTE_HOST_MEMORY_POOLS_SUPPORTED},
-    DriverAttribute{"Host virtual memory",
-                    CU_DEVICE_ATTRIBUTE_HOST_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED},
-    DriverAttribute{"Host allocation DMA-BUF", CU_DEVICE_ATTRIBUTE_HOST_ALLOC_DMA_BUF_SUPPORTED},
-    DriverAttribute{"DMA-BUF mmap", CU_DEVICE_ATTRIBUTE_DMA_BUF_MMAP_SUPPORTED},
-    DriverAttribute{"Partial host native atomics",
-                    CU_DEVICE_ATTRIBUTE_ONLY_PARTIAL_HOST_NATIVE_ATOMIC_SUPPORTED},
-    DriverAttribute{"Atomic reductions", CU_DEVICE_ATTRIBUTE_ATOMIC_REDUCTION_SUPPORTED},
-    DriverAttribute{"Logical endpoint unicast",
-                    CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_SUPPORTED},
-    DriverAttribute{"Logical endpoint multicast",
-                    CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_MULTICAST_SUPPORTED},
-    DriverAttribute{"Logical endpoint counted ops",
-                    CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_COUNTED_OPS_SUPPORTED},
-    DriverAttribute{"Owner-device endpoint access",
-                    CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_ACCESS_ON_OWNER_DEVICE_SUPPORTED},
+  DriverAttribute{"Virtual memory management",
+                  CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED},
+  DriverAttribute{"Generic memory compression", CU_DEVICE_ATTRIBUTE_GENERIC_COMPRESSION_SUPPORTED},
+  DriverAttribute{"GPUDirect RDMA with VMM",
+                  CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED},
+  DriverAttribute{"64-bit stream memory ops", CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS},
+  DriverAttribute{"Stream wait-value NOR", CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_WAIT_VALUE_NOR},
+  DriverAttribute{"Memory sync domains", CU_DEVICE_ATTRIBUTE_MEM_SYNC_DOMAIN_COUNT, format_number},
+  DriverAttribute{"Tensor Map access", CU_DEVICE_ATTRIBUTE_TENSOR_MAP_ACCESS_SUPPORTED},
+  DriverAttribute{"Fabric memory handles", CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED},
+  DriverAttribute{"Multicast operations", CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED},
+  DriverAttribute{"Memory decompression algorithms",
+                  CU_DEVICE_ATTRIBUTE_MEM_DECOMPRESS_ALGORITHM_MASK, format_mask},
+  DriverAttribute{"Maximum decompression length", CU_DEVICE_ATTRIBUTE_MEM_DECOMPRESS_MAXIMUM_LENGTH,
+                  format_int_bytes},
+  DriverAttribute{"Host NUMA virtual memory",
+                  CU_DEVICE_ATTRIBUTE_HOST_NUMA_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED},
+  DriverAttribute{"Host NUMA memory pools", CU_DEVICE_ATTRIBUTE_HOST_NUMA_MEMORY_POOLS_SUPPORTED},
+  DriverAttribute{"Host memory pools", CU_DEVICE_ATTRIBUTE_HOST_MEMORY_POOLS_SUPPORTED},
+  DriverAttribute{"Host virtual memory",
+                  CU_DEVICE_ATTRIBUTE_HOST_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED},
+  DriverAttribute{"Host allocation DMA-BUF", CU_DEVICE_ATTRIBUTE_HOST_ALLOC_DMA_BUF_SUPPORTED},
+  DriverAttribute{"DMA-BUF mmap", CU_DEVICE_ATTRIBUTE_DMA_BUF_MMAP_SUPPORTED},
+  DriverAttribute{"Partial host native atomics",
+                  CU_DEVICE_ATTRIBUTE_ONLY_PARTIAL_HOST_NATIVE_ATOMIC_SUPPORTED},
+  DriverAttribute{"Atomic reductions", CU_DEVICE_ATTRIBUTE_ATOMIC_REDUCTION_SUPPORTED},
+  DriverAttribute{"Logical endpoint unicast",
+                  CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_SUPPORTED},
+  DriverAttribute{"Logical endpoint multicast",
+                  CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_MULTICAST_SUPPORTED},
+  DriverAttribute{"Logical endpoint counted ops",
+                  CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_COUNTED_OPS_SUPPORTED},
+  DriverAttribute{"Owner-device endpoint access",
+                  CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_ACCESS_ON_OWNER_DEVICE_SUPPORTED},
 };
 
 template <typename Attribute, typename Device, typename Query>
 void print_query(
-    const char* title, Attribute attr, Device device, Query query, IntFormatter formatter) {
+  const char* title, Attribute attr, Device device, Query query, IntFormatter formatter
+) {
   const auto value = query(attr, device);
   print_row(title, value ? formatter(*value) : "unavailable");
 }
 
-void print_attr(const char* title,
-                cudaDeviceAttr attr,
-                int device,
-                IntFormatter formatter = format_number) {
+void print_attr(
+  const char* title, cudaDeviceAttr attr, int device, IntFormatter formatter = format_number
+) {
   print_query(title, attr, device, query_attr, formatter);
 }
 
-void print_driver_attr(const char* title,
-                       CUdevice_attribute attr,
-                       CUdevice device,
-                       IntFormatter formatter = format_number) {
+void print_driver_attr(
+  const char* title,
+  CUdevice_attribute attr,
+  CUdevice device,
+  IntFormatter formatter = format_number
+) {
   print_query(title, attr, device, query_driver_attr, formatter);
 }
 
@@ -361,17 +365,20 @@ void print_limit(const char* title, cudaLimit limit, SizeFormatter formatter = f
 
 void print_identity(int device, const cudaDeviceProp& prop) {
   std::array<char, 32> pci_bus{};
-  if (!cuda_ok(cudaDeviceGetPCIBusId(pci_bus.data(), static_cast<int>(pci_bus.size()), device),
-               "cudaDeviceGetPCIBusId")) {
+  if (!cuda_ok(
+        cudaDeviceGetPCIBusId(pci_bus.data(), static_cast<int>(pci_bus.size()), device),
+        "cudaDeviceGetPCIBusId"
+      )) {
     pci_bus[0] = '\0';
   }
 
   const std::string section = "Device " + std::to_string(device);
   print_section(section.c_str());
   print_row("Name", prop.name);
-  print_row("Compute capability", std::to_string(prop.major) + "." + std::to_string(prop.minor) +
-                                      " (sm_" + std::to_string(prop.major) +
-                                      std::to_string(prop.minor) + ")");
+  print_row(
+    "Compute capability", std::to_string(prop.major) + "." + std::to_string(prop.minor) + " (sm_" +
+                            std::to_string(prop.major) + std::to_string(prop.minor) + ")"
+  );
   print_row("PCI bus ID", pci_bus.data());
   print_row("PCI device/vendor ID", format_hex(prop.gpuPciDeviceID));
   print_row("PCI subsystem/vendor ID", format_hex(prop.gpuPciSubsystemID));
@@ -456,12 +463,14 @@ void print_capabilities(int device, const cudaDeviceProp& prop) {
   print_row("Managed memory", format_bool(prop.managedMemory));
   print_row("Concurrent managed access", format_bool(prop.concurrentManagedAccess));
   print_row("Pageable memory access", format_bool(prop.pageableMemoryAccess));
-  print_row("Pageable access uses host tables",
-            format_bool(prop.pageableMemoryAccessUsesHostPageTables));
+  print_row(
+    "Pageable access uses host tables", format_bool(prop.pageableMemoryAccessUsesHostPageTables)
+  );
   print_row("Direct managed host access", format_bool(prop.directManagedMemAccessFromHost));
   print_row("Map host memory", format_bool(prop.canMapHostMemory));
-  print_row("Registered host pointer identity",
-            format_bool(prop.canUseHostPointerForRegisteredMem));
+  print_row(
+    "Registered host pointer identity", format_bool(prop.canUseHostPointerForRegisteredMem)
+  );
   print_row("Host memory registration", format_bool(prop.hostRegisterSupported));
   print_row("Read-only host registration", format_bool(prop.hostRegisterReadOnlySupported));
   print_row("Host native atomics", format_bool(prop.hostNativeAtomicSupported));
@@ -534,15 +543,16 @@ void print_peer_access(int device_count) {
       int atomics = 0;
       int arrays = 0;
       const bool available =
-          cudaDeviceCanAccessPeer(&access, source, target) == cudaSuccess &&
-          cudaDeviceGetP2PAttribute(&rank, cudaDevP2PAttrPerformanceRank, source, target) ==
-              cudaSuccess &&
-          cudaDeviceGetP2PAttribute(&atomics, cudaDevP2PAttrNativeAtomicSupported, source,
-                                    target) == cudaSuccess &&
-          cudaDeviceGetP2PAttribute(&arrays, cudaDevP2PAttrCudaArrayAccessSupported, source,
-                                    target) == cudaSuccess;
+        cudaDeviceCanAccessPeer(&access, source, target) == cudaSuccess &&
+        cudaDeviceGetP2PAttribute(&rank, cudaDevP2PAttrPerformanceRank, source, target) ==
+          cudaSuccess &&
+        cudaDeviceGetP2PAttribute(&atomics, cudaDevP2PAttrNativeAtomicSupported, source, target) ==
+          cudaSuccess &&
+        cudaDeviceGetP2PAttribute(
+          &arrays, cudaDevP2PAttrCudaArrayAccessSupported, source, target
+        ) == cudaSuccess;
       const std::string title =
-          "Device " + std::to_string(source) + " -> " + std::to_string(target);
+        "Device " + std::to_string(source) + " -> " + std::to_string(target);
       if (!available) {
         print_row(title.c_str(), "unavailable");
         continue;

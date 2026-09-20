@@ -19,12 +19,14 @@ inline constexpr nvbench::float32_t kThrottleThreshold = 0.75F;
 inline constexpr nvbench::float64_t kTimeoutSeconds = 90.0;
 inline constexpr nvbench::float64_t kWarmupSeconds = 1.0;
 
-void add_rate(nvbench::state& state,
-              std::string tag,
-              const char* name,
-              const char* description,
-              std::size_t work,
-              double seconds) {
+void add_rate(
+  nvbench::state& state,
+  std::string tag,
+  const char* name,
+  const char* description,
+  std::size_t work,
+  double seconds
+) {
   if (seconds <= 0.0) {
     return;
   }
@@ -34,11 +36,9 @@ void add_rate(nvbench::state& state,
   summary.set_float64("value", static_cast<double>(work) / seconds / 1.0e9);
 }
 
-void add_status(nvbench::state& state,
-                std::string tag,
-                double walltime,
-                double noise,
-                nvbench::int64_t samples) {
+void add_status(
+  nvbench::state& state, std::string tag, double walltime, double noise, nvbench::int64_t samples
+) {
   const auto params = state.get_criterion_params();
   const double max_noise = params.has_value("max-noise") ? params.get_float64("max-noise") : 0.0;
   std::string status;
@@ -61,19 +61,17 @@ void add_status(nvbench::state& state,
 
 nvbench::benchmark_base& configure(nvbench::benchmark_base& entry) {
   return entry.set_min_samples(20)
-      .set_cold_warmup_runs(5)
-      .set_cold_max_warmup_walltime(kWarmupSeconds)
-      .set_batch_target_time(1.0)
-      .set_timeout(kTimeoutSeconds)
-      .set_throttle_threshold(kThrottleThreshold)
-      .set_throttle_recovery_delay(0.1F);
+    .set_cold_warmup_runs(5)
+    .set_cold_max_warmup_walltime(kWarmupSeconds)
+    .set_batch_target_time(1.0)
+    .set_timeout(kTimeoutSeconds)
+    .set_throttle_threshold(kThrottleThreshold)
+    .set_throttle_recovery_delay(0.1F);
 }
 
-void add_summary(nvbench::state& state,
-                 std::string tag,
-                 std::string name,
-                 nvbench::int64_t value,
-                 std::string hint) {
+void add_summary(
+  nvbench::state& state, std::string tag, std::string name, nvbench::int64_t value, std::string hint
+) {
   auto& summary = state.add_summary(std::move(tag));
   summary.set_string("name", std::move(name));
   if (!hint.empty()) {
@@ -83,24 +81,37 @@ void add_summary(nvbench::state& state,
 }
 
 void add_resources(nvbench::state& state, const KernelResources& resources) {
-  add_summary(state, "kernel/resources/threads_per_block", "Threads/Block",
-              resources.threads_per_block);
-  add_summary(state, "kernel/resources/registers_per_thread", "Registers/Thread",
-              resources.registers_per_thread);
-  add_summary(state, "kernel/resources/shared_static", "Static Shared Memory",
-              static_cast<nvbench::int64_t>(resources.static_shared_bytes), "bytes");
-  add_summary(state, "kernel/resources/shared_dynamic", "Dynamic Shared Memory",
-              static_cast<nvbench::int64_t>(resources.dynamic_shared_bytes), "bytes");
-  add_summary(state, "kernel/resources/constant", "Constant Memory",
-              static_cast<nvbench::int64_t>(resources.constant_bytes), "bytes");
-  add_summary(state, "kernel/resources/local_per_thread", "Local Memory/Thread",
-              static_cast<nvbench::int64_t>(resources.local_bytes_per_thread), "bytes");
+  add_summary(
+    state, "kernel/resources/threads_per_block", "Threads/Block", resources.threads_per_block
+  );
+  add_summary(
+    state, "kernel/resources/registers_per_thread", "Registers/Thread",
+    resources.registers_per_thread
+  );
+  add_summary(
+    state, "kernel/resources/shared_static", "Static Shared Memory",
+    static_cast<nvbench::int64_t>(resources.static_shared_bytes), "bytes"
+  );
+  add_summary(
+    state, "kernel/resources/shared_dynamic", "Dynamic Shared Memory",
+    static_cast<nvbench::int64_t>(resources.dynamic_shared_bytes), "bytes"
+  );
+  add_summary(
+    state, "kernel/resources/constant", "Constant Memory",
+    static_cast<nvbench::int64_t>(resources.constant_bytes), "bytes"
+  );
+  add_summary(
+    state, "kernel/resources/local_per_thread", "Local Memory/Thread",
+    static_cast<nvbench::int64_t>(resources.local_bytes_per_thread), "bytes"
+  );
 }
 
-void finish_summaries(nvbench::state& state,
-                      std::string_view prefix,
-                      std::size_t flops,
-                      std::optional<std::size_t> model_bytes) {
+void finish_summaries(
+  nvbench::state& state,
+  std::string_view prefix,
+  std::size_t flops,
+  std::optional<std::size_t> model_bytes
+) {
   double cold_seconds = 0.0;
   double batch_seconds = 0.0;
   double walltime = 0.0;
@@ -125,15 +136,23 @@ void finish_summaries(nvbench::state& state,
   }
 
   const std::string base(prefix);
-  add_rate(state, base + "/cold/gflops", "Cold GFLOPs/s",
-           "Billions of floating-point operations per cold GPU second", flops, cold_seconds);
-  add_rate(state, base + "/batch/gflops", "Batch GFLOPs/s",
-           "Billions of floating-point operations per batch GPU second", flops, batch_seconds);
+  add_rate(
+    state, base + "/cold/gflops", "Cold GFLOPs/s",
+    "Billions of floating-point operations per cold GPU second", flops, cold_seconds
+  );
+  add_rate(
+    state, base + "/batch/gflops", "Batch GFLOPs/s",
+    "Billions of floating-point operations per batch GPU second", flops, batch_seconds
+  );
   if (model_bytes) {
-    add_rate(state, base + "/cold/model_gbytes", "Cold Model GB/s",
-             "Modeled global-memory bytes per cold GPU second", *model_bytes, cold_seconds);
-    add_rate(state, base + "/batch/model_gbytes", "Batch Model GB/s",
-             "Modeled global-memory bytes per batch GPU second", *model_bytes, batch_seconds);
+    add_rate(
+      state, base + "/cold/model_gbytes", "Cold Model GB/s",
+      "Modeled global-memory bytes per cold GPU second", *model_bytes, cold_seconds
+    );
+    add_rate(
+      state, base + "/batch/model_gbytes", "Batch Model GB/s",
+      "Modeled global-memory bytes per batch GPU second", *model_bytes, batch_seconds
+    );
   }
   add_status(state, base + "/cold/status", walltime, noise, samples);
 }
@@ -205,9 +224,11 @@ int run_json(int argc, char** argv) {
 }
 
 int run_args(int argc, char** argv) {
-  if (has_option(argc, argv,
-                 {"--help", "-h", "--help-axis", "--help-axes", "--version", "--list", "-l",
-                  "--jsonlist-benches", "--jsonlist-devices"})) {
+  if (has_option(
+        argc, argv,
+        {"--help", "-h", "--help-axis", "--help-axes", "--version", "--list", "-l",
+         "--jsonlist-benches", "--jsonlist-devices"}
+      )) {
     return run_impl(argc, argv);
   }
 

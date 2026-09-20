@@ -2,11 +2,14 @@
 BasedOnStyle: LLVM
 IndentWidth: 2
 TabWidth: 2
+ContinuationIndentWidth: 2
 ColumnLimit: 100
 AllowShortFunctionsOnASingleLine: None
 UseTab: Never
 PointerAlignment: Left # Google/Chromium/Mozilla
 DerivePointerAlignment: false
+BreakAfterOpenBracketFunction: true
+BreakBeforeCloseBracketFunction: true
 
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false

@@ -62,7 +62,8 @@ matmul_corner_kernel(const float* a, const float* b, float* c, unsigned m, unsig
 }
 
 void launch_matmul_corner(
-    const float* a, const float* b, float* c, const mm::GemmShape& shape, cudaStream_t stream) {
+  const float* a, const float* b, float* c, const mm::GemmShape& shape, cudaStream_t stream
+) {
   const dim3 block(kTileWidth, kTileWidth);
   const dim3 grid(cuda::ceil_div(shape.n(), block.x), cuda::ceil_div(shape.m(), block.y));
   matmul_corner_kernel<<<grid, block, 0, stream>>>(a, b, c, shape.m(), shape.n(), shape.k());
@@ -80,15 +81,16 @@ mm::Matrix column_major(const mm::Matrix& input) {
 }
 
 const mm::Kernel kMatmulCorner{
-    "matmul.corner",
-    launch_matmul_corner,
-    nullptr,
-    {nullptr, column_major},
-    lg::benchmark::fixed_resources<mm::GemmShape, matmul_corner_kernel, kTileWidth, kTileWidth>};
+  "matmul.corner",
+  launch_matmul_corner,
+  nullptr,
+  {nullptr, column_major},
+  lg::benchmark::fixed_resources<mm::GemmShape, matmul_corner_kernel, kTileWidth, kTileWidth>};
 
 } // namespace
 
 int main(int argc, char** argv) {
-  return mm::run_app(argc, argv,
-                     {kMatmulCorner, kMatmulCell, {kBenchSize, kBenchSize, kBenchSize}});
+  return mm::run_app(
+    argc, argv, {kMatmulCorner, kMatmulCell, {kBenchSize, kBenchSize, kBenchSize}}
+  );
 }

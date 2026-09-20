@@ -21,24 +21,29 @@ nvbench::benchmark_base& configure(nvbench::benchmark_base& entry);
 template <typename Runner> nvbench::benchmark_base& add(std::string_view name, Runner runner) {
   auto entry = std::make_unique<nvbench::benchmark<Runner>>(std::move(runner));
   return configure(
-      nvbench::benchmark_manager::get().add(std::move(entry)).set_name(std::string(name)));
+    nvbench::benchmark_manager::get().add(std::move(entry)).set_name(std::string(name))
+  );
 }
 
 /// Adds an integer result column.
-void add_summary(nvbench::state& state,
-                 std::string tag,
-                 std::string name,
-                 nvbench::int64_t value,
-                 std::string hint = {});
+void add_summary(
+  nvbench::state& state,
+  std::string tag,
+  std::string name,
+  nvbench::int64_t value,
+  std::string hint = {}
+);
 
 /// Adds concrete compiled-kernel and launch resources.
 void add_resources(nvbench::state& state, const KernelResources& resources);
 
 /// Adds throughput and convergence columns.
-void finish_summaries(nvbench::state& state,
-                      std::string_view prefix,
-                      std::size_t flops,
-                      std::optional<std::size_t> model_bytes = std::nullopt);
+void finish_summaries(
+  nvbench::state& state,
+  std::string_view prefix,
+  std::size_t flops,
+  std::optional<std::size_t> model_bytes = std::nullopt
+);
 
 /// Runs NVBench with forwarded arguments.
 int run_args(int argc, char** argv);

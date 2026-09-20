@@ -40,7 +40,7 @@ constexpr std::array<LodePNGColorType, 4> kColorTypes{LCT_GREY, LCT_GREY_ALPHA, 
 bool load_rgb_png(const char* path, Image& image) {
   ImageByte* decoded = nullptr;
   const unsigned error =
-      lodepng_decode_file(&decoded, &image.width, &image.height, path, LCT_RGB, 8);
+    lodepng_decode_file(&decoded, &image.width, &image.height, path, LCT_RGB, 8);
   image.pixels.reset(decoded);
   if (error != 0) {
     HOST_LOG("PNG decode failed: %s", lodepng_error_text(error));
@@ -54,13 +54,15 @@ bool save_png(const char* path, const Image& image) {
   const auto channels = image.channels();
   if (channels == 0 || channels > kColorTypes.size() ||
       channels * image.pixel_count() != image.size) {
-    HOST_LOG("PNG encode failed: invalid size %zu for %ux%u", image.size, image.width,
-             image.height);
+    HOST_LOG(
+      "PNG encode failed: invalid size %zu for %ux%u", image.size, image.width, image.height
+    );
     return false;
   }
 
-  const unsigned error = lodepng_encode_file(path, image.pixels.get(), image.width, image.height,
-                                             kColorTypes[channels - 1], 8);
+  const unsigned error = lodepng_encode_file(
+    path, image.pixels.get(), image.width, image.height, kColorTypes[channels - 1], 8
+  );
   if (error != 0) {
     HOST_LOG("PNG encode failed: %s", lodepng_error_text(error));
     return false;
@@ -74,11 +76,12 @@ bool save_png(const char* path, const Image& image) {
 bool ImageBytes::upload(const Image& input, std::size_t output_size) {
   output_size_ = output_size;
   input_ =
-      cuda::device_buffer<ImageByte>{default_stream(), device_pool(), input.size, cuda::no_init};
+    cuda::device_buffer<ImageByte>{default_stream(), device_pool(), input.size, cuda::no_init};
   output_ =
-      cuda::device_buffer<ImageByte>{default_stream(), device_pool(), output_size_, cuda::no_init};
+    cuda::device_buffer<ImageByte>{default_stream(), device_pool(), output_size_, cuda::no_init};
   return CUDA_CHECK(
-      cudaMemcpy(input_.data(), input.pixels.get(), input.size, cudaMemcpyHostToDevice));
+    cudaMemcpy(input_.data(), input.pixels.get(), input.size, cudaMemcpyHostToDevice)
+  );
 }
 
 bool ImageBytes::download(Image& output, unsigned width, unsigned height) const {

@@ -53,9 +53,9 @@ void add_fixed(Benchmark& harness, Kernel kernel) {
 
 void add_shaped(Kernel kernel, const GemmShape& shape) {
   add_benchmark(kernel, ShapeRunner{kernel})
-      .add_int64_axis("Height", {shape.m()})
-      .add_int64_axis("Width", {shape.n()})
-      .add_int64_axis("K", {shape.k()});
+    .add_int64_axis("Height", {shape.m()})
+    .add_int64_axis("Width", {shape.n()})
+    .add_int64_axis("K", {shape.k()});
 }
 
 void print_defaults(const char* label, const GemmShape& shape) {
@@ -80,13 +80,15 @@ std::string join_options(std::initializer_list<KernelChoice> choices) {
 }
 
 void print_choice_usage(const char* app, std::initializer_list<KernelChoice> choices) {
-  std::printf("Usage: %s [--kernel %s] [--height N] [--width N] [--k N] [--bench [options]]\n", app,
-              join_options(choices).c_str());
+  std::printf(
+    "Usage: %s [--kernel %s] [--height N] [--width N] [--k N] [--bench [options]]\n", app,
+    join_options(choices).c_str()
+  );
   print_defaults("Defaults", default_shape());
 }
 
-const KernelChoice* find_choice(std::initializer_list<KernelChoice> choices,
-                                std::string_view name) {
+const KernelChoice*
+find_choice(std::initializer_list<KernelChoice> choices, std::string_view name) {
   const auto* found = std::find_if(choices.begin(), choices.end(), [name](const auto& choice) {
     return choice.option == name;
   });
@@ -94,11 +96,13 @@ const KernelChoice* find_choice(std::initializer_list<KernelChoice> choices,
 }
 
 /// Strips `--kernel <name>` / `--kernel=<name>`; everything else lands in `remaining`.
-bool parse_choice_args(int argc,
-                       char** argv,
-                       std::initializer_list<KernelChoice> choices,
-                       const KernelChoice*& selected,
-                       std::vector<char*>& remaining) {
+bool parse_choice_args(
+  int argc,
+  char** argv,
+  std::initializer_list<KernelChoice> choices,
+  const KernelChoice*& selected,
+  std::vector<char*>& remaining
+) {
   constexpr std::string_view flag = "--kernel";
   remaining.push_back(argv[0]);
   for (int index = 1; index < argc; ++index) {
@@ -177,8 +181,9 @@ void add_model_traffic(nvbench::state& state, const Traffic& traffic, std::size_
   if (!bytes || *bytes == 0) {
     return;
   }
-  benchmark::add_summary(state, "matmul/model/bytes", "Model Bytes",
-                         static_cast<nvbench::int64_t>(*bytes), "bytes");
+  benchmark::add_summary(
+    state, "matmul/model/bytes", "Model Bytes", static_cast<nvbench::int64_t>(*bytes), "bytes"
+  );
   auto& summary = state.add_summary("matmul/model/intensity");
   summary.set_string("name", "Model FLOP/B");
   summary.set_string("description", "Arithmetic intensity of the cache-less traffic model");
@@ -221,8 +226,9 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     benchmark::add_resources(state, resources);
   }
 
-  benchmark::add_summary(state, "matmul/flops", "FLOPs",
-                         static_cast<nvbench::int64_t>(counts->flops), "flops");
+  benchmark::add_summary(
+    state, "matmul/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops), "flops"
+  );
   state.add_buffer_size(counts->elements * sizeof(float), "matmul/device_memory", "Memory");
   if (kernel.traffic != nullptr) {
     Traffic traffic;
@@ -316,8 +322,10 @@ struct Benchmark::Impl {
       if (!CUDA_CHECK(cudaSetDevice(device))) {
         throw std::runtime_error("CUDA device selection failed");
       }
-      devices.push_back(DeviceEntry{device, kernel.inputs,
-                                    std::make_unique<DeviceData>(host, kernel.inputs, device)});
+      devices.push_back(
+        DeviceEntry{device, kernel.inputs,
+                    std::make_unique<DeviceData>(host, kernel.inputs, device)}
+      );
       found = std::prev(devices.end());
     }
     return *found->data;
@@ -364,8 +372,9 @@ std::optional<GemmShape> get_shape(nvbench::state& state) {
     state.skip("matrix dimensions must fit positive unsigned values");
     return std::nullopt;
   }
-  return GemmShape(static_cast<unsigned>(height), static_cast<unsigned>(width),
-                   static_cast<unsigned>(k));
+  return GemmShape(
+    static_cast<unsigned>(height), static_cast<unsigned>(width), static_cast<unsigned>(k)
+  );
 }
 
 int run_nvbench_args(int argc, char** argv) {
@@ -419,7 +428,7 @@ int run_app(int argc, char** argv, std::initializer_list<KernelChoice> choices) 
 
     AppArgs args;
     if (const auto status =
-            prepare(static_cast<int>(common_args.size()), common_args.data(), args, usage)) {
+          prepare(static_cast<int>(common_args.size()), common_args.data(), args, usage)) {
       return *status;
     }
 

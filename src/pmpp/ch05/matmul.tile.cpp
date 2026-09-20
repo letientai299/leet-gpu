@@ -51,7 +51,8 @@ matmul_tile_kernel(const float* a, const float* b, float* c, unsigned m, unsigne
 }
 
 void launch_matmul_tile(
-    const float* a, const float* b, float* c, const mm::GemmShape& shape, cudaStream_t stream) {
+  const float* a, const float* b, float* c, const mm::GemmShape& shape, cudaStream_t stream
+) {
   const unsigned height = shape.m();
   const unsigned width = shape.n();
   const unsigned k = shape.k();
@@ -78,15 +79,16 @@ bool tile_traffic(const mm::GemmShape& shape, mm::Traffic& traffic) {
 }
 
 const mm::Kernel kMatmulTile{
-    "matmul.tile",
-    launch_matmul_tile,
-    tile_traffic,
-    {},
-    lg::benchmark::fixed_resources<mm::GemmShape, matmul_tile_kernel, kTileWidth, kTileWidth>};
+  "matmul.tile",
+  launch_matmul_tile,
+  tile_traffic,
+  {},
+  lg::benchmark::fixed_resources<mm::GemmShape, matmul_tile_kernel, kTileWidth, kTileWidth>};
 
 } // namespace
 
 int main(int argc, char** argv) {
-  return mm::run_app(argc, argv,
-                     {kMatmulTile, kMatmulCell, mm::GemmShape(kBenchSize, kBenchSize, kBenchSize)});
+  return mm::run_app(
+    argc, argv, {kMatmulTile, kMatmulCell, mm::GemmShape(kBenchSize, kBenchSize, kBenchSize)}
+  );
 }

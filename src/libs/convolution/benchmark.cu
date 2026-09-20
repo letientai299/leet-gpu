@@ -75,8 +75,9 @@ public:
 
 private:
   static std::optional<Counts> get_counts(Shape shape) {
-    const auto taps = checked_mul(valid_axis_pairs(shape.width, shape.radius),
-                                  valid_axis_pairs(shape.height, shape.radius));
+    const auto taps = checked_mul(
+      valid_axis_pairs(shape.width, shape.radius), valid_axis_pairs(shape.height, shape.radius)
+    );
     const auto flops = taps ? checked_mul(*taps, std::size_t{2}) : std::nullopt;
     const auto elements = checked_mul(shape.input_size(), std::size_t{2});
     if (!flops || !elements || *elements > static_cast<std::size_t>(-1) - shape.filter_size()) {
@@ -106,8 +107,10 @@ private:
       state.skip("convolution traffic overflow");
       return std::nullopt;
     }
-    lg::benchmark::add_summary(state, "convolution/model/gmem_bytes", "Model GMEM Bytes",
-                               static_cast<nvbench::int64_t>(*bytes), "bytes");
+    lg::benchmark::add_summary(
+      state, "convolution/model/gmem_bytes", "Model GMEM Bytes",
+      static_cast<nvbench::int64_t>(*bytes), "bytes"
+    );
     auto& intensity = state.add_summary("convolution/model/intensity");
     intensity.set_string("name", "Model FLOP/B");
     intensity.set_string("description", "Arithmetic intensity of the logical GMEM traffic model");
@@ -154,16 +157,18 @@ private:
     lg::benchmark::add_summary(state, "convolution/width", "Width", data.shape.width);
     lg::benchmark::add_summary(state, "convolution/height", "Height", data.shape.height);
     lg::benchmark::add_summary(state, "convolution/radius", "Radius", data.shape.radius);
-    lg::benchmark::add_summary(state, "convolution/flops", "FLOPs",
-                               static_cast<nvbench::int64_t>(counts->flops), "flops");
+    lg::benchmark::add_summary(
+      state, "convolution/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops), "flops"
+    );
     state.add_buffer_size(counts->device_bytes, "convolution/device_memory", "Memory");
 #ifdef __clang_analyzer__
     data.output.data()[0] = 0.0F;
     kernel.launch(data.input.data(), data.filter.data(), data.output.data(), data.shape, nullptr);
 #else
     state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& launch) {
-      kernel.launch(data.input.data(), data.filter.data(), data.output.data(), data.shape,
-                    launch.get_stream());
+      kernel.launch(
+        data.input.data(), data.filter.data(), data.output.data(), data.shape, launch.get_stream()
+      );
     });
     lg::benchmark::finish_summaries(state, "convolution", counts->flops, model_bytes);
 #endif
@@ -238,8 +243,10 @@ int run_app(int argc, char** argv, Kernel kernel, Shape bench_shape) {
     fill_problem(bench_problem);
     Benchmark benchmark(std::move(bench_problem));
     lg::benchmark::add(kernel.name, Runner{&benchmark, kernel});
-    HOST_LOG("Benchmark shape: width %d, height %d, radius %d", bench_shape.width,
-             bench_shape.height, bench_shape.radius);
+    HOST_LOG(
+      "Benchmark shape: width %d, height %d, radius %d", bench_shape.width, bench_shape.height,
+      bench_shape.radius
+    );
     return lg::benchmark::run_args(static_cast<int>(args.remaining.size()), args.remaining.data());
   });
 }

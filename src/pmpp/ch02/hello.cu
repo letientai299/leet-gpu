@@ -21,7 +21,8 @@ int run_hello() {
   hello_kernel<<<blocks, threads>>>(device_output.data());
   if (!CUDA_CHECK(cudaGetLastError()) ||
       !CUDA_CHECK(
-          cudaMemcpy(output, device_output.data(), sizeof(output), cudaMemcpyDeviceToHost))) {
+        cudaMemcpy(output, device_output.data(), sizeof(output), cudaMemcpyDeviceToHost)
+      )) {
     return 1;
   }
 

@@ -18,9 +18,9 @@ struct DimensionOption {
 };
 
 constexpr DimensionOption kDimensions[] = {
-    {"--height", &AppArgs::height},
-    {"--width", &AppArgs::width},
-    {"--k", &AppArgs::k},
+  {"--height", &AppArgs::height},
+  {"--width", &AppArgs::width},
+  {"--k", &AppArgs::k},
 };
 
 /// std::string_view::starts_with is C++20; this file targets C++17.
@@ -58,8 +58,9 @@ parse_dimension_arg(std::string_view arg, int& index, int argc, char** argv, App
 } // namespace
 
 GemmShape AppArgs::shape(const GemmShape& fallback) const {
-  return GemmShape(height.value_or(fallback.m()), width.value_or(fallback.n()),
-                   k.value_or(fallback.k()));
+  return GemmShape(
+    height.value_or(fallback.m()), width.value_or(fallback.n()), k.value_or(fallback.k())
+  );
 }
 
 bool parse_args(int argc, char** argv, AppArgs& args) {
@@ -95,14 +96,16 @@ int run_check(int argc, char** argv, Kernel kernel, GemmShape shape) {
 
 void print_shape_usage(const char* app) {
   std::printf("Usage: %s [--height N] [--width N] [--k N]\n", app);
-  std::printf("Defaults: --height %u --width %u --k %u\n", kDefaultHeight, kDefaultWidth,
-              kDefaultK);
+  std::printf(
+    "Defaults: --height %u --width %u --k %u\n", kDefaultHeight, kDefaultWidth, kDefaultK
+  );
 }
 
 void print_bench_usage(const char* app) {
   std::printf("Usage: %s [--height N] [--width N] [--k N] [NVBench options]\n", app);
-  std::printf("Defaults: --height %u --width %u --k %u\n", kDefaultHeight, kDefaultWidth,
-              kDefaultK);
+  std::printf(
+    "Defaults: --height %u --width %u --k %u\n", kDefaultHeight, kDefaultWidth, kDefaultK
+  );
 }
 
 } // namespace lg::matmul

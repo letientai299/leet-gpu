@@ -30,24 +30,27 @@ bool run_reference(Problem& problem) {
   using RowMajor = cutlass::layout::RowMajor;
   using Gemm = cutlass::gemm::device::Gemm<float, RowMajor, float, RowMajor, float, RowMajor>;
 
-  return on_device(problem.a, problem.b, problem.expected,
-                   [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
-                     constexpr float alpha = 1.0F;
-                     constexpr float beta = 0.0F;
-                     const int m = static_cast<int>(problem.shape.m());
-                     const int n = static_cast<int>(problem.shape.n());
-                     const int k = static_cast<int>(problem.shape.k());
-                     // Row-major leading dimensions: lda = k, ldb = ldc = n.
-                     const Gemm::Arguments args({m, n, k}, {a.data(), k}, {b.data(), n},
-                                                {c.data(), n}, {c.data(), n}, {alpha, beta});
+  return on_device(
+    problem.a, problem.b, problem.expected,
+    [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
+      constexpr float alpha = 1.0F;
+      constexpr float beta = 0.0F;
+      const int m = static_cast<int>(problem.shape.m());
+      const int n = static_cast<int>(problem.shape.n());
+      const int k = static_cast<int>(problem.shape.k());
+      // Row-major leading dimensions: lda = k, ldb = ldc = n.
+      const Gemm::Arguments args(
+        {m, n, k}, {a.data(), k}, {b.data(), n}, {c.data(), n}, {c.data(), n}, {alpha, beta}
+      );
 #ifdef __clang_analyzer__
-                     (void)args;
-                     return true;
+      (void)args;
+      return true;
 #else
-                     Gemm gemm;
-                     return CUTLASS_CHECK(gemm(args));
+      Gemm gemm;
+      return CUTLASS_CHECK(gemm(args));
 #endif
-                   });
+    }
+  );
 }
 
 bool run_kernel(Problem& problem, Kernel kernel) {
@@ -58,12 +61,14 @@ bool run_kernel(Problem& problem, Kernel kernel) {
   // Zero first so a kernel that skips elements shows up as a mismatch.
   std::fill(problem.result.begin(), problem.result.end(), 0.0F);
   const KernelInputs inputs(problem, kernel.inputs);
-  return on_device(inputs.a(), inputs.b(), problem.result,
-                   [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
-                     cudaGetLastError(); // Drop any error left over from an earlier launch.
-                     kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr);
-                     return CUDA_CHECK(cudaGetLastError());
-                   });
+  return on_device(
+    inputs.a(), inputs.b(), problem.result,
+    [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
+      cudaGetLastError(); // Drop any error left over from an earlier launch.
+      kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr);
+      return CUDA_CHECK(cudaGetLastError());
+    }
+  );
 }
 
 bool verify(const Problem& problem) {
@@ -74,8 +79,10 @@ bool verify(const Problem& problem) {
     const float diff = std::fabs(actual - expected);
     const float tolerance = kAbsoluteTolerance + kRelativeTolerance * std::fabs(expected);
     if (!std::isfinite(actual) || diff > tolerance) {
-      HOST_LOG("Mismatch at [%zu,%zu]: %g vs %g (diff %g, tol %g)", index / result.cols(),
-               index % result.cols(), actual, expected, diff, tolerance);
+      HOST_LOG(
+        "Mismatch at [%zu,%zu]: %g vs %g (diff %g, tol %g)", index / result.cols(),
+        index % result.cols(), actual, expected, diff, tolerance
+      );
       return false;
     }
   }

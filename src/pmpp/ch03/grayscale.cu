@@ -4,10 +4,9 @@
 #include <cuda/cmath>
 
 /// Convert RGB pixels in parallel.
-__global__ void grayscale_kernel(const ImageByte* input,
-                                 ImageByte* output,
-                                 const unsigned width,
-                                 const unsigned height) {
+__global__ void grayscale_kernel(
+  const ImageByte* input, ImageByte* output, const unsigned width, const unsigned height
+) {
   const auto pos = image_thread();
   if (!pos.in_bounds(width, height)) {
     return;

@@ -66,8 +66,9 @@ std::string format_value(const Json& summary) {
       return "0 B";
     }
     return scaled(
-        value,
-        {{1024.0 * 1024.0 * 1024.0, "GiB"}, {1024.0 * 1024.0, "MiB"}, {1024.0, "KiB"}, {1.0, "B"}});
+      value,
+      {{1024.0 * 1024.0 * 1024.0, "GiB"}, {1024.0 * 1024.0, "MiB"}, {1024.0, "KiB"}, {1.0, "B"}}
+    );
   }
   if (hint == "byte_rate") {
     return scaled(value, {{1.0e12, "TB/s"}, {1.0e9, "GB/s"}, {1.0e6, "MB/s"}, {1.0e3, "kB/s"}});
@@ -77,8 +78,9 @@ std::string format_value(const Json& summary) {
   }
   if (hint == "flops") {
     return scaled(
-        value,
-        {{1.0e12, "TFLOP"}, {1.0e9, "GFLOP"}, {1.0e6, "MFLOP"}, {1.0e3, "kFLOP"}, {1.0, "FLOP"}});
+      value,
+      {{1.0e12, "TFLOP"}, {1.0e9, "GFLOP"}, {1.0e6, "MFLOP"}, {1.0e3, "kFLOP"}, {1.0, "FLOP"}}
+    );
   }
   if (hint == "sample_size") {
     return fmt::format("{}x", std::stoll(raw));
@@ -153,9 +155,9 @@ void add_summaries(std::vector<Field>& fields, const Json& state) {
 
 void print_fields(const std::vector<Field>& fields) {
   const auto longest =
-      std::max_element(fields.begin(), fields.end(), [](const auto& left, const auto& right) {
-        return left.first.size() < right.first.size();
-      });
+    std::max_element(fields.begin(), fields.end(), [](const auto& left, const auto& right) {
+      return left.first.size() < right.first.size();
+    });
   const auto width = longest == fields.end() ? std::size_t{0} : longest->first.size();
   for (const auto& [name, value] : fields) {
     fmt::print("  {:{}}  {}\n", name, width, value);
@@ -171,8 +173,10 @@ void print_result(std::string_view input) {
     for (const auto& state : bench.at("states")) {
       const int device = state.value("device", -1);
       const std::string gpu = device_name(root, device);
-      fmt::print("\n{} [Device={}{}{}]\n", bench.value("name", "Benchmark"), device,
-                 gpu.empty() ? "" : ", ", gpu);
+      fmt::print(
+        "\n{} [Device={}{}{}]\n", bench.value("name", "Benchmark"), device, gpu.empty() ? "" : ", ",
+        gpu
+      );
 
       if (state.value("is_skipped", false)) {
         fmt::print("  Status  Skipped: {}\n", state.value("skip_reason", "unknown reason"));

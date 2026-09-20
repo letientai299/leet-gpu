@@ -29,12 +29,12 @@ matmul_coarse_kernel(const float* a, const float* b, float* c, unsigned m, unsig
     const auto aCol = tileBase + tx; // Select A's global column.
     const auto bRow = tileBase + ty; // Select B's global row.
     aTile[ty][tx] =                  // Load or pad A.
-        row < m && aCol < k ? a[row * k + aCol] : 0.0F;
+      row < m && aCol < k ? a[row * k + aCol] : 0.0F;
 
     for (auto coarse = 0U; coarse < kCoarseFactor; ++coarse) {
       const auto col = colBase + coarse * kTileWidth; // Select C's column.
       bTile[ty][tx] =                                 // Load or pad B.
-          bRow < k && col < n ? b[bRow * n + col] : 0.0F;
+        bRow < k && col < n ? b[bRow * n + col] : 0.0F;
       __syncthreads(); // Publish both shared tiles.
 
       for (auto j = 0U; j < kTileWidth; ++j) { // Reduce one tile.
@@ -56,23 +56,26 @@ matmul_coarse_kernel(const float* a, const float* b, float* c, unsigned m, unsig
 }
 
 void launch_matmul_coarse(
-    const float* a, const float* b, float* c, const mm::GemmShape& shape, cudaStream_t stream) {
+  const float* a, const float* b, float* c, const mm::GemmShape& shape, cudaStream_t stream
+) {
   const dim3 block(kTileWidth, kTileWidth);
-  const dim3 grid(cuda::ceil_div(shape.n(), block.x * kCoarseFactor),
-                  cuda::ceil_div(shape.m(), block.y));
+  const dim3 grid(
+    cuda::ceil_div(shape.n(), block.x * kCoarseFactor), cuda::ceil_div(shape.m(), block.y)
+  );
   matmul_coarse_kernel<<<grid, block, 0, stream>>>(a, b, c, shape.m(), shape.n(), shape.k());
 }
 
 const mm::Kernel kMatmulCoarse{
-    "matmul.coarse",
-    launch_matmul_coarse,
-    nullptr,
-    {},
-    lg::benchmark::fixed_resources<mm::GemmShape, matmul_coarse_kernel, kTileWidth, kTileWidth>};
+  "matmul.coarse",
+  launch_matmul_coarse,
+  nullptr,
+  {},
+  lg::benchmark::fixed_resources<mm::GemmShape, matmul_coarse_kernel, kTileWidth, kTileWidth>};
 
 } // namespace
 
 int main(int argc, char** argv) {
-  return mm::run_app(argc, argv,
-                     {kMatmulCoarse, kMatmulCell, {kBenchSize, kBenchSize, kBenchSize}});
+  return mm::run_app(
+    argc, argv, {kMatmulCoarse, kMatmulCell, {kBenchSize, kBenchSize, kBenchSize}}
+  );
 }

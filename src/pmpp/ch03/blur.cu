@@ -5,10 +5,9 @@
 
 constexpr unsigned kBlurRadius = 7;
 
-__global__ void blur_kernel(const ImageByte* input,
-                            ImageByte* output,
-                            const unsigned width,
-                            const unsigned height) {
+__global__ void blur_kernel(
+  const ImageByte* input, ImageByte* output, const unsigned width, const unsigned height
+) {
   const auto pos = image_thread();
   if (!pos.in_bounds(width, height)) {
     return;

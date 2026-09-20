@@ -72,14 +72,18 @@ bool copy_checked(const Source& source, Destination& destination, const char* fi
   using Element = std::remove_pointer_t<decltype(destination.data())>;
   static_assert(std::is_trivially_copyable_v<Element>, "readback needs a trivially copyable type");
   if (source.size() > destination.size()) {
-    write_log("CUDA", file, line, "copy destination holds %zu of %zu elements",
-              static_cast<std::size_t>(destination.size()),
-              static_cast<std::size_t>(source.size()));
+    write_log(
+      "CUDA", file, line, "copy destination holds %zu of %zu elements",
+      static_cast<std::size_t>(destination.size()), static_cast<std::size_t>(source.size())
+    );
     return false;
   }
-  return cuda_check(cudaMemcpy(destination.data(), source.data(), source.size() * sizeof(Element),
-                               cudaMemcpyDeviceToHost),
-                    file, line);
+  return cuda_check(
+    cudaMemcpy(
+      destination.data(), source.data(), source.size() * sizeof(Element), cudaMemcpyDeviceToHost
+    ),
+    file, line
+  );
 }
 
 #define COPY_CHECK(source, destination) copy_checked((source), (destination), __FILE__, __LINE__)
@@ -88,8 +92,9 @@ inline __host__ __device__ void not_implemented(const char* file, int line) {
 #ifdef __CUDA_ARCH__
   if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 &&
       threadIdx.y == 0 && threadIdx.z == 0) {
-    __assert_fail("kernel is not implemented", file, static_cast<unsigned int>(line),
-                  "NOT_IMPLEMENTED");
+    __assert_fail(
+      "kernel is not implemented", file, static_cast<unsigned int>(line), "NOT_IMPLEMENTED"
+    );
   }
 #else
   write_log("CUDA", file, line, "kernel is not implemented");
@@ -136,6 +141,8 @@ template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
 
 inline void log_image_launch(dim3 grid, dim3 block, std::size_t pixels) {
   const auto threads = static_cast<std::size_t>(grid.x) * grid.y * block.x * block.y;
-  HOST_LOG("Grid %ux%u, block %ux%u, threads %zu, pixels %zu", grid.x, grid.y, block.x, block.y,
-           threads, pixels);
+  HOST_LOG(
+    "Grid %ux%u, block %ux%u, threads %zu, pixels %zu", grid.x, grid.y, block.x, block.y, threads,
+    pixels
+  );
 }

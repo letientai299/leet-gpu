@@ -6,7 +6,8 @@ namespace {
 
 // C[height, width] = A[height, k] * B[k, width]. One thread per output element.
 __global__ void matmul_cell_kernel(
-    const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k) {
+  const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k
+) {
   const auto col = blockIdx.x * blockDim.x + threadIdx.x;
   const auto row = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -24,7 +25,8 @@ __global__ void matmul_cell_kernel(
 
 // Ex 3.1a: each thread produces one output matrix row.
 __global__ void matmul_row_kernel(
-    const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k) {
+  const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k
+) {
   const auto y = blockIdx.x * blockDim.x + threadIdx.x;
   if (y >= height) {
     return;
@@ -41,7 +43,8 @@ __global__ void matmul_row_kernel(
 
 // Ex 3.1b: each thread produces one output matrix column.
 __global__ void matmul_col_kernel(
-    const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k) {
+  const float* a, const float* b, float* c, unsigned height, unsigned width, unsigned k
+) {
   const auto x = blockIdx.x * blockDim.x + threadIdx.x;
   if (x >= width) {
     return;
@@ -58,11 +61,9 @@ __global__ void matmul_col_kernel(
 
 } // namespace
 
-void launch_matmul_cell(const float* a,
-                        const float* b,
-                        float* c,
-                        const lg::matmul::GemmShape& shape,
-                        cudaStream_t stream) {
+void launch_matmul_cell(
+  const float* a, const float* b, float* c, const lg::matmul::GemmShape& shape, cudaStream_t stream
+) {
   const unsigned height = shape.m();
   const unsigned width = shape.n();
   const unsigned k = shape.k();
@@ -71,11 +72,9 @@ void launch_matmul_cell(const float* a,
   matmul_cell_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);
 }
 
-void launch_matmul_row(const float* a,
-                       const float* b,
-                       float* c,
-                       const lg::matmul::GemmShape& shape,
-                       cudaStream_t stream) {
+void launch_matmul_row(
+  const float* a, const float* b, float* c, const lg::matmul::GemmShape& shape, cudaStream_t stream
+) {
   const unsigned height = shape.m();
   const unsigned width = shape.n();
   const unsigned k = shape.k();
@@ -84,11 +83,9 @@ void launch_matmul_row(const float* a,
   matmul_row_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);
 }
 
-void launch_matmul_col(const float* a,
-                       const float* b,
-                       float* c,
-                       const lg::matmul::GemmShape& shape,
-                       cudaStream_t stream) {
+void launch_matmul_col(
+  const float* a, const float* b, float* c, const lg::matmul::GemmShape& shape, cudaStream_t stream
+) {
   const unsigned height = shape.m();
   const unsigned width = shape.n();
   const unsigned k = shape.k();
@@ -97,20 +94,26 @@ void launch_matmul_col(const float* a,
   matmul_col_kernel<<<grid, block, 0, stream>>>(a, b, c, height, width, k);
 }
 
-cudaError_t matmul_cell_resources(const lg::matmul::GemmShape& shape,
-                                  lg::benchmark::KernelResources& resources) {
+cudaError_t matmul_cell_resources(
+  const lg::matmul::GemmShape& shape, lg::benchmark::KernelResources& resources
+) {
   return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_cell_kernel, 16, 16>(
-      shape, resources);
+    shape, resources
+  );
 }
 
-cudaError_t matmul_row_resources(const lg::matmul::GemmShape& shape,
-                                 lg::benchmark::KernelResources& resources) {
-  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_row_kernel, 256>(shape,
-                                                                                       resources);
+cudaError_t matmul_row_resources(
+  const lg::matmul::GemmShape& shape, lg::benchmark::KernelResources& resources
+) {
+  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_row_kernel, 256>(
+    shape, resources
+  );
 }
 
-cudaError_t matmul_col_resources(const lg::matmul::GemmShape& shape,
-                                 lg::benchmark::KernelResources& resources) {
-  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_col_kernel, 256>(shape,
-                                                                                       resources);
+cudaError_t matmul_col_resources(
+  const lg::matmul::GemmShape& shape, lg::benchmark::KernelResources& resources
+) {
+  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_col_kernel, 256>(
+    shape, resources
+  );
 }

@@ -26,11 +26,13 @@ void matvec(float* a, const float* b, const float* c, unsigned n, cudaStream_t s
   matvec_kernel<<<grid, block, 0, stream>>>(a, b, c, n);
 }
 
-void launch_matvec(const float* matrix,
-                   const float* vec_in,
-                   float* vec_out,
-                   const mm::GemmShape& shape,
-                   cudaStream_t stream) {
+void launch_matvec(
+  const float* matrix,
+  const float* vec_in,
+  float* vec_out,
+  const mm::GemmShape& shape,
+  cudaStream_t stream
+) {
   matvec(vec_out, matrix, vec_in, shape.m(), stream);
 }
 
