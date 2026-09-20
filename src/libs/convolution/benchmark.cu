@@ -115,6 +115,20 @@ private:
     return bytes;
   }
 
+  static bool add_resources(nvbench::state& state, Shape shape, Kernel kernel) {
+    if (kernel.resources == nullptr) {
+      return true;
+    }
+    lg::benchmark::KernelResources resources;
+    if (!CUDA_CHECK(kernel.resources(shape, resources))) {
+      state.skip("CUDA kernel resource query failed");
+      return false;
+    }
+
+    lg::benchmark::add_resources(state, resources);
+    return true;
+  }
+
   static void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     if (kernel.launch == nullptr) {
       state.skip("kernel callback is null");
@@ -127,6 +141,9 @@ private:
     const auto counts = get_counts(data.shape);
     if (!counts) {
       state.skip("convolution metric overflow");
+      return;
+    }
+    if (!add_resources(state, data.shape, kernel)) {
       return;
     }
     const auto model_bytes = add_traffic(state, data.shape, kernel, counts->flops);

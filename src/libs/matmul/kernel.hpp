@@ -1,5 +1,6 @@
 #pragma once
 
+#include "benchmark/resources.cuh"
 #include "matmul/matrix.hpp"
 
 #include <cstddef>
@@ -75,6 +76,8 @@ struct Traffic {
 };
 
 using TrafficCallback = bool (*)(const GemmShape&, Traffic&);
+using ResourcesCallback = cudaError_t (*)(const GemmShape&,
+                                          lg::benchmark::KernelResources& resources);
 
 /// Estimates naive per-cell memory traffic.
 inline bool cell_traffic(const GemmShape& shape, Traffic& traffic) {
@@ -92,6 +95,7 @@ struct Kernel {
   KernelCallback launch;
   TrafficCallback traffic = nullptr;
   InputTransforms inputs;
+  ResourcesCallback resources = nullptr;
 };
 
 } // namespace lg::matmul

@@ -77,7 +77,12 @@ bool tile_traffic(const mm::GemmShape& shape, mm::Traffic& traffic) {
   return true;
 }
 
-const mm::Kernel kMatmulTile{"matmul.tile", launch_matmul_tile, tile_traffic};
+const mm::Kernel kMatmulTile{
+    "matmul.tile",
+    launch_matmul_tile,
+    tile_traffic,
+    {},
+    lg::benchmark::fixed_resources<mm::GemmShape, matmul_tile_kernel, kTileWidth, kTileWidth>};
 
 } // namespace
 

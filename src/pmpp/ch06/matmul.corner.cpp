@@ -80,7 +80,11 @@ mm::Matrix column_major(const mm::Matrix& input) {
 }
 
 const mm::Kernel kMatmulCorner{
-    "matmul.corner", launch_matmul_corner, nullptr, {nullptr, column_major}};
+    "matmul.corner",
+    launch_matmul_corner,
+    nullptr,
+    {nullptr, column_major},
+    lg::benchmark::fixed_resources<mm::GemmShape, matmul_corner_kernel, kTileWidth, kTileWidth>};
 
 } // namespace
 

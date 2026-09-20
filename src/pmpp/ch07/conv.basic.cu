@@ -6,6 +6,10 @@ namespace {
 
 namespace conv = lg::convolution;
 
+constexpr dim3 block_shape() {
+  return {32, 32};
+}
+
 __global__ void conv_basic_kernel(const float* input, //
                                   const float* filter,
                                   float* output,
@@ -39,7 +43,7 @@ void launch_basic(const float* input,
                   float* output,
                   conv::Shape shape,
                   cudaStream_t stream) {
-  constexpr dim3 block(32, 32);
+  constexpr dim3 block = block_shape();
   const dim3 grid(cuda::ceil_div(shape.width, block.x), //
                   cuda::ceil_div(shape.height, block.y));
   conv_basic_kernel<<<grid, block, 0, stream>>>(input, filter, output, shape);
@@ -48,5 +52,7 @@ void launch_basic(const float* input,
 } // namespace
 
 int main(int argc, char** argv) {
-  return conv::run_app(argc, argv, {"conv.basic", launch_basic, conv::basic_traffic});
+  return conv::run_app(argc, argv,
+                       {"conv.basic", launch_basic, conv::basic_traffic,
+                        lg::benchmark::fixed_resources<conv::Shape, conv_basic_kernel, 32, 32>});
 }

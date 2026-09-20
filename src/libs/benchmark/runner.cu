@@ -49,11 +49,11 @@ void add_status(nvbench::state& state,
   } else if (noise < max_noise) {
     status = "converged";
   } else {
-    status = "converged, noise plateaued";
+    status = "UNSTABLE, noise plateaued";
   }
   auto& summary = state.add_summary(std::move(tag));
   summary.set_string("name", "Status");
-  summary.set_string("description", "Whether the stopping criterion converged or the timeout hit");
+  summary.set_string("description", "Whether cold timing met its noise target");
   summary.set_string("value", fmt::format("{} ({}x)", status, samples));
 }
 
@@ -80,6 +80,21 @@ void add_summary(nvbench::state& state,
     summary.set_string("hint", std::move(hint));
   }
   summary.set_int64("value", value);
+}
+
+void add_resources(nvbench::state& state, const KernelResources& resources) {
+  add_summary(state, "kernel/resources/threads_per_block", "Threads/Block",
+              resources.threads_per_block);
+  add_summary(state, "kernel/resources/registers_per_thread", "Registers/Thread",
+              resources.registers_per_thread);
+  add_summary(state, "kernel/resources/shared_static", "Static Shared Memory",
+              static_cast<nvbench::int64_t>(resources.static_shared_bytes), "bytes");
+  add_summary(state, "kernel/resources/shared_dynamic", "Dynamic Shared Memory",
+              static_cast<nvbench::int64_t>(resources.dynamic_shared_bytes), "bytes");
+  add_summary(state, "kernel/resources/constant", "Constant Memory",
+              static_cast<nvbench::int64_t>(resources.constant_bytes), "bytes");
+  add_summary(state, "kernel/resources/local_per_thread", "Local Memory/Thread",
+              static_cast<nvbench::int64_t>(resources.local_bytes_per_thread), "bytes");
 }
 
 void finish_summaries(nvbench::state& state,
@@ -136,6 +151,28 @@ bool has_option(int argc, char** argv, std::initializer_list<std::string_view> o
   return false;
 }
 
+std::vector<std::string> benchmark_args(int argc, char** argv) {
+  auto raw_args = nvbench::detail::main_convert_args(argc, argv);
+  std::vector<std::string> args;
+  args.reserve(raw_args.size() + 4);
+  args.push_back(raw_args.front());
+  args.emplace_back("--devices");
+  args.emplace_back("0");
+  args.emplace_back("--throttle-threshold");
+  args.emplace_back("0");
+  args.insert(args.end(), raw_args.begin() + 1, raw_args.end());
+  return args;
+}
+
+std::vector<char*> arg_pointers(std::vector<std::string>& args) {
+  std::vector<char*> pointers;
+  pointers.reserve(args.size());
+  for (auto& arg : args) {
+    pointers.push_back(arg.data());
+  }
+  return pointers;
+}
+
 int run_captured(int argc, char** argv, std::string& output) try {
   nvbench::detail::main_initialize(argc, argv);
   {
@@ -163,26 +200,30 @@ NVBENCH_MAIN_CATCH_EXCEPTIONS
 int run_json(int argc, char** argv) {
   auto args = nvbench::detail::main_convert_args(argc, argv);
   args.emplace_back("--quiet");
-  std::vector<char*> pointers;
-  pointers.reserve(args.size());
-  for (auto& arg : args) {
-    pointers.push_back(arg.data());
-  }
+  auto pointers = arg_pointers(args);
   return run_impl(static_cast<int>(pointers.size()), pointers.data());
 }
 
 int run_args(int argc, char** argv) {
-  if (has_option(argc, argv, {"--json", "--jsonbin"})) {
-    return run_json(argc, argv);
-  }
   if (has_option(argc, argv,
-                 {"--quiet", "-q", "--help", "-h", "--help-axis", "--help-axes", "--version",
-                  "--list", "-l", "--jsonlist-benches", "--jsonlist-devices"})) {
+                 {"--help", "-h", "--help-axis", "--help-axes", "--version", "--list", "-l",
+                  "--jsonlist-benches", "--jsonlist-devices"})) {
     return run_impl(argc, argv);
   }
 
+  auto args = benchmark_args(argc, argv);
+  auto pointers = arg_pointers(args);
+  const int bench_argc = static_cast<int>(pointers.size());
+  char** bench_argv = pointers.data();
+  if (has_option(argc, argv, {"--json", "--jsonbin"})) {
+    return run_json(bench_argc, bench_argv);
+  }
+  if (has_option(argc, argv, {"--quiet", "-q"})) {
+    return run_impl(bench_argc, bench_argv);
+  }
+
   std::string output;
-  const int result = run_captured(argc, argv, output);
+  const int result = run_captured(bench_argc, bench_argv, output);
   if (result == 0) {
     print_result(output);
   }

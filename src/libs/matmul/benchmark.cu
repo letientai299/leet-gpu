@@ -212,6 +212,15 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     return;
   }
 
+  if (kernel.resources != nullptr) {
+    benchmark::KernelResources resources;
+    if (!CUDA_CHECK(kernel.resources(data.shape, resources))) {
+      state.skip("CUDA kernel resource query failed");
+      return;
+    }
+    benchmark::add_resources(state, resources);
+  }
+
   benchmark::add_summary(state, "matmul/flops", "FLOPs",
                          static_cast<nvbench::int64_t>(counts->flops), "flops");
   state.add_buffer_size(counts->elements * sizeof(float), "matmul/device_memory", "Memory");

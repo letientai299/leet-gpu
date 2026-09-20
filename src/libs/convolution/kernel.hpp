@@ -1,5 +1,7 @@
 #pragma once
 
+#include "benchmark/resources.cuh"
+
 #include <cstddef>
 #include <cuda_runtime_api.h>
 #include <optional>
@@ -33,6 +35,8 @@ struct Traffic {
 };
 
 using TrafficCallback = bool (*)(Shape, Traffic&);
+
+using ResourcesCallback = cudaError_t (*)(const Shape&, lg::benchmark::KernelResources& resources);
 
 /// Multiplies counts without overflow.
 inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
@@ -70,6 +74,7 @@ struct Kernel {
   const char* name;
   Launch launch;
   TrafficCallback traffic = nullptr;
+  ResourcesCallback resources = nullptr;
 };
 
 } // namespace lg::convolution

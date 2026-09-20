@@ -62,6 +62,9 @@ std::string format_value(const Json& summary) {
     return scaled(value, {{1.0e9, "GHz"}, {1.0e6, "MHz"}, {1.0e3, "kHz"}});
   }
   if (hint == "bytes") {
+    if (value == 0.0) {
+      return "0 B";
+    }
     return scaled(
         value,
         {{1024.0 * 1024.0 * 1024.0, "GiB"}, {1024.0 * 1024.0, "MiB"}, {1024.0, "KiB"}, {1.0, "B"}});

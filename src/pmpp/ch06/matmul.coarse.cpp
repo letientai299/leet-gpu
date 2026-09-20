@@ -63,7 +63,12 @@ void launch_matmul_coarse(
   matmul_coarse_kernel<<<grid, block, 0, stream>>>(a, b, c, shape.m(), shape.n(), shape.k());
 }
 
-const mm::Kernel kMatmulCoarse{"matmul.coarse", launch_matmul_coarse};
+const mm::Kernel kMatmulCoarse{
+    "matmul.coarse",
+    launch_matmul_coarse,
+    nullptr,
+    {},
+    lg::benchmark::fixed_resources<mm::GemmShape, matmul_coarse_kernel, kTileWidth, kTileWidth>};
 
 } // namespace
 

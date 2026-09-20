@@ -1,5 +1,7 @@
 #pragma once
 
+#include "benchmark/resources.cuh"
+
 #include <cstddef>
 #include <memory>
 #include <nvbench/benchmark.cuh>
@@ -28,6 +30,9 @@ void add_summary(nvbench::state& state,
                  std::string name,
                  nvbench::int64_t value,
                  std::string hint = {});
+
+/// Adds concrete compiled-kernel and launch resources.
+void add_resources(nvbench::state& state, const KernelResources& resources);
 
 /// Adds throughput and convergence columns.
 void finish_summaries(nvbench::state& state,
