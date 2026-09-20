@@ -1,0 +1,71 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/build.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # No GPU needed: nvcc only needs to emit device code for
+    # CMAKE_CUDA_ARCHITECTURES, never run it.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.4"
+
+      - name: Install CUDA toolchain (nvcc + cudart only)
+        uses: Jimver/cuda-toolkit@v0.2.36
+        id: cuda-toolkit
+        with:
+          cuda: "13.2.0"
+          method: network
+          sub-packages: '["nvcc", "cudart"]'
+
+      - name: Install ccache
+        run: sudo apt-get update && sudo apt-get install -y ccache
+
+      # Keyed on sources so a cache hit means "nothing to recompile"; falls
+      # back to the branch's, then any, most recent cache for partial hits.
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: build/local/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('src/**/*.cu', 'src/**/*.cpp', 'src/**/*.hpp', '**/CMakeLists.txt') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.ref_name }}-
+            ccache-${{ runner.os }}-
+
+      # FetchContent deps (spdlog, lodepng, CCCL, CUTLASS, nvbench) are
+      # pinned by URL+hash in src/libs/CMakeLists.txt, so cache invalidates
+      # only when a pin changes.
+      - name: Cache FetchContent sources
+        uses: actions/cache@v4
+        with:
+          path: .cache/fetchcontent
+          key: fetchcontent-${{ hashFiles('src/libs/CMakeLists.txt') }}
+
+      - name: Build all apps
+        env:
+          BUILD_ENV: local
+          CCACHE_MAXSIZE: 500M
+        run: bash .config/mise/tasks/build
