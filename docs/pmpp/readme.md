@@ -9,13 +9,13 @@ Hwu, Kirk & El Hajj (2022).
 - [x] [Chapter 1 — Introduction](./ch01.md)
 - [x] [Chapter 2 — Heterogeneous data parallel computing](./ch02.md)
 - [x] [Chapter 3 — Multidimensional grids and data](./ch03.md)
-- [ ] [Chapter 4 — Compute architecture and scheduling](./ch04.md)
-- [ ] [Chapter 5 — Memory architecture and data locality](./ch05.md)
-- [ ] [Chapter 6 — Performance considerations](./ch06.md)
+- [x] [Chapter 4 — Compute architecture and scheduling](./ch04.md)
+- [x] [Chapter 5 — Memory architecture and data locality](./ch05.md)
+- [x] [Chapter 6 — Performance considerations](./ch06.md)
 
 ## Part II — Parallel Patterns
 
-- [ ] [Chapter 7 — Convolution](./ch07.md)
+- [ ] [Chapter 7 — Convolution](./ch07.md): WIP
 - [ ] [Chapter 8 — Stencil](./ch08.md)
 - [ ] [Chapter 9 — Parallel histogram](./ch09.md)
 - [ ] [Chapter 10 — Reduction](./ch10.md)
