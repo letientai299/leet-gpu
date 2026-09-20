@@ -84,6 +84,11 @@ bool run_kernel(
     return false;
   }
 
+  if (kernel.filter_setup != nullptr &&
+      !CUDA_CHECK(kernel.filter_setup(filter.data(), problem.shape, nullptr))) {
+    return false;
+  }
+
   cudaGetLastError();
   kernel.launch(input.data(), filter.data(), output.data(), problem.shape, nullptr);
   return CUDA_CHECK(cudaGetLastError());

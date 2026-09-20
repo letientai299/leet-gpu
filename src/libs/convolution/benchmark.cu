@@ -137,6 +137,11 @@ private:
       state.skip("kernel callback is null");
       return;
     }
+    if (kernel.filter_setup != nullptr &&
+        !CUDA_CHECK(kernel.filter_setup(data.filter.data(), data.shape, nullptr))) {
+      state.skip("CUDA filter setup failed");
+      return;
+    }
     if (!CUDA_CHECK(cudaDeviceSynchronize())) {
       state.skip("CUDA setup failed");
       return;

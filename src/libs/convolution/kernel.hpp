@@ -29,6 +29,8 @@ using Launch = void (*)(
   const float* input, const float* filter, float* output, Shape shape, cudaStream_t stream
 );
 
+using FilterSetup = cudaError_t (*)(const float* filter, Shape shape, cudaStream_t stream);
+
 /// Logical global-memory operations performed by a kernel.
 struct Traffic {
   std::size_t global_reads = 0;
@@ -77,6 +79,7 @@ struct Kernel {
   Launch launch;
   TrafficCallback traffic = nullptr;
   ResourcesCallback resources = nullptr;
+  FilterSetup filter_setup = nullptr;
 };
 
 } // namespace lg::convolution
