@@ -46,7 +46,7 @@ jobs:
       # Keyed on sources so a cache hit means "nothing to recompile"; falls
       # back to the branch's, then any, most recent cache for partial hits.
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/local/ccache
           key: >-
@@ -61,7 +61,7 @@ jobs:
       # pinned by URL+hash in src/libs/CMakeLists.txt, so cache invalidates
       # only when a pin changes.
       - name: Cache FetchContent sources
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/fetchcontent
           key: fetchcontent-${{ hashFiles('src/libs/CMakeLists.txt') }}
