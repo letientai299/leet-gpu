@@ -29,6 +29,12 @@ CompileFlags:
     - -t0
     - --expt-relaxed-constexpr
     - --compress-mode=*
+Diagnostics:
+  Includes:
+    # threadIdx/blockIdx are builtins injected by clang's CUDA wrapper;
+    # never suggest explicitly including the internal header that declares them.
+    IgnoreHeader:
+      - __clang_cuda_builtin_vars\.h
 
 ---
 If:
