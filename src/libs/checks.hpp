@@ -69,13 +69,20 @@ bool copy_checked(const Source& source, Destination& destination, const char* fi
 
 #define COPY_CHECK(source, destination) copy_checked((source), (destination), __FILE__, __LINE__)
 
-[[noreturn]] inline __host__ __device__ void not_implemented() {
+inline __host__ __device__ void not_implemented(const char* file, int line) {
 #ifdef __CUDA_ARCH__
-  __trap();
+  if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 &&
+      threadIdx.y == 0 && threadIdx.z == 0) {
+    __assert_fail("kernel is not implemented", file, static_cast<unsigned int>(line),
+                  "NOT_IMPLEMENTED");
+  }
 #else
-  throw std::logic_error("not implemented");
+  write_log("CUDA", file, line, "kernel is not implemented");
+  throw std::logic_error("kernel is not implemented");
 #endif
 }
+
+#define NOT_IMPLEMENTED() not_implemented(__FILE__, __LINE__)
 
 inline bool init_cuda() {
   int device_id = 0;
