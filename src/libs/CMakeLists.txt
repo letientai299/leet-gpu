@@ -141,6 +141,22 @@ target_link_libraries(
 add_library(lg_convolution_nvbench STATIC convolution/benchmark.cu)
 target_link_libraries(lg_convolution_nvbench PUBLIC lg_convolution lg_benchmark)
 
+add_library(lg_convolution3d STATIC convolution3d/correctness.cu)
+target_include_directories(
+  lg_convolution3d
+  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(
+  lg_convolution3d
+  PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL
+)
+
+add_library(lg_convolution3d_nvbench STATIC convolution3d/benchmark.cu)
+target_link_libraries(
+  lg_convolution3d_nvbench
+  PUBLIC lg_convolution3d lg_benchmark
+)
+
 add_library(
   lg_matmul
   STATIC

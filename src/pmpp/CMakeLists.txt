@@ -15,6 +15,9 @@ add_cuda_app(pmpp/ch07/conv.basic LIBRARIES lg_convolution_nvbench)
 add_cuda_app(pmpp/ch07/conv.constant LIBRARIES lg_convolution_nvbench)
 add_cuda_app(pmpp/ch07/conv.tiled LIBRARIES lg_convolution_nvbench)
 add_cuda_app(pmpp/ch07/conv.cached LIBRARIES lg_convolution_nvbench)
+add_cuda_app(pmpp/ch07/conv3d.basic LIBRARIES lg_convolution3d_nvbench)
+add_cuda_app(pmpp/ch07/conv3d.constant LIBRARIES lg_convolution3d_nvbench)
+add_cuda_app(pmpp/ch07/conv3d.tiled LIBRARIES lg_convolution3d_nvbench)
 add_cuda_app(
   pmpp/ch05/matmul.tile
   LIBRARIES lg_matmul_kernels lg_matmul_nvbench

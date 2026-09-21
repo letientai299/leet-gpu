@@ -15,7 +15,7 @@ Hwu, Kirk & El Hajj (2022).
 
 ## Part II — Parallel Patterns
 
-- [ ] [Chapter 7 — Convolution](./ch07.md): WIP
+- [x] [Chapter 7 — Convolution](./ch07.md)
 - [ ] [Chapter 8 — Stencil](./ch08.md)
 - [ ] [Chapter 9 — Parallel histogram](./ch09.md)
 - [ ] [Chapter 10 — Reduction](./ch10.md)
