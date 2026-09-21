@@ -10,6 +10,13 @@ constexpr dim3 block_shape() {
   return {32, 32};
 }
 
+// PMPP §7.2 parallel convolution: a basic algorithm.
+//
+// A100X SM80; 4096², r=3.
+// Nsys: 1.297349 ms; 1266.268 GFLOP/s.
+// NCU SM requests: 4.875 GB.
+// NCU L2 traffic: 344.885 MB.
+// NCU DRAM traffic: 124.200 MB.
 __global__ void
 conv_basic_kernel(const float* input, const float* filter, float* output, conv::Shape shape) {
   // the cell I'm working on
