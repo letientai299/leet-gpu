@@ -15,8 +15,8 @@ constexpr dim3 block_shape() {
 
 // PMPP §7.5 tiled convolution using caches for halo cells.
 //
-// A100X SM80; 4096², r=3.
-// Nsys: 2.044871 ms; 803.372 GFLOP/s.
+// A100X SM80; 4096 × 4096, r=3; GPU locked to 1215 MHz.
+// NVBench median: 1.337344 ms; 1229.058 GFLOP/s.
 // NCU SM requests: 1.887 GB.
 // NCU L2 traffic: 426.582 MB.
 // NCU DRAM traffic: 124.784 MB.

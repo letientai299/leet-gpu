@@ -14,10 +14,10 @@ constexpr dim3 block_shape() {
   return {kTile, kTile};
 }
 
-// PMPP §7.4 tiled convolution with halo cells.
+// PMPP §7.4: thread block matches the output tile.
 //
-// A100X SM80; 4096², r=3.
-// Nsys: 0.854467 ms; 1924.202 GFLOP/s.
+// A100X SM80; 4096 × 4096, r=3; GPU locked to 1215 MHz.
+// NVBench median: 0.562176 ms; 2924.778 GFLOP/s.
 // NCU SM requests: 297.140 MB.
 // NCU L2 traffic: 433.501 MB.
 // NCU DRAM traffic: 124.723 MB.
@@ -35,6 +35,8 @@ __global__ void conv_tiled_kernel(const float* input, float* output, conv::Shape
   const int in_tile = kTile + 2 * shape.radius;
   const int y0 = y - ty;
   const int x0 = x - tx;
+  // Block is the output tile (kTile²). Input SMEM is (kTile+2r)², so one load
+  // per thread cannot fill it; stride leftover cells across the block.
   for (int i = ty; i < in_tile; i += kTile) {
     for (int j = tx; j < in_tile; j += kTile) {
       const int iy = y0 + i - shape.radius;
