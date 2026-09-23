@@ -1,5 +1,6 @@
 #include "benchmark/format.hpp"
 #include "benchmark/runner.hpp"
+#include "validation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -27,7 +28,7 @@ void add_rate(
   std::size_t work,
   double seconds
 ) {
-  if (seconds <= 0.0) {
+  if (!std::isfinite(seconds) || seconds <= 0.0) {
     return;
   }
   auto& summary = state.add_summary(std::move(tag));
@@ -42,14 +43,22 @@ void add_status(
   const auto params = state.get_criterion_params();
   const double max_noise = params.has_value("max-noise") ? params.get_float64("max-noise") : 0.0;
   std::string status;
-  if (walltime > state.get_timeout() * 1.001) {
+  if (samples == 0) {
+    status = "NO SAMPLES";
+  } else if (state.get_run_once()) {
+    status = "single run, noise n/a";
+  } else if (samples < state.get_min_samples()) {
+    status = "INSUFFICIENT SAMPLES";
+  } else if (state.get_timeout() > 0 && walltime >= state.get_timeout()) {
     status = fmt::format("TIMED OUT {:.0f}s", walltime);
-  } else if (!std::isfinite(noise)) {
-    status = "converged, noise n/a";
-  } else if (noise < max_noise) {
-    status = "converged";
+  } else if (!std::isfinite(noise) || noise < 0) {
+    status = "noise unavailable";
+  } else if (state.get_stopping_criterion() != "stdrel") {
+    status = "criterion completed: " + state.get_stopping_criterion();
+  } else if (max_noise > 0 && noise <= max_noise) {
+    status = "noise target met";
   } else {
-    status = "UNSTABLE, noise plateaued";
+    status = "noise above target";
   }
   auto& summary = state.add_summary(std::move(tag));
   summary.set_string("name", "Status");
@@ -104,6 +113,44 @@ void add_resources(nvbench::state& state, const KernelResources& resources) {
     state, "kernel/resources/local_per_thread", "Local Memory/Thread",
     static_cast<nvbench::int64_t>(resources.local_bytes_per_thread), "bytes"
   );
+  if (resources.max_warps_per_sm > 0) {
+    add_summary(
+      state, "kernel/resources/blocks_per_sm", "Active Blocks/SM", resources.active_blocks_per_sm
+    );
+    add_summary(
+      state, "kernel/resources/warps_per_sm", "Active Warps/SM", resources.active_warps_per_sm
+    );
+    auto& occupancy = state.add_summary("kernel/resources/occupancy");
+    occupancy.set_string("name", "Theoretical Occupancy");
+    occupancy.set_string("hint", "percentage");
+    occupancy.set_float64(
+      "value", static_cast<double>(resources.active_warps_per_sm) / resources.max_warps_per_sm
+    );
+  }
+}
+
+std::optional<std::size_t> add_traffic(
+  nvbench::state& state,
+  std::string_view prefix,
+  std::size_t reads,
+  std::size_t writes,
+  std::size_t flops
+) {
+  const auto elements = lg::checked_add(reads, writes);
+  const auto bytes = elements ? lg::checked_mul(*elements, sizeof(float)) : std::nullopt;
+  if (!bytes || *bytes == 0 ||
+      *bytes > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
+    state.skip("invalid traffic model size");
+    return std::nullopt;
+  }
+  const std::string base(prefix);
+  add_summary(
+    state, base + "/model/bytes", "Model GMEM Bytes", static_cast<nvbench::int64_t>(*bytes), "bytes"
+  );
+  auto& intensity = state.add_summary(base + "/model/intensity");
+  intensity.set_string("name", "Model FLOP/B");
+  intensity.set_float64("value", static_cast<double>(flops) / static_cast<double>(*bytes));
+  return bytes;
 }
 
 void finish_summaries(
@@ -129,8 +176,12 @@ void finish_summaries(
       noise = summary.get_float64("value");
     } else if (tag == "nv/cold/sample_size") {
       samples = summary.get_int64("value");
-    } else if (tag == "nv/cold/sm_clock_rate/mean" ||
-               tag == "nv/cold/sm_clock_rate/scaling/percent") {
+    }
+    if (tag == "nv/cold/sm_clock_rate/mean" || tag == "nv/cold/sm_clock_rate/scaling/percent" ||
+        tag == "nv/cold/walltime" || tag == "nv/batch/walltime" || tag == "nv/cold/time/gpu/min" ||
+        tag == "nv/cold/time/gpu/max" || tag == "nv/cold/time/gpu/median" ||
+        tag == "nv/cold/time/gpu/q1" || tag == "nv/cold/time/gpu/q3" ||
+        tag == "nv/cold/time/gpu/iqr/relative") {
       summary.remove_value("hide");
     }
   }
@@ -155,9 +206,24 @@ void finish_summaries(
     );
   }
   add_status(state, base + "/cold/status", walltime, noise, samples);
+  if (!std::isfinite(cold_seconds) || cold_seconds <= 0 || samples == 0 ||
+      (!state.get_run_once() && samples < state.get_min_samples())) {
+    state.skip("insufficient valid timing samples");
+  }
 }
 
-inline int run_impl(int argc, char** argv) try { NVBENCH_MAIN_BODY(argc, argv); }
+inline int run_impl(int argc, char** argv) try {
+  nvbench::detail::main_initialize(argc, argv);
+  auto args = nvbench::detail::main_convert_args(argc, argv);
+  nvbench::option_parser parser;
+  parser.set_raw_args(args);
+  parser.parse(std::move(args));
+  nvbench::detail::main_print_preamble(parser);
+  nvbench::detail::main_run_benchmarks(parser);
+  nvbench::detail::main_print_epilogue(parser);
+  nvbench::detail::main_print_results(parser);
+  return 0;
+}
 NVBENCH_MAIN_CATCH_EXCEPTIONS
 
 bool has_option(int argc, char** argv, std::initializer_list<std::string_view> options) {
@@ -194,6 +260,7 @@ std::vector<char*> arg_pointers(std::vector<std::string>& args) {
 
 int run_captured(int argc, char** argv, std::string& output) try {
   nvbench::detail::main_initialize(argc, argv);
+  int result = 0;
   {
     auto raw_args = nvbench::detail::main_convert_args(argc, argv);
     auto args = raw_args;
@@ -203,6 +270,21 @@ int run_captured(int argc, char** argv, std::string& output) try {
     parser.set_raw_args(raw_args);
     parser.parse(std::move(args));
     nvbench::detail::main_run_benchmarks(parser);
+    nvbench::detail::main_print_results(parser);
+    std::size_t states = 0;
+    for (const auto& bench : parser.get_benchmarks()) {
+      for (const auto& state : bench->get_states()) {
+        ++states;
+        if (state.is_skipped()) {
+          fmt::print(stderr, "Benchmark skipped: {}\n", state.get_skip_reason());
+          result = 1;
+        }
+      }
+    }
+    if (states == 0) {
+      fmt::print(stderr, "No benchmark states ran\n");
+      result = 1;
+    }
 
     std::ostringstream stream;
     nvbench::json_printer printer(stream);
@@ -211,17 +293,10 @@ int run_captured(int argc, char** argv, std::string& output) try {
     printer.print_benchmark_results(parser.get_benchmarks());
     output = stream.str();
   }
-  nvbench::detail::main_finalize();
-  return 0;
+  // Callers still own CUDA buffers and contexts.
+  return result;
 }
 NVBENCH_MAIN_CATCH_EXCEPTIONS
-
-int run_json(int argc, char** argv) {
-  auto args = nvbench::detail::main_convert_args(argc, argv);
-  args.emplace_back("--quiet");
-  auto pointers = arg_pointers(args);
-  return run_impl(static_cast<int>(pointers.size()), pointers.data());
-}
 
 int run_args(int argc, char** argv) {
   if (has_option(
@@ -236,16 +311,9 @@ int run_args(int argc, char** argv) {
   auto pointers = arg_pointers(args);
   const int bench_argc = static_cast<int>(pointers.size());
   char** bench_argv = pointers.data();
-  if (has_option(argc, argv, {"--json", "--jsonbin"})) {
-    return run_json(bench_argc, bench_argv);
-  }
-  if (has_option(argc, argv, {"--quiet", "-q"})) {
-    return run_impl(bench_argc, bench_argv);
-  }
-
   std::string output;
   const int result = run_captured(bench_argc, bench_argv, output);
-  if (result == 0) {
+  if (!output.empty() && !has_option(argc, argv, {"--json", "--jsonbin", "--quiet", "-q"})) {
     print_result(output);
   }
   return result;

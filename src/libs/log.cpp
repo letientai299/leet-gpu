@@ -100,7 +100,7 @@ void init_log() {
     return;
   }
   color_enabled = std::getenv("NO_COLOR") == nullptr;
-  auto logger = spdlog::stdout_color_mt("cuda");
+  auto logger = spdlog::stderr_color_mt("cuda");
   const std::string stamp =
     color_enabled ? std::string(color::time) + "%T.%e" + color::reset : std::string("%T.%e");
   logger->set_pattern(stamp + " %v");

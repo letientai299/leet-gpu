@@ -55,6 +55,9 @@ std::string format_value(const Json& summary) {
   }
 
   const double value = std::stod(raw);
+  if (!std::isfinite(value)) {
+    return "n/a";
+  }
   if (hint == "duration") {
     return scaled(value, {{1.0, "s"}, {1.0e-3, "ms"}, {1.0e-6, "us"}, {1.0e-9, "ns"}});
   }
@@ -118,6 +121,18 @@ std::string field_name(const Json& summary) {
   if (tag == "nv/batch/sample_size") {
     return "Batch Samples";
   }
+  if (tag == "nv/cold/walltime") {
+    return "Cold Wall Time";
+  }
+  if (tag == "nv/batch/walltime") {
+    return "Batch Wall Time";
+  }
+  if (tag == "nv/batch/time/gpu/mean") {
+    return "Batch GPU Time";
+  }
+  if (tag == "nv/cold/time/gpu/iqr/relative") {
+    return "Cold GPU IQR";
+  }
   return name;
 }
 
@@ -180,7 +195,6 @@ void print_result(std::string_view input) {
 
       if (state.value("is_skipped", false)) {
         fmt::print("  Status  Skipped: {}\n", state.value("skip_reason", "unknown reason"));
-        continue;
       }
 
       std::vector<Field> fields;

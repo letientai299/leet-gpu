@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cuda_runtime.h>
+#include <limits>
 
 namespace lg::benchmark {
 
@@ -13,6 +14,9 @@ struct KernelResources {
   std::size_t dynamic_shared_bytes = 0;
   std::size_t constant_bytes = 0;
   std::size_t local_bytes_per_thread = 0;
+  int active_blocks_per_sm = 0;
+  int active_warps_per_sm = 0;
+  int max_warps_per_sm = 0;
 };
 
 /// Queries launch resources without executing the kernel.
@@ -25,13 +29,40 @@ inspect_kernel(dim3 block, std::size_t dynamic_shared_bytes, KernelResources& re
     return result;
   }
 
-  resources.threads_per_block = static_cast<int>(block.x * block.y * block.z);
+  int device = 0;
+  cudaDeviceProp properties{};
+  auto status = cudaGetDevice(&device);
+  if (status != cudaSuccess) {
+    return status;
+  }
+  status = cudaGetDeviceProperties(&properties, device);
+  if (status != cudaSuccess) {
+    return status;
+  }
+  if (block.x == 0 || block.y == 0 || block.z == 0 ||
+      block.x > static_cast<unsigned>(properties.maxThreadsDim[0]) ||
+      block.y > static_cast<unsigned>(properties.maxThreadsDim[1]) ||
+      block.z > static_cast<unsigned>(properties.maxThreadsDim[2])) {
+    return cudaErrorInvalidConfiguration;
+  }
+  const auto threads = static_cast<std::size_t>(block.x) * block.y * block.z;
+  if (threads > static_cast<std::size_t>(attributes.maxThreadsPerBlock)) {
+    return cudaErrorInvalidConfiguration;
+  }
+  resources.threads_per_block = static_cast<int>(threads);
   resources.registers_per_thread = attributes.numRegs;
   resources.static_shared_bytes = attributes.sharedSizeBytes;
   resources.dynamic_shared_bytes = dynamic_shared_bytes;
   resources.constant_bytes = attributes.constSizeBytes;
   resources.local_bytes_per_thread = attributes.localSizeBytes;
-  return cudaSuccess;
+  status = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+    &resources.active_blocks_per_sm, DeviceKernel, resources.threads_per_block, dynamic_shared_bytes
+  );
+  resources.active_warps_per_sm =
+    resources.active_blocks_per_sm *
+    ((resources.threads_per_block + properties.warpSize - 1) / properties.warpSize);
+  resources.max_warps_per_sm = properties.maxThreadsPerMultiProcessor / properties.warpSize;
+  return status;
 }
 
 /// Adapts a fixed launch configuration to a shape-aware resource callback.

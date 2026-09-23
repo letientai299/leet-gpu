@@ -78,6 +78,15 @@ public:
       return;
     }
     const int device = selected.value().get_id();
+    constexpr std::size_t reference_samples = 257;
+    if (!CUDA_CHECK(cudaSetDevice(device)) || check(host_, kernel, reference_samples) != 0) {
+      state.skip("benchmark correctness failed");
+      return;
+    }
+    lg::benchmark::add_summary(
+      state, "validation/samples", "Reference Samples",
+      static_cast<nvbench::int64_t>(std::min(reference_samples, host_.result.size()))
+    );
     if (!data_ || device_ != device) {
       if (!CUDA_CHECK(cudaSetDevice(device))) {
         state.skip("CUDA device selection failed");
@@ -108,6 +117,20 @@ public:
       }
       lg::benchmark::add_resources(state, resources);
     }
+    std::optional<std::size_t> model_bytes;
+    if (kernel.traffic != nullptr) {
+      Traffic traffic;
+      if (!kernel.traffic(data_->shape, traffic)) {
+        state.skip("convolution traffic overflow");
+        return;
+      }
+      model_bytes = lg::benchmark::add_traffic(
+        state, "convolution3d", traffic.global_reads, traffic.global_writes, counts->flops
+      );
+      if (!model_bytes) {
+        return;
+      }
+    }
     lg::benchmark::add_summary(state, "convolution3d/width", "Width", data_->shape.width);
     lg::benchmark::add_summary(state, "convolution3d/height", "Height", data_->shape.height);
     lg::benchmark::add_summary(state, "convolution3d/depth", "Depth", data_->shape.depth);
@@ -128,7 +151,7 @@ public:
         launch.get_stream()
       );
     });
-    lg::benchmark::finish_summaries(state, "convolution3d", counts->flops);
+    lg::benchmark::finish_summaries(state, "convolution3d", counts->flops, model_bytes);
 #endif
   }
 
@@ -171,33 +194,37 @@ void print_usage(const char* app, Shape shape) {
 
 } // namespace
 
-int run_app(int argc, char** argv, Kernel kernel, Shape bench_shape) {
-  return run_host(argc, argv, [&] {
-    AppArgs args;
-    if (!parse_args(argc, argv, args)) {
-      print_usage(argv[0], bench_shape);
-      return 2;
-    }
-    if (args.help) {
-      print_usage(argv[0], bench_shape);
-      return 0;
-    }
+int run_app(int argc, char** argv, Kernel kernel, Shape bench_shape) try {
+  AppArgs args;
+  if (!parse_args(argc, argv, args)) {
+    print_usage(argv[0], bench_shape);
+    return 2;
+  }
+  if (args.help) {
+    print_usage(argv[0], bench_shape);
+    return 0;
+  }
+  if (!init_host()) {
+    return 1;
+  }
 
-    Problem problem{kDefaultShape, {}, {}, {}, {}};
-    fill_problem(problem);
-    if (const int result = check(problem, kernel); result != 0) {
-      return result;
-    }
-    if (!args.bench) {
-      return 0;
-    }
+  Problem problem{kDefaultShape, {}, {}, {}, {}};
+  fill_problem(problem);
+  if (const int result = check(problem, kernel); result != 0) {
+    return result;
+  }
+  if (!args.bench) {
+    return 0;
+  }
 
-    Problem bench_problem{bench_shape, {}, {}, {}, {}};
-    fill_problem(bench_problem);
-    Benchmark benchmark(std::move(bench_problem));
-    lg::benchmark::add(kernel.name, Runner{&benchmark, kernel});
-    return lg::benchmark::run_args(static_cast<int>(args.remaining.size()), args.remaining.data());
-  });
+  Problem bench_problem{bench_shape, {}, {}, {}, {}};
+  fill_problem(bench_problem);
+  Benchmark benchmark(std::move(bench_problem));
+  lg::benchmark::add(kernel.name, Runner{&benchmark, kernel});
+  return lg::benchmark::run_args(static_cast<int>(args.remaining.size()), args.remaining.data());
+} catch (const std::exception& error) {
+  std::fprintf(stderr, "%s\n", error.what());
+  return 1;
 }
 
 } // namespace lg::convolution3d

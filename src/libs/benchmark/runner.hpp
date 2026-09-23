@@ -37,6 +37,14 @@ void add_summary(
 /// Adds concrete compiled-kernel and launch resources.
 void add_resources(nvbench::state& state, const KernelResources& resources);
 
+std::optional<std::size_t> add_traffic(
+  nvbench::state& state,
+  std::string_view prefix,
+  std::size_t reads,
+  std::size_t writes,
+  std::size_t flops
+);
+
 /// Adds throughput and convergence columns.
 void finish_summaries(
   nvbench::state& state,

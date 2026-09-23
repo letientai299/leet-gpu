@@ -167,29 +167,6 @@ std::optional<Counts> get_counts(const GemmShape& shape) {
   return Counts{*elements, *flops};
 }
 
-/// PMPP counts the traffic a cache-less machine would move, which is the whole
-/// point of tiling. It is NOT DRAM traffic, so it must not go to
-/// add_global_memory_reads: NVBench divides that by DRAM peak and reported 456%
-/// bandwidth utilisation. Reported as a model instead, so the column never
-/// claims to be measured. https://en.wikipedia.org/wiki/Roofline_model
-void add_model_traffic(nvbench::state& state, const Traffic& traffic, std::size_t flops) {
-  const auto elements = checked_add(traffic.global_reads, traffic.global_writes);
-  if (!elements) {
-    return;
-  }
-  const auto bytes = checked_mul(*elements, sizeof(float));
-  if (!bytes || *bytes == 0) {
-    return;
-  }
-  benchmark::add_summary(
-    state, "matmul/model/bytes", "Model Bytes", static_cast<nvbench::int64_t>(*bytes), "bytes"
-  );
-  auto& summary = state.add_summary("matmul/model/intensity");
-  summary.set_string("name", "Model FLOP/B");
-  summary.set_string("description", "Arithmetic intensity of the cache-less traffic model");
-  summary.set_float64("value", static_cast<double>(flops) / static_cast<double>(*bytes));
-}
-
 void add_shape(nvbench::state& state, const GemmShape& shape) {
   benchmark::add_summary(state, "matmul/height", "Height", shape.m());
   benchmark::add_summary(state, "matmul/width", "Width", shape.n());
@@ -230,13 +207,19 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     state, "matmul/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops), "flops"
   );
   state.add_buffer_size(counts->elements * sizeof(float), "matmul/device_memory", "Memory");
+  std::optional<std::size_t> model_bytes;
   if (kernel.traffic != nullptr) {
     Traffic traffic;
     if (!kernel.traffic(data.shape, traffic)) {
       state.skip("matmul traffic overflow");
       return;
     }
-    add_model_traffic(state, traffic, counts->flops);
+    model_bytes = benchmark::add_traffic(
+      state, "matmul", traffic.global_reads, traffic.global_writes, counts->flops
+    );
+    if (!model_bytes) {
+      return;
+    }
   }
 #ifdef __clang_analyzer__
   data.c.data()[0] = 0.0F;
@@ -245,7 +228,7 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
   state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& launch) {
     kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, launch.get_stream());
   });
-  benchmark::finish_summaries(state, "matmul", counts->flops);
+  benchmark::finish_summaries(state, "matmul", counts->flops, model_bytes);
 #endif
 }
 
@@ -345,13 +328,21 @@ Benchmark::Benchmark(Benchmark&&) noexcept = default;
 Benchmark& Benchmark::operator=(Benchmark&&) noexcept = default;
 
 void Benchmark::run(nvbench::state& state, Kernel kernel) {
+  const auto& device = state.get_device();
+  if (!device || !CUDA_CHECK(cudaSetDevice(device->get_id())) || check(impl_->host, kernel) != 0) {
+    state.skip("benchmark correctness failed");
+    return;
+  }
+  benchmark::add_summary(
+    state, "validation/values", "Verified Values",
+    static_cast<nvbench::int64_t>(impl_->host.result.size())
+  );
   run_benchmark(state, impl_->get(state, kernel), kernel);
 }
 
 void Benchmark::run_with_shape(nvbench::state& state, Kernel kernel) {
-  auto& data = impl_->get(state, kernel);
-  add_shape(state, data.shape);
-  run_benchmark(state, data, kernel);
+  add_shape(state, impl_->host.shape);
+  run(state, kernel);
 }
 
 void benchmark(nvbench::state& state, GemmShape shape, Kernel kernel) {

@@ -62,6 +62,14 @@ public:
       return;
     }
     const int device = selected.value().get_id();
+    if (!CUDA_CHECK(cudaSetDevice(device)) || check(host_, kernel) != 0) {
+      state.skip("benchmark correctness failed");
+      return;
+    }
+    lg::benchmark::add_summary(
+      state, "validation/values", "Verified Values",
+      static_cast<nvbench::int64_t>(host_.result.size())
+    );
     if (!data_ || device_ != device) {
       if (!CUDA_CHECK(cudaSetDevice(device))) {
         state.skip("CUDA device selection failed");
@@ -97,25 +105,13 @@ private:
       return std::nullopt;
     }
     Traffic traffic;
-    if (!kernel.traffic(shape, traffic) ||
-        traffic.global_reads > static_cast<std::size_t>(-1) - traffic.global_writes) {
+    if (!kernel.traffic(shape, traffic)) {
       state.skip("convolution traffic overflow");
       return std::nullopt;
     }
-    const auto bytes = checked_mul(traffic.global_reads + traffic.global_writes, sizeof(float));
-    if (!bytes || *bytes > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
-      state.skip("convolution traffic overflow");
-      return std::nullopt;
-    }
-    lg::benchmark::add_summary(
-      state, "convolution/model/gmem_bytes", "Model GMEM Bytes",
-      static_cast<nvbench::int64_t>(*bytes), "bytes"
+    return lg::benchmark::add_traffic(
+      state, "convolution", traffic.global_reads, traffic.global_writes, flops
     );
-    auto& intensity = state.add_summary("convolution/model/intensity");
-    intensity.set_string("name", "Model FLOP/B");
-    intensity.set_string("description", "Arithmetic intensity of the logical GMEM traffic model");
-    intensity.set_float64("value", static_cast<double>(flops) / static_cast<double>(*bytes));
-    return bytes;
   }
 
   static bool add_resources(nvbench::state& state, Shape shape, Kernel kernel) {
