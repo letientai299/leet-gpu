@@ -21,6 +21,9 @@ void print_help(const char* program) {
 }
 
 bool parse_args(int argc, char** argv, ImageArgs& args) {
+  if (argc % 2 == 0) {
+    return false;
+  }
   for (int index = 1; index + 1 < argc; index += 2) {
     const char* flag = argv[index];
     if (std::strcmp(flag, "-i") == 0) {

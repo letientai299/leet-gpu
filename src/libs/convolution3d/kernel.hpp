@@ -1,6 +1,7 @@
 #pragma once
 
 #include "benchmark/resources.cuh"
+#include "validation.hpp"
 
 #include <cstddef>
 #include <cuda_runtime_api.h>
@@ -26,6 +27,24 @@ struct Shape {
   }
 };
 
+inline void validate_shape(Shape shape) {
+  constexpr int max_dimension = std::numeric_limits<int>::max();
+  if (shape.width <= 0 || shape.height <= 0 || shape.depth <= 0 || shape.radius < 0 ||
+      shape.radius > (max_dimension - 1) / 2 ||
+      std::max({shape.width, shape.height, shape.depth}) > max_dimension - 2 * shape.radius) {
+    throw std::invalid_argument("invalid convolution dimensions");
+  }
+  const auto xy = lg::checked_mul(static_cast<std::size_t>(shape.width), shape.height);
+  const auto xyz = xy ? lg::checked_mul(*xy, shape.depth) : std::nullopt;
+  const auto side = static_cast<std::size_t>(shape.filter_width());
+  const auto area = lg::checked_mul(side, side);
+  const auto volume = area ? lg::checked_mul(*area, side) : std::nullopt;
+  if (!xyz || !volume || !lg::checked_mul(*xyz, sizeof(float)) ||
+      !lg::checked_mul(*volume, sizeof(float))) {
+    throw std::invalid_argument("convolution size overflow");
+  }
+}
+
 using Launch = void (*)(
   const float* input, const float* filter, float* output, Shape shape, cudaStream_t stream
 );
@@ -39,22 +58,8 @@ struct Traffic {
 using TrafficCallback = bool (*)(Shape, Traffic&);
 using ResourcesCallback = cudaError_t (*)(const Shape&, lg::benchmark::KernelResources& resources);
 
-inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
-  if (right != 0 && left > static_cast<std::size_t>(-1) / right) {
-    return std::nullopt;
-  }
-  return left * right;
-}
-
-inline std::size_t valid_axis_pairs(int length, int radius) {
-  std::size_t pairs = 0;
-  for (int position = 0; position < length; ++position) {
-    const int first = position > radius ? position - radius : 0;
-    const int last = position + radius < length ? position + radius : length - 1;
-    pairs += static_cast<std::size_t>(last - first + 1);
-  }
-  return pairs;
-}
+using lg::checked_mul;
+using lg::valid_axis_pairs;
 
 inline bool basic_traffic(Shape shape, Traffic& traffic) {
   const auto xy = checked_mul(

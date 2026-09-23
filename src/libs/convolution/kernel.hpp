@@ -1,6 +1,7 @@
 #pragma once
 
 #include "benchmark/resources.cuh"
+#include "validation.hpp"
 
 #include <cstddef>
 #include <cuda_runtime_api.h>
@@ -25,6 +26,15 @@ struct Shape {
   }
 };
 
+inline void validate_shape(Shape shape) {
+  constexpr int max_pitch = std::numeric_limits<int>::max() / sizeof(float);
+  if (shape.width <= 0 || shape.height <= 0 || shape.radius < 0 ||
+      shape.radius > (max_pitch - 1) / 2 || shape.width > max_pitch - 2 * shape.radius ||
+      shape.height > std::numeric_limits<int>::max() - 2 * shape.radius) {
+    throw std::invalid_argument("invalid convolution dimensions");
+  }
+}
+
 using Launch = void (*)(
   const float* input, const float* filter, float* output, Shape shape, cudaStream_t stream
 );
@@ -42,23 +52,10 @@ using TrafficCallback = bool (*)(Shape, Traffic&);
 using ResourcesCallback = cudaError_t (*)(const Shape&, lg::benchmark::KernelResources& resources);
 
 /// Multiplies counts without overflow.
-inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
-  if (right != 0 && left > static_cast<std::size_t>(-1) / right) {
-    return std::nullopt;
-  }
-  return left * right;
-}
+using lg::checked_mul;
 
 /// Counts in-bounds filter positions along one axis.
-inline std::size_t valid_axis_pairs(int length, int radius) {
-  std::size_t pairs = 0;
-  for (int position = 0; position < length; ++position) {
-    const int first = position > radius ? position - radius : 0;
-    const int last = position + radius < length ? position + radius : length - 1;
-    pairs += static_cast<std::size_t>(last - first + 1);
-  }
-  return pairs;
-}
+using lg::valid_axis_pairs;
 
 /// Estimates the basic kernel's logical GMEM traffic.
 inline bool basic_traffic(Shape shape, Traffic& traffic) {

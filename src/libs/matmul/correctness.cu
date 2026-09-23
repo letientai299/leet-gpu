@@ -1,9 +1,8 @@
 #include "checks.hpp"
 #include "matmul/correctness.hpp"
+#include "validation.hpp"
 
 #include <algorithm>
-#include <cmath>
-#include <cstddef>
 #include <cuda/buffer>
 #include <cutlass/gemm/device/gemm.h>
 #include <cutlass/layout/matrix.h>
@@ -27,6 +26,16 @@ bool on_device(const Matrix& a, const Matrix& b, Matrix& output, Operation&& ope
 } // namespace
 
 bool run_reference(Problem& problem) {
+  if (problem.a.rows() != problem.shape.m() || problem.a.cols() != problem.shape.k() ||
+      problem.b.rows() != problem.shape.k() || problem.b.cols() != problem.shape.n() ||
+      problem.expected.rows() != problem.shape.m() ||
+      problem.expected.cols() != problem.shape.n() || problem.result.rows() != problem.shape.m() ||
+      problem.result.cols() != problem.shape.n()) {
+    throw std::invalid_argument("matrix shape mismatch");
+  }
+  std::fill(
+    problem.expected.begin(), problem.expected.end(), std::numeric_limits<float>::quiet_NaN()
+  );
   using RowMajor = cutlass::layout::RowMajor;
   using Gemm = cutlass::gemm::device::Gemm<float, RowMajor, float, RowMajor, float, RowMajor>;
 
@@ -58,13 +67,14 @@ bool run_kernel(Problem& problem, Kernel kernel) {
     HOST_LOG("Kernel callback is null");
     return false;
   }
-  // Zero first so a kernel that skips elements shows up as a mismatch.
-  std::fill(problem.result.begin(), problem.result.end(), 0.0F);
+  std::fill(problem.result.begin(), problem.result.end(), std::numeric_limits<float>::quiet_NaN());
   const KernelInputs inputs(problem, kernel.inputs);
   return on_device(
     inputs.a(), inputs.b(), problem.result,
     [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
-      cudaGetLastError(); // Drop any error left over from an earlier launch.
+      if (!CUDA_CHECK(cudaGetLastError())) {
+        return false;
+      }
       kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr);
       return CUDA_CHECK(cudaGetLastError());
     }
@@ -72,22 +82,9 @@ bool run_kernel(Problem& problem, Kernel kernel) {
 }
 
 bool verify(const Problem& problem) {
-  const Matrix& result = problem.result;
-  for (std::size_t index = 0; index < result.size(); ++index) {
-    const float actual = result.data()[index];
-    const float expected = problem.expected.data()[index];
-    const float diff = std::fabs(actual - expected);
-    const float tolerance = kAbsoluteTolerance + kRelativeTolerance * std::fabs(expected);
-    if (!std::isfinite(actual) || diff > tolerance) {
-      HOST_LOG(
-        "Mismatch at [%zu,%zu]: %g vs %g (diff %g, tol %g)", index / result.cols(),
-        index % result.cols(), actual, expected, diff, tolerance
-      );
-      return false;
-    }
-  }
-  HOST_LOG("Matrix multiply passed: %zu values", result.size());
-  return true;
+  return lg::verify_values(
+    problem.result, problem.expected, "matmul", kAbsoluteTolerance, kRelativeTolerance
+  );
 }
 
 int check(Problem& problem, Kernel kernel) {

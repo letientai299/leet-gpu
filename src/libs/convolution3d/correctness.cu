@@ -1,5 +1,6 @@
 #include "checks.hpp"
 #include "convolution3d/correctness.hpp"
+#include "validation.hpp"
 
 #include <cmath>
 #include <cuda/buffer>
@@ -13,58 +14,76 @@ std::size_t offset(Shape shape, int x, int y, int z) {
   return (static_cast<std::size_t>(z) * shape.height + y) * shape.width + x;
 }
 
-void run_reference(Problem& problem) {
+std::size_t reference_index(std::size_t sample, std::size_t count, std::size_t checks) {
+  return checks <= 1 || checks == count
+           ? sample
+           : static_cast<std::size_t>(
+               static_cast<long double>(sample) * static_cast<long double>(count - 1) /
+               static_cast<long double>(checks - 1)
+             );
+}
+
+void run_reference(Problem& problem, std::size_t samples) {
   const int side = problem.shape.filter_width();
-  for (int z = 0; z < problem.shape.depth; ++z) {
-    for (int y = 0; y < problem.shape.height; ++y) {
-      for (int x = 0; x < problem.shape.width; ++x) {
-        float sum = 0.0F;
-        for (int fz = 0; fz < side; ++fz) {
-          const int iz = z + fz - problem.shape.radius;
-          if (iz < 0 || iz >= problem.shape.depth) {
-            continue;
-          }
-          for (int fy = 0; fy < side; ++fy) {
-            const int iy = y + fy - problem.shape.radius;
-            if (iy < 0 || iy >= problem.shape.height) {
-              continue;
-            }
-            for (int fx = 0; fx < side; ++fx) {
-              const int ix = x + fx - problem.shape.radius;
-              if (ix >= 0 && ix < problem.shape.width) {
-                const auto filter_index = (static_cast<std::size_t>(fz) * side + fy) * side + fx;
-                sum +=
-                  problem.input[offset(problem.shape, ix, iy, iz)] * problem.filter[filter_index];
-              }
-            }
+  const auto count = problem.shape.input_size();
+  const auto checks = samples == 0 ? count : std::min(samples, count);
+  for (std::size_t sample = 0; sample < checks; ++sample) {
+    const auto index = reference_index(sample, count, checks);
+    const int x = static_cast<int>(index % problem.shape.width);
+    const int y = static_cast<int>(index / problem.shape.width % problem.shape.height);
+    const int z = static_cast<int>(index / problem.shape.width / problem.shape.height);
+    float sum = 0.0F;
+    for (int fz = 0; fz < side; ++fz) {
+      const int iz = z + fz - problem.shape.radius;
+      if (iz < 0 || iz >= problem.shape.depth) {
+        continue;
+      }
+      for (int fy = 0; fy < side; ++fy) {
+        const int iy = y + fy - problem.shape.radius;
+        if (iy < 0 || iy >= problem.shape.height) {
+          continue;
+        }
+        for (int fx = 0; fx < side; ++fx) {
+          const int ix = x + fx - problem.shape.radius;
+          if (ix >= 0 && ix < problem.shape.width) {
+            const auto filter_index = (static_cast<std::size_t>(fz) * side + fy) * side + fx;
+            sum += problem.input[offset(problem.shape, ix, iy, iz)] * problem.filter[filter_index];
           }
         }
-        problem.expected[offset(problem.shape, x, y, z)] = sum;
       }
     }
+    problem.expected[offset(problem.shape, x, y, z)] = sum;
   }
 }
 
-bool verify(const Problem& problem, Kernel kernel) {
-  constexpr float kAbsoluteTolerance = 1.0e-5F;
-  constexpr float kRelativeTolerance = 1.0e-4F;
+bool verify(const Problem& problem, Kernel kernel, std::size_t samples) {
+  if (samples == 0) {
+    return lg::verify_values(problem.result, problem.expected, kernel.name);
+  }
+  std::vector<float> actual;
+  std::vector<float> expected;
+  const auto checks = std::min(samples, problem.result.size());
+  actual.reserve(checks);
+  expected.reserve(checks);
   for (std::size_t index = 0; index < problem.result.size(); ++index) {
-    const float actual = problem.result[index];
-    const float expected = problem.expected[index];
-    const float difference = std::fabs(actual - expected);
-    const float tolerance = kAbsoluteTolerance + kRelativeTolerance * std::fabs(expected);
-    if (!std::isfinite(actual) || difference > tolerance) {
-      HOST_LOG("%s mismatch at %zu: %g vs %g", kernel.name, index, actual, expected);
+    if (!std::isfinite(problem.result[index])) {
+      HOST_LOG("%s nonfinite output[%zu]", kernel.name, index);
       return false;
     }
   }
-  HOST_LOG("%s passed: %zu values", kernel.name, problem.result.size());
-  return true;
+  for (std::size_t sample = 0; sample < checks; ++sample) {
+    const auto index = reference_index(sample, problem.result.size(), checks);
+    actual.push_back(problem.result[index]);
+    expected.push_back(problem.expected[index]);
+  }
+  HOST_LOG("Reference coverage: %zu/%zu values", actual.size(), problem.result.size());
+  return lg::verify_values(actual, expected, kernel.name);
 }
 
 } // namespace
 
 void fill_problem(Problem& problem) {
+  validate_shape(problem.shape);
   problem.input.resize(problem.shape.input_size());
   problem.filter.resize(problem.shape.filter_size());
   problem.expected.assign(problem.shape.input_size(), 0.0F);
@@ -76,14 +95,22 @@ void fill_problem(Problem& problem) {
   for (std::size_t index = 0; index < problem.filter.size(); ++index) {
     problem.filter[index] = static_cast<float>(index % 5) * 0.125F - 0.25F;
   }
-  run_reference(problem);
 }
 
-int check(Problem& problem, Kernel kernel) {
+int check(Problem& problem, Kernel kernel, std::size_t samples) {
   if (kernel.launch == nullptr) {
     HOST_LOG("Kernel callback is null");
     return 1;
   }
+
+  validate_shape(problem.shape);
+  if (problem.input.size() != problem.shape.input_size() ||
+      problem.filter.size() != problem.shape.filter_size()) {
+    throw std::invalid_argument("convolution input size mismatch");
+  }
+  problem.expected.assign(problem.shape.input_size(), std::numeric_limits<float>::quiet_NaN());
+  problem.result.assign(problem.shape.input_size(), std::numeric_limits<float>::quiet_NaN());
+  run_reference(problem, samples);
 
   const auto stream = default_stream();
   auto& pool = device_pool();
@@ -95,10 +122,12 @@ int check(Problem& problem, Kernel kernel) {
     return 1;
   }
 
-  cudaGetLastError();
+  if (!CUDA_CHECK(cudaGetLastError())) {
+    return 1;
+  }
   kernel.launch(input.data(), filter.data(), result.data(), problem.shape, nullptr);
   return CUDA_CHECK(cudaGetLastError()) && COPY_CHECK(result, problem.result) &&
-             verify(problem, kernel)
+             verify(problem, kernel, samples)
            ? 0
            : 1;
 }

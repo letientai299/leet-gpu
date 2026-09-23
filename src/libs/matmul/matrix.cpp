@@ -1,6 +1,7 @@
 #include "matmul/matrix.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <random>
 #include <stdexcept>
@@ -35,8 +36,9 @@ public:
 
 private:
   static RandomFill validate(RandomFill config) {
-    if (config.minimum > config.maximum) {
-      throw std::invalid_argument("random range is reversed");
+    if (!std::isfinite(config.minimum) || !std::isfinite(config.maximum) ||
+        config.minimum > config.maximum || !std::isfinite(config.maximum - config.minimum)) {
+      throw std::invalid_argument("invalid random range");
     }
     return config;
   }
@@ -57,10 +59,16 @@ Matrix::Matrix(unsigned rows, unsigned cols) : rows_(rows), cols_(cols) {
 }
 
 float& Matrix::operator()(unsigned row, unsigned col) {
+  if (row >= rows_ || col >= cols_) {
+    throw std::out_of_range("matrix index out of range");
+  }
   return values_.at(std::size_t{row} * cols_ + col);
 }
 
 const float& Matrix::operator()(unsigned row, unsigned col) const {
+  if (row >= rows_ || col >= cols_) {
+    throw std::out_of_range("matrix index out of range");
+  }
   return values_.at(std::size_t{row} * cols_ + col);
 }
 

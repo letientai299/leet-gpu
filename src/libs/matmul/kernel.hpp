@@ -2,6 +2,7 @@
 
 #include "benchmark/resources.cuh"
 #include "matmul/matrix.hpp"
+#include "validation.hpp"
 
 #include <cstddef>
 #include <cuda_runtime_api.h>
@@ -54,20 +55,10 @@ private:
 };
 
 /// Multiplies counts without overflow.
-inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
-  if (right != 0 && left > std::numeric_limits<std::size_t>::max() / right) {
-    return std::nullopt;
-  }
-  return left * right;
-}
+using lg::checked_mul;
 
 /// Adds counts without overflow.
-inline std::optional<std::size_t> checked_add(std::size_t left, std::size_t right) {
-  if (left > std::numeric_limits<std::size_t>::max() - right) {
-    return std::nullopt;
-  }
-  return left + right;
-}
+using lg::checked_add;
 
 /// Bytes a kernel moves through global memory, for NVBench bandwidth columns.
 struct Traffic {

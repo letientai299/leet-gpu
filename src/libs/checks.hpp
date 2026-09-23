@@ -60,7 +60,11 @@ inline cuda::stream_ref default_stream() {
 }
 
 inline auto& device_pool() {
-  return cuda::device_default_memory_pool(cuda::devices[0]);
+  int device = 0;
+  if (!CUDA_CHECK(cudaGetDevice(&device))) {
+    throw std::runtime_error("CUDA device selection failed");
+  }
+  return cuda::device_default_memory_pool(cuda::devices[device]);
 }
 
 // Shared device-to-host readback. cuda::copy_bytes would be the CCCL-idiomatic
@@ -70,7 +74,9 @@ inline auto& device_pool() {
 template <typename Source, typename Destination>
 bool copy_checked(const Source& source, Destination& destination, const char* file, int line) {
   using Element = std::remove_pointer_t<decltype(destination.data())>;
+  using SourceElement = std::remove_pointer_t<decltype(source.data())>;
   static_assert(std::is_trivially_copyable_v<Element>, "readback needs a trivially copyable type");
+  static_assert(std::is_same_v<std::remove_cv_t<Element>, std::remove_cv_t<SourceElement>>);
   if (source.size() > destination.size()) {
     write_log(
       "CUDA", file, line, "copy destination holds %zu of %zu elements",
@@ -128,7 +134,7 @@ inline bool help_requested(int argc, char** argv) {
   return argc == 2 && std::strcmp(argv[1], "--help") == 0;
 }
 
-template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
+template <typename Fn> int run_host(int argc, char** argv, Fn&& body) try {
   if (help_requested(argc, argv)) {
     std::printf("Usage: %s\n", argv[0]);
     return 0;
@@ -137,6 +143,9 @@ template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
     return 1;
   }
   return std::forward<Fn>(body)();
+} catch (const std::exception& error) {
+  std::fprintf(stderr, "%s\n", error.what());
+  return 1;
 }
 
 inline void log_image_launch(dim3 grid, dim3 block, std::size_t pixels) {

@@ -1,8 +1,8 @@
 #include "checks.hpp"
 #include "convolution/correctness.hpp"
+#include "validation.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <cuda/buffer>
 #include <nppi_filtering_functions.h>
@@ -65,10 +65,13 @@ bool run_reference(
 
   NppStreamContext context{};
   const auto* source = padded.data() + source_offset;
+  // Preserve padding beyond the output ROI.
+  // https://docs.nvidia.com/cuda/npp/image_filtering_functions.html
   return make_npp_context(context) &&
-         NPP_CHECK(nppiFilter_32f_C1R_Ctx(
-           source, static_cast<int>(padded_step), output.data(), static_cast<int>(input_step),
-           {width, height}, filter.data(), {filter_width, filter_width}, {radius, radius}, context
+         NPP_CHECK(nppiFilterBorder_32f_C1R_Ctx(
+           source, static_cast<int>(padded_step), {padded_width, padded_height}, {radius, radius},
+           output.data(), static_cast<int>(input_step), {width, height}, filter.data(),
+           {filter_width, filter_width}, {radius, radius}, NPP_BORDER_REPLICATE, context
          ));
 }
 
@@ -89,31 +92,21 @@ bool run_kernel(
     return false;
   }
 
-  cudaGetLastError();
+  if (!CUDA_CHECK(cudaGetLastError())) {
+    return false;
+  }
   kernel.launch(input.data(), filter.data(), output.data(), problem.shape, nullptr);
   return CUDA_CHECK(cudaGetLastError());
 }
 
 bool verify(const Problem& problem, Kernel kernel) {
-  constexpr float absolute_tolerance = 1.0e-5F;
-  constexpr float relative_tolerance = 1.0e-4F;
-  for (std::size_t index = 0; index < problem.result.size(); ++index) {
-    const float actual = problem.result[index];
-    const float expected = problem.expected[index];
-    const float difference = std::fabs(actual - expected);
-    const float tolerance = absolute_tolerance + relative_tolerance * std::fabs(expected);
-    if (!std::isfinite(actual) || difference > tolerance) {
-      HOST_LOG("%s mismatch at %zu: %g vs %g", kernel.name, index, actual, expected);
-      return false;
-    }
-  }
-  HOST_LOG("%s passed: %zu values", kernel.name, problem.result.size());
-  return true;
+  return lg::verify_values(problem.result, problem.expected, kernel.name);
 }
 
 } // namespace
 
 void fill_problem(Problem& problem) {
+  validate_shape(problem.shape);
   problem.input.resize(problem.shape.input_size());
   problem.filter.resize(problem.shape.filter_size());
   problem.expected.resize(problem.shape.input_size());
@@ -130,6 +123,13 @@ void fill_problem(Problem& problem) {
 }
 
 int check(Problem& problem, Kernel kernel) {
+  validate_shape(problem.shape);
+  if (problem.input.size() != problem.shape.input_size() ||
+      problem.filter.size() != problem.shape.filter_size()) {
+    throw std::invalid_argument("convolution input size mismatch");
+  }
+  problem.expected.assign(problem.shape.input_size(), std::numeric_limits<float>::quiet_NaN());
+  problem.result.assign(problem.shape.input_size(), std::numeric_limits<float>::quiet_NaN());
   const auto stream = default_stream();
   auto& pool = device_pool();
   // NPP expects reversed filter coefficients.

@@ -15,6 +15,6 @@ struct Problem {
 };
 
 void fill_problem(Problem& problem);
-int check(Problem& problem, Kernel kernel);
+int check(Problem& problem, Kernel kernel, std::size_t samples = 0);
 
 } // namespace lg::convolution3d
