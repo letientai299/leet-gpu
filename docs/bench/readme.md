@@ -1,6 +1,6 @@
 # Benchmarking and profiling CUDA kernels
 
-PMPP teaches *what* to look at (occupancy, coalescing, traffic). It does not
+PMPP teaches _what_ to look at (occupancy, coalescing, traffic). It does not
 teach a timing harness or Nsight. Use this note when measuring kernels in
 `src/`.
 
@@ -23,14 +23,16 @@ not one `pprof` binary.
 hardware counters. CUDA needs both; pprof often collapses them into “this
 function is hot.”
 
-Libraries exist (NVBench, Google Benchmark + CUDA). For this repo, events +
-`nsys` / `ncu` are enough.
+This repository uses NVBench for kernel timing. See the
+[harness workflow][harness] for correctness checks, reports, and comparisons.
+
+[harness]: ./harness.md
 
 ## Order of work
 
 1. **Harness first.** Do not open a GUI until kernel-only time is stable.
 2. **`nsys`.** Is the GPU busy, or are you timing memcpy / launch / disk?
-3. **`ncu`.** Why is *this* kernel slow?
+3. **`ncu`.** Why is _this_ kernel slow?
 
 For image apps (`grayscale`, `blur`), wall-clock of the binary includes PNG
 decode/encode. Time the kernel, not `main`.
@@ -117,7 +119,7 @@ Ch 4 occupancy, ch 6 coalescing / bottleneck checklist, ch 22 bandwidth vs
 compute. No harness, no `nsys`/`ncu` tutorial.
 
 When optimizing [`src/pmpp/ch03/blur.cu`][blur], see
-[`docs/pmpp/todo.md`][blur-todo]. Measure kernel-only time *before*
+[`docs/pmpp/todo.md`][blur-todo]. Measure kernel-only time _before_
 tiling so later chapters have a baseline.
 
 [blur]: ../../src/pmpp/ch03/blur.cu

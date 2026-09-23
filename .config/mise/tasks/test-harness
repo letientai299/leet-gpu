@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#MISE description="Build and test harnesses locally; --gpu enables GPU tests"
+set -euo pipefail
+
+if [ "$#" -gt 1 ] || { [ "$#" = 1 ] && [ "$1" != --gpu ]; }; then
+  echo "usage: mise test-harness [--gpu]" >&2
+  exit 2
+fi
+
+root=${MISE_PROJECT_ROOT:-$PWD}
+build_dir=$root/build/local
+export CCACHE_DIR=$build_dir/ccache
+cmake -S "$root" -B "$build_dir" -G Ninja -DLG_BUILD_TESTS=ON
+targets=(harness_host)
+ctest_args=(-LE gpu)
+if [ "${1:-}" = --gpu ]; then
+  targets+=(harness_cuda)
+  ctest_args=()
+fi
+cmake --build "$build_dir" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-4}" --target "${targets[@]}"
+ctest --test-dir "$build_dir" --output-on-failure -R '^harness_' "${ctest_args[@]}"

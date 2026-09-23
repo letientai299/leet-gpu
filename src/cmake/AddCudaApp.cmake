@@ -1,7 +1,10 @@
 function(add_cuda_app key)
   cmake_parse_arguments(APP "" "" "LIBRARIES" ${ARGN})
 
-  if(NOT key MATCHES "^[a-z0-9][a-z0-9./-]*[a-z0-9]$")
+  if(
+    NOT key MATCHES "^[a-z0-9]([a-z0-9./-]*[a-z0-9])?$"
+    OR key MATCHES "(^|/)\\.\\.?(/|$)|//"
+  )
     message(FATAL_ERROR "Invalid app key: ${key}")
   endif()
   if(APP_UNPARSED_ARGUMENTS)
@@ -44,6 +47,7 @@ function(add_cuda_app key)
     ${target}
     PROPERTIES
       LINKER_LANGUAGE CUDA
+      CUDA_RESOLVE_DEVICE_SYMBOLS ON
       OUTPUT_NAME "${output_name}"
       RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin/${output_dir}"
   )

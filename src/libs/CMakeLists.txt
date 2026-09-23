@@ -173,3 +173,7 @@ target_link_libraries(
 
 add_library(lg_matmul_nvbench STATIC matmul/benchmark.cu)
 target_link_libraries(lg_matmul_nvbench PUBLIC lg_matmul lg_benchmark)
+
+if(LG_BUILD_TESTS)
+  add_subdirectory(tests)
+endif()

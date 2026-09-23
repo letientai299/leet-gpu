@@ -71,6 +71,10 @@ if(CCACHE_PROGRAM)
 endif()
 
 option(STRIP_DEPLOY "Strip symbols from deploy binaries" ON)
+option(LG_BUILD_TESTS "Build harness regression tests" OFF)
+if(LG_BUILD_TESTS)
+  enable_testing()
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/src/cmake")
 include(AddCudaApp)

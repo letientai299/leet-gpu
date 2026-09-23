@@ -11,11 +11,16 @@ if [ -z "$run" ] || [ ! -f "$run" ]; then
   exit 2
 fi
 shift
+if [ "$#" -gt 2 ]; then
+  echo "too many benchmark names" >&2
+  exit 2
+fi
 
 names=()
+name_list=$(jq -er '.benchmarks | arrays | .[].name' "$run")
 while IFS= read -r name; do
   names+=("$name")
-done < <(jq -r '.benchmarks[].name' "$run")
+done <<<"$name_list"
 
 baseline=${1:-${names[0]:-}}
 candidate=${2:-${names[1]:-}}
@@ -29,13 +34,21 @@ fi
 # Keep the splits beside the source: bulk sample paths inside the JSON are
 # relative to its directory.
 run_dir=$(cd -- "$(dirname -- "$run")" && pwd -P)
-ref=$run_dir/.compare-ref.json
-cmp=$run_dir/.compare-cmp.json
-trap 'rm -f "$ref" "$cmp"' EXIT
+ref=
+cmp=
+trap 'rm -f -- "${ref:-}" "${cmp:-}"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+ref=$(mktemp "$run_dir/.compare-ref.XXXXXX.json")
+cmp=$(mktemp "$run_dir/.compare-cmp.XXXXXX.json")
 
 select_one() {
-  jq --arg want "$1" \
-    '.benchmarks |= [.[] | select(.name == $want) | .name = "matmul"]' \
+  jq -e --arg want "$1" \
+    '.benchmarks |= [.[] | select(.name == $want) | .name = "comparison"] |
+     if (.benchmarks | length) != 1 then error("benchmark name missing or ambiguous")
+     elif (.benchmarks[0].states | length) == 0 then error("benchmark states missing")
+     elif any(.benchmarks[0].states[]; .is_skipped == true) then error("benchmark state skipped")
+     else . end' \
     "$run" >"$2"
 }
 select_one "$baseline" "$ref"
@@ -52,5 +65,5 @@ if [ ! -f "$script" ]; then
   exit 1
 fi
 
-exec uv run --no-project --quiet --with numpy --with tabulate \
+uv run --no-project --quiet --with numpy --with tabulate \
   python "$script" --no-color --display explain "$ref" "$cmp"
