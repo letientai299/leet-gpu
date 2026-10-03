@@ -4,27 +4,27 @@ ARG CLANGD_VERSION=22.1.0
 ARG CLANGD_SHA256=c54e57dbff3ccc9e8352367ddb7030ad3f624073ec58c7477424e7919f578572
 
 # The mise installer fails under QEMU emulation.
-RUN yum install -y \
-    yum-utils \
-    epel-release \
+RUN yum install -y\
+    yum-utils\
+    epel-release\
     && yum-config-manager --set-enabled powertools \
     && yum install -y \
-    gdb \
-    git \
-    ccache \
-    ninja-build \
-    libstdc++-static \
-    python3.12-pip \
-    unzip \
-    curl \
-    ca-certificates \
+    gdb\
+    git\
+    ccache\
+    ninja-build\
+    libstdc++-static\
+    python3.12-pip\
+    unzip\
+    curl\
+    ca-certificates\
     && yum-config-manager --add-repo https://mise.jdx.dev/rpm/mise.repo \
     && yum install -y mise \
     && yum clean all \
     && rm -rf /var/cache/yum
 
-RUN curl -fsSLo /tmp/clangd.zip \
-      "https://github.com/clangd/clangd/releases/download/${CLANGD_VERSION}/clangd-linux-${CLANGD_VERSION}.zip" \
+RUN curl -fsSLo /tmp/clangd.zip\
+      "https://github.com/clangd/clangd/releases/download/${CLANGD_VERSION}/clangd-linux-${CLANGD_VERSION}.zip"\
     && echo "${CLANGD_SHA256}  /tmp/clangd.zip" | sha256sum -c - \
     && unzip -q /tmp/clangd.zip -d /opt \
     && rm /tmp/clangd.zip
@@ -32,9 +32,9 @@ RUN curl -fsSLo /tmp/clangd.zip \
 # Rocky 8 ships CMake 3.26, below the 3.30.4 this project requires, so pip
 # provides the only cmake. CLion's Docker toolchain probes /usr/bin instead of
 # resolving PATH, and would otherwise report the older one.
-RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore \
-    clang-tidy \
-    cmake==3.30.9 \
+RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore\
+    clang-tidy\
+    cmake==3.30.9\
     && ln -sf /usr/local/bin/cmake /usr/bin/cmake \
     && ln -sf /usr/local/bin/ctest /usr/bin/ctest \
     && ln -sf /usr/local/bin/cpack /usr/bin/cpack
@@ -43,4 +43,4 @@ ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_CACHE_DIR=/usr/local/share/mise/cache \
     PATH=/opt/clangd_${CLANGD_VERSION}/bin:/usr/local/share/mise/shims:/usr/local/bin:$PATH
 
-RUN mise activate bash >> /etc/bash.bashrc
+RUN mise activate bash >>/etc/bash.bashrc
