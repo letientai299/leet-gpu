@@ -79,12 +79,15 @@ std::string join_options(std::initializer_list<KernelChoice> choices) {
   return joined;
 }
 
-void print_choice_usage(const char* app, std::initializer_list<KernelChoice> choices) {
+void print_choice_usage(
+  const char* app, std::initializer_list<KernelChoice> choices, const GemmShape& bench_shape
+) {
   std::printf(
     "Usage: %s [--kernel %s] [--height N] [--width N] [--k N] [--bench [options]]\n", app,
     join_options(choices).c_str()
   );
-  print_defaults("Defaults", default_shape());
+  print_defaults("Check defaults", default_shape());
+  print_defaults("Bench defaults", bench_shape);
 }
 
 const KernelChoice*
@@ -192,6 +195,13 @@ int launch_nvbench(std::vector<char*>& argv) {
   return benchmark::run_args(static_cast<int>(argv.size()), argv.data());
 }
 
+/// Correctness runs on the small default shape; --bench then sizes up.
+int check_app(const AppArgs& args, Kernel kernel) {
+  Problem problem(args.bench ? default_shape() : args.shape());
+  fill_random(problem);
+  return check(problem, kernel);
+}
+
 void log_shape(const GemmShape& shape) {
   HOST_LOG("Benchmark shape: height %u, width %u, k %u", shape.m(), shape.n(), shape.k());
 }
@@ -271,10 +281,7 @@ int run_app(int argc, char** argv, const AppConfig& config) {
       return *status;
     }
 
-    // Correctness runs on the small default shape; --bench then sizes up.
-    Problem check_problem(args.bench ? default_shape() : args.shape());
-    fill_random(check_problem);
-    const int result = check(check_problem, config.kernel);
+    const int result = check_app(args, config.kernel);
     if (result != 0 || !args.bench) {
       return result;
     }
@@ -292,7 +299,9 @@ int run_app(int argc, char** argv, const AppConfig& config) {
   });
 }
 
-int run_app(int argc, char** argv, std::initializer_list<KernelChoice> choices) {
+int run_app(
+  int argc, char** argv, std::initializer_list<KernelChoice> choices, const GemmShape& bench_shape
+) {
   return guarded([&] {
     if (choices.size() == 0) {
       throw std::invalid_argument("kernel choices are empty");
@@ -301,7 +310,7 @@ int run_app(int argc, char** argv, std::initializer_list<KernelChoice> choices) 
     const KernelChoice* selected = choices.begin();
     std::vector<char*> common_args;
     const auto usage = [&] {
-      print_choice_usage(argv[0], choices);
+      print_choice_usage(argv[0], choices, bench_shape);
     };
     if (!parse_choice_args(argc, argv, choices, selected, common_args)) {
       usage();
@@ -314,14 +323,12 @@ int run_app(int argc, char** argv, std::initializer_list<KernelChoice> choices) 
       return *status;
     }
 
-    const GemmShape shape = args.shape();
-    Problem problem(shape);
-    fill_random(problem);
-    const int result = check(problem, selected->kernel);
+    const int result = check_app(args, selected->kernel);
     if (result != 0 || !args.bench) {
       return result;
     }
 
+    const GemmShape shape = args.shape(bench_shape);
     // Only the selected kernel is registered, so NVBench needs no --benchmark filter.
     add_shaped(selected->kernel, shape);
     log_shape(shape);
