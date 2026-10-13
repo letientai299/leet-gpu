@@ -14,7 +14,7 @@ TASKS = ROOT / ".config/mise/tasks"
 ARTIFACTS = ROOT / ".ai/benchmark-harness"
 
 SMI = """#!/usr/bin/env python3
-import os, sys
+import os, sys, time
 with open(os.environ['MOCK_LOG'], 'a') as log:
     log.write('smi ' + ' '.join(sys.argv[1:]) + '\\n')
 args = ' '.join(sys.argv[1:])
@@ -29,6 +29,13 @@ elif '--query-gpu=' in args:
               'temperature.gpu': os.environ.get('MOCK_TEMP', '32'),
               'name': 'Mock GPU', 'driver_version': 'test',
               'power.limit': '300', 'clocks.sm': '1000', 'clocks.mem': '1215'}
+    capped = int(time.time() * 1e6) if os.environ.get('MOCK_POWER_CAP') else 0
+    for reason in ('hw_slowdown', 'hw_thermal_slowdown', 'sw_thermal_slowdown',
+                   'hw_power_brake_slowdown'):
+        values['clocks_event_reasons.' + reason] = (
+            'Active' if os.environ.get('MOCK_UNHEALTHY') == reason else 'Not Active')
+    values['clocks_event_reasons_counters.sw_power_cap'] = str(capped)
+    values['clocks_event_reasons_counters.hw_power_brake_slowdown'] = '0'
     print(', '.join(values[f] for f in field.split(',')))
 elif '-rgc' in sys.argv and os.environ.get('MOCK_RESTORE_FAIL'):
     sys.exit(1)
@@ -46,7 +53,8 @@ if os.environ.get('MOCK_WAIT'):
         sys.exit(143)
     signal.signal(signal.SIGTERM, stop)
     while True: time.sleep(0.01)
-print(json.dumps({'args': sys.argv[1:]}))
+print(json.dumps({'args': sys.argv[1:],
+                  'locked': os.environ.get('LG_LOCKED_CLOCK_MHZ')}))
 sys.exit(int(os.environ.get('MOCK_EXIT', '0')))
 """
 
@@ -232,6 +240,39 @@ class ScriptTests(unittest.TestCase):
         run = self.run_task("deploy", "test/app", "--bench", MOCK_LOCK_FAIL="1")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("running unlocked", run.stderr)
+
+    def test_power_cap_lowers_ceiling(self):
+        ceiling = self.root / "lg-gpu-GPU-1234-abcd.clock"
+        run = self.run_task("deploy", "test/app", "--bench", MOCK_POWER_CAP="1")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)["locked"], "1000")
+        self.assertIn("next runs lock to 900MHz", run.stderr)
+        self.assertEqual(ceiling.read_text().strip(), "900")
+
+        run = self.run_task("deploy", "test/app", "--bench")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)["locked"], "900")
+        self.assertEqual(ceiling.read_text().strip(), "900")
+
+        run = self.run_task("deploy", "test/app", "--bench", GPU_CLOCK="1200")
+        self.assertEqual(json.loads(run.stdout)["locked"], "1200")
+
+        run = self.run_task("bench", "test/app")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)["locked"], "900")
+
+    def test_unhealthy_gpu_refused(self):
+        for task, args in (("deploy", ["--bench"]), ("bench", [])):
+            with self.subTest(task=task):
+                self.log.unlink(missing_ok=True)
+                run = self.run_task(
+                    task, "test/app", *args, MOCK_UNHEALTHY="hw_thermal_slowdown"
+                )
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn("hw_thermal_slowdown active", run.stderr)
+                self.assertNotIn("app ", self.events())
+        run = self.run_task("deploy", "test/app", "x", MOCK_UNHEALTHY="hw_slowdown")
+        self.assertEqual(run.returncode, 0, run.stderr)
 
     def test_deploy_criterion(self):
         entropy = ["--stopping-criterion", "entropy"]

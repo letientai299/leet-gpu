@@ -101,6 +101,14 @@ root; when that fails, the run continues unlocked. `GPU_CLOCK` takes `auto`, a
 MHz value, or `off`; `GPU_CLOCK_FRACTION` and `GPU_INDEX` adjust `auto` and the
 GPU.
 
+An automatic lock that the power cap held back for more than 1% of a run lowers
+a per-GPU ceiling in `/tmp/lg-gpu-<uuid>.clock` on the host by one supported
+clock; later automatic locks stay at or below it. Delete the file to reset it.
+Before a locked run, an active hardware, thermal, or power-brake slowdown stops
+the run. Status reads `THROTTLED` when the measured clock falls more than 1%
+below the lock, and `UNHEALTHY` (the run fails) when it stays under half the
+maximum clock.
+
 Every run waits while another run holds the same GPU, through a per-GPU lock
 file in the host's `/tmp`; `bench` refuses instead of waiting. A locked run
 passes NVBench a `--throttle-threshold` just under the locked clock, while

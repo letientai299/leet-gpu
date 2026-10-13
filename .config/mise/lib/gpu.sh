@@ -8,6 +8,11 @@ gpu_query() {
     | sed 's/^ *//; s/ *$//'
 }
 
+# Prints comma-separated fields with no spaces ("Not Active" -> Not_Active).
+gpu_fields() {
+  gpu_query "$1" "$2" | sed 's/, */,/g; s/ /_/g'
+}
+
 # Non-root users go through sudo first, which saves a failing nvidia-smi call.
 gpu_admin() {
   local gpu=$1
@@ -31,13 +36,85 @@ gpu_pick_clock() {
     return 1
   fi
   target=$((max_clock * fraction / 100))
-  clock=$(nvidia-smi -i "$gpu" --query-supported-clocks=gr --format=csv,noheader,nounits \
-    | awk -v t="$target" '$1 ~ /^[0-9]+$/ && $1 <= t && $1 > best {best=$1} END {print best}')
+  gpu_clock_at_most "$gpu" "$target"
+}
+
+# Prints the highest supported SM clock at or below a MHz limit.
+gpu_clock_at_most() {
+  local clock
+  clock=$(nvidia-smi -i "$1" --query-supported-clocks=gr --format=csv,noheader,nounits \
+    | awk -v t="$2" '$1 ~ /^[0-9]+$/ && $1 <= t && $1 > best {best=$1} END {print best}')
   if [ -z "$clock" ]; then
     echo "gpu: supported SM clocks unavailable" >&2
     return 1
   fi
   printf '%s\n' "$clock"
+}
+
+# A power-capped auto lock lowers this per-GPU ceiling; later auto locks start
+# below it. It only moves down, so kernels compared in later runs share a clock.
+# Delete the file to reset.
+gpu_ceiling_file() {
+  printf '%s/lg-gpu-%s.clock\n' "${LG_GPU_LOCK_DIR:-/tmp}" "$1"
+}
+
+# gpu_cap_clock UUID CLOCK: prints CLOCK lowered to the stored ceiling.
+gpu_cap_clock() {
+  local ceiling
+  ceiling=$(cat "$(gpu_ceiling_file "$1")" 2>/dev/null || true)
+  if [[ "$ceiling" =~ ^[1-9][0-9]{0,5}$ ]] && ((ceiling < $2)); then
+    printf '%s\n' "$ceiling"
+    return
+  fi
+  printf '%s\n' "$2"
+}
+
+# Refuses to benchmark while the GPU slows itself for thermal or hardware
+# reasons; the run would measure the fault, not the kernel.
+gpu_check_health() {
+  local fields name state index
+  local -a names states
+  fields=$(gpu_fields "$1" clocks_event_reasons.hw_slowdown,clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.sw_thermal_slowdown,clocks_event_reasons.hw_power_brake_slowdown)
+  names=(hw_slowdown hw_thermal_slowdown sw_thermal_slowdown hw_power_brake_slowdown)
+  IFS=, read -r -a states <<<"$fields"
+  for index in "${!names[@]}"; do
+    name=${names[$index]}
+    state=${states[$index]:-}
+    if [ "$state" = Active ]; then
+      echo "gpu: $(hostname) GPU $1 unhealthy: $name active; not running" >&2
+      return 1
+    fi
+  done
+}
+
+# Prints "<power-capped microseconds> <now in microseconds>".
+gpu_power_mark() {
+  local fields capped brake
+  fields=$(gpu_fields "$1" clocks_event_reasons_counters.sw_power_cap,clocks_event_reasons_counters.hw_power_brake_slowdown)
+  IFS=, read -r capped brake <<<"$fields"
+  [[ "$capped" =~ ^[0-9]+$ ]] || capped=0
+  [[ "$brake" =~ ^[0-9]+$ ]] || brake=0
+  printf '%s %s\n' "$((capped + brake))" "$(($(date +%s%N) / 1000))"
+}
+
+# gpu_review_power GPU UUID CLOCK MAX_CLOCK START_MARK
+# Steps the ceiling down one supported clock when the power cap held the clock
+# for more than 1% of the run. Stops at half the max clock: below that the GPU
+# is unhealthy, not merely busy.
+gpu_review_power() {
+  local gpu=$1 uuid=$2 clock=$3 max_clock=$4 start_capped start_time capped now permille next
+  read -r start_capped start_time <<<"$5"
+  read -r capped now <<<"$(gpu_power_mark "$gpu")"
+  ((now > start_time)) || return 0
+  permille=$(((capped - start_capped) * 1000 / (now - start_time)))
+  ((permille > 10)) || return 0
+  next=$(gpu_clock_at_most "$gpu" "$((clock - 1))") || return 0
+  if ((next * 2 < max_clock)); then
+    echo "gpu: $(hostname) GPU $gpu unhealthy: power cap holds below half the max clock" >&2
+    return 0
+  fi
+  (umask 000 && printf '%s\n' "$next" >"$(gpu_ceiling_file "$uuid")")
+  echo "gpu: power cap held ${clock}MHz for $((permille / 10)).$((permille % 10))% of the run; next runs lock to ${next}MHz" >&2
 }
 
 # NVBench discards samples below this percent of max; keep it just under the
@@ -93,7 +170,7 @@ gpu_run_stop() {
 # Waits for the GPU, locks its clock unless CLOCK is off, runs APP pinned to the
 # GPU, and unlocks afterward unless KEEP is 1 (a dev session keeps the lock).
 gpu_run() {
-  local clock=$2 fraction=$3 info uuid max_clock persistence has_threshold=0 arg
+  local clock=$2 fraction=$3 info uuid max_clock persistence has_threshold=0 arg mark status=0
   run_gpu=$1
   run_keep=$4
   shift 4
@@ -111,13 +188,18 @@ gpu_run() {
   trap 'gpu_run_stop 130' INT
   trap 'gpu_run_stop 143' TERM
 
+  local request=$clock
   if [ "$clock" != off ]; then
+    gpu_check_health "$run_gpu"
     if [ "$persistence" = Disabled ]; then
       echo "gpu: persistence mode off; the clock lock may not hold" >&2
     fi
     if clock=$(gpu_pick_clock "$run_gpu" "$clock" "$fraction" "$max_clock") \
+      && { [ "$request" != auto ] || clock=$(gpu_cap_clock "$uuid" "$clock"); } \
       && gpu_admin "$run_gpu" -lgc "$clock,$clock"; then
       run_locked=1
+      # The runner flags runs whose measured clock fell below this.
+      export LG_LOCKED_CLOCK_MHZ=$clock
       echo "gpu: $(hostname) GPU $run_gpu locked to ${clock}MHz" >&2
       for arg in "$@"; do
         case "$arg" in
@@ -131,9 +213,17 @@ gpu_run() {
       echo "gpu: clock lock failed; running unlocked: $(hostname) GPU $run_gpu" >&2
     fi
   fi
+  if [ "$run_locked" = 1 ]; then
+    mark=$(gpu_power_mark "$run_gpu")
+  fi
   CUDA_VISIBLE_DEVICES=$uuid "$@" <&0 &
   run_child=$!
-  wait "$run_child"
+  wait "$run_child" || status=$?
+  run_child=
+  if [ "$run_locked" = 1 ] && [ "$request" = auto ]; then
+    gpu_review_power "$run_gpu" "$uuid" "$clock" "$max_clock" "$mark"
+  fi
+  return "$status"
 }
 
 gpu_unlock_now() {
