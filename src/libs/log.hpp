@@ -3,6 +3,7 @@
 void init_log();
 void set_gpu_arch(int major, int minor);
 const char* gpu_arch();
+bool log_color();
 
 // printf attribute makes the compiler type-check the varargs.
 // https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html

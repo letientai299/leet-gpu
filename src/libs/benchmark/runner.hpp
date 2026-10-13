@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace lg::benchmark {
 
@@ -37,21 +38,31 @@ void add_summary(
 /// Adds concrete compiled-kernel and launch resources.
 void add_resources(nvbench::state& state, const KernelResources& resources);
 
-std::optional<std::size_t> add_traffic(
-  nvbench::state& state,
-  std::string_view prefix,
-  std::size_t reads,
-  std::size_t writes,
-  std::size_t flops
-);
+/// Bytes moved through global memory.
+struct MemoryTraffic {
+  std::size_t read_bytes = 0;
+  std::size_t write_bytes = 0;
+};
 
-/// Adds throughput and convergence columns.
-void finish_summaries(
-  nvbench::state& state,
-  std::string_view prefix,
-  std::size_t flops,
-  std::optional<std::size_t> model_bytes = std::nullopt
-);
+/// What one benchmark state computes and moves; every app reports the same fields.
+struct Workload {
+  std::vector<std::pair<std::string, nvbench::int64_t>> shape;
+  std::size_t flops = 0;
+  std::size_t buffer_bytes = 0;
+  // Each input read once and each output written once.
+  MemoryTraffic minimum;
+  // Every operand access reaches DRAM: no cache or shared-memory reuse.
+  std::optional<MemoryTraffic> no_reuse;
+};
+
+/// Converts float element counts to bytes.
+std::optional<MemoryTraffic> float_traffic(std::size_t reads, std::size_t writes);
+
+/// Adds workload columns before timing; skips the state when invalid.
+bool describe(nvbench::state& state, const Workload& workload);
+
+/// Adds throughput, utilization, and convergence columns.
+void finish_summaries(nvbench::state& state, const Workload& workload);
 
 /// Runs NVBench with forwarded arguments.
 int run_args(int argc, char** argv);

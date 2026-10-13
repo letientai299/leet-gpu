@@ -2,7 +2,6 @@
 #include "convolution3d/correctness.hpp"
 #include "validation.hpp"
 
-#include <cmath>
 #include <cuda/buffer>
 
 namespace lg::convolution3d {
@@ -14,21 +13,12 @@ std::size_t offset(Shape shape, int x, int y, int z) {
   return (static_cast<std::size_t>(z) * shape.height + y) * shape.width + x;
 }
 
-std::size_t reference_index(std::size_t sample, std::size_t count, std::size_t checks) {
-  return checks <= 1 || checks == count
-           ? sample
-           : static_cast<std::size_t>(
-               static_cast<long double>(sample) * static_cast<long double>(count - 1) /
-               static_cast<long double>(checks - 1)
-             );
-}
-
 void run_reference(Problem& problem, std::size_t samples) {
   const int side = problem.shape.filter_width();
   const auto count = problem.shape.input_size();
   const auto checks = samples == 0 ? count : std::min(samples, count);
   for (std::size_t sample = 0; sample < checks; ++sample) {
-    const auto index = reference_index(sample, count, checks);
+    const auto index = lg::sample_index(sample, count, checks);
     const int x = static_cast<int>(index % problem.shape.width);
     const int y = static_cast<int>(index / problem.shape.width % problem.shape.height);
     const int z = static_cast<int>(index / problem.shape.width / problem.shape.height);
@@ -54,30 +44,6 @@ void run_reference(Problem& problem, std::size_t samples) {
     }
     problem.expected[offset(problem.shape, x, y, z)] = sum;
   }
-}
-
-bool verify(const Problem& problem, Kernel kernel, std::size_t samples) {
-  if (samples == 0) {
-    return lg::verify_values(problem.result, problem.expected, kernel.name);
-  }
-  std::vector<float> actual;
-  std::vector<float> expected;
-  const auto checks = std::min(samples, problem.result.size());
-  actual.reserve(checks);
-  expected.reserve(checks);
-  for (std::size_t index = 0; index < problem.result.size(); ++index) {
-    if (!std::isfinite(problem.result[index])) {
-      HOST_LOG("%s nonfinite output[%zu]", kernel.name, index);
-      return false;
-    }
-  }
-  for (std::size_t sample = 0; sample < checks; ++sample) {
-    const auto index = reference_index(sample, problem.result.size(), checks);
-    actual.push_back(problem.result[index]);
-    expected.push_back(problem.expected[index]);
-  }
-  HOST_LOG("Reference coverage: %zu/%zu values", actual.size(), problem.result.size());
-  return lg::verify_values(actual, expected, kernel.name);
 }
 
 } // namespace
@@ -127,7 +93,7 @@ int check(Problem& problem, Kernel kernel, std::size_t samples) {
   }
   kernel.launch(input.data(), filter.data(), result.data(), problem.shape, nullptr);
   return CUDA_CHECK(cudaGetLastError()) && COPY_CHECK(result, problem.result) &&
-             verify(problem, kernel, samples)
+             lg::verify_sampled(problem.result, problem.expected, samples, kernel.name)
            ? 0
            : 1;
 }

@@ -189,7 +189,7 @@ int main(int argc, char** argv) try {
       if (mode == "skip") {
         state.skip("injected failure");
       } else {
-        lg::benchmark::finish_summaries(state, "test", 0);
+        lg::benchmark::finish_summaries(state, lg::benchmark::Workload{{}, 1, 4, {4, 0}, {}});
       }
     });
     if (mode == "retain") {

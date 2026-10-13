@@ -37,33 +37,119 @@ void add_rate(
   summary.set_float64("value", static_cast<double>(work) / seconds / 1.0e9);
 }
 
+// Rare slow runs inflate the per-sample stdev without moving the result, so
+// stability is judged by IQR / median and the mean's 95% confidence interval.
+// An IQR of one timer step is the finest spread events can report, but only
+// counts when that step is small next to the kernel time.
 void add_status(
-  nvbench::state& state, std::string tag, double walltime, double noise, nvbench::int64_t samples
+  nvbench::state& state,
+  std::string tag,
+  double walltime,
+  double noise,
+  double iqr,
+  double iqr_seconds,
+  nvbench::int64_t samples
 ) {
+  constexpr double kDefaultMaxSpread = 0.005;
+  // cudaEventElapsedTime moved in 1.024 us steps on the A100X.
+  constexpr double kTimerStep = 1.024e-6;
+  constexpr double kMaxStepSpread = 0.05;
   const auto params = state.get_criterion_params();
-  const double max_noise = params.has_value("max-noise") ? params.get_float64("max-noise") : 0.0;
+  const double max_spread =
+    params.has_value("max-noise") ? params.get_float64("max-noise") : kDefaultMaxSpread;
   std::string status;
   if (samples == 0) {
     status = "NO SAMPLES";
   } else if (state.get_run_once()) {
-    status = "single run, noise n/a";
+    status = "single run, spread n/a";
   } else if (samples < state.get_min_samples()) {
     status = "INSUFFICIENT SAMPLES";
   } else if (state.get_timeout() > 0 && walltime >= state.get_timeout()) {
     status = fmt::format("TIMED OUT {:.0f}s", walltime);
-  } else if (!std::isfinite(noise) || noise < 0) {
-    status = "noise unavailable";
-  } else if (state.get_stopping_criterion() != "stdrel") {
-    status = "criterion completed: " + state.get_stopping_criterion();
-  } else if (max_noise > 0 && noise <= max_noise) {
-    status = "noise target met";
+  } else if (!std::isfinite(noise) || noise < 0 || !std::isfinite(iqr) || iqr < 0) {
+    status = "spread unavailable";
   } else {
-    status = "noise above target";
+    const double interval = 1.96 * noise / std::sqrt(static_cast<double>(samples));
+    status = fmt::format(
+      "{} · IQR {:.2f}% · mean ±{:.2f}% (95% CI)",
+      iqr <= max_spread || (iqr_seconds <= kTimerStep * 1.01 && iqr <= kMaxStepSpread) ? "stable"
+                                                                                       : "UNSTABLE",
+      iqr * 100.0, interval * 100.0
+    );
   }
   auto& summary = state.add_summary(std::move(tag));
   summary.set_string("name", "Status");
-  summary.set_string("description", "Whether cold timing met its noise target");
-  summary.set_string("value", fmt::format("{} ({}x)", status, samples));
+  summary.set_string("description", "Whether the cold median is stable");
+  summary.set_string("value", status);
+}
+
+// Non-Tensor Core FP32 FMA results per clock per SM.
+// https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#arithmetic-instructions-throughput-native-arithmetic-instructions
+int fp32_lanes_per_sm(int sm_version) {
+  if (sm_version < 700) {
+    return 0;
+  }
+  return sm_version <= 800 ? 64 : 128;
+}
+
+void add_compute_peak(nvbench::state& state, std::size_t flops, double seconds, double clock_hz) {
+  const auto& device = state.get_device();
+  if (!device.has_value() || !std::isfinite(seconds) || seconds <= 0.0) {
+    return;
+  }
+  const int lanes = fp32_lanes_per_sm(device->get_sm_version());
+  if (lanes == 0) {
+    return;
+  }
+  // NVBench skips clock sampling under --run-once or --profile.
+  if (!std::isfinite(clock_hz) || clock_hz <= 0.0) {
+    return;
+  }
+  // An FMA counts as two FLOPs.
+  const double peak = 2.0 * lanes * device->get_number_of_sms() * clock_hz;
+  auto& peak_summary = state.add_summary("lg/fp32/peak");
+  peak_summary.set_string("name", "FP32 Peak");
+  peak_summary.set_string("description", "FP32 FMA FLOP/s at the measured clock");
+  peak_summary.set_float64("value", peak);
+  auto& summary = state.add_summary("lg/cold/fp32/utilization");
+  summary.set_string("name", "FP32Util");
+  summary.set_string("hint", "percentage");
+  summary.set_string("description", "Cold FLOP/s over FP32 FMA peak at measured clock");
+  summary.set_float64("value", static_cast<double>(flops) / seconds / peak);
+}
+
+// No-reuse bytes = DRAM bytes + bytes served on chip (L1, L2, shared memory).
+// DRAM moves at least the minimum bytes and at most peak × time, which bounds
+// the on-chip share.
+void add_cache_bounds(nvbench::state& state, const Workload& workload, double seconds) {
+  const auto& device = state.get_device();
+  if (!workload.no_reuse || !device.has_value() || !std::isfinite(seconds) || seconds <= 0.0) {
+    return;
+  }
+  const auto minimum =
+    static_cast<double>(workload.minimum.read_bytes + workload.minimum.write_bytes);
+  const auto no_reuse =
+    static_cast<double>(workload.no_reuse->read_bytes + workload.no_reuse->write_bytes);
+  const auto dram_limit = static_cast<double>(device->get_global_memory_bus_bandwidth()) * seconds;
+  const auto add = [&](const char* tag, const char* name, double value) {
+    auto& summary = state.add_summary(tag);
+    summary.set_string("name", name);
+    summary.set_string("hint", "percentage");
+    summary.set_float64("value", std::clamp(value, 0.0, 1.0));
+  };
+  add("lg/cache/served_min", "Cache Served Min", 1.0 - dram_limit / no_reuse);
+  add("lg/cache/served_max", "Cache Served Max", 1.0 - minimum / no_reuse);
+}
+
+void add_dram_peak(nvbench::state& state) {
+  const auto& device = state.get_device();
+  if (!device.has_value()) {
+    return;
+  }
+  auto& summary = state.add_summary("lg/dram/peak");
+  summary.set_string("name", "DRAM Peak");
+  summary.set_string("hint", "byte_rate");
+  summary.set_float64("value", static_cast<double>(device->get_global_memory_bus_bandwidth()));
 }
 
 } // namespace
@@ -90,6 +176,11 @@ void add_summary(
 }
 
 void add_resources(nvbench::state& state, const KernelResources& resources) {
+  auto& block = state.add_summary("kernel/resources/block");
+  block.set_string("name", "Block");
+  block.set_string(
+    "value", fmt::format("{}×{}×{}", resources.block.x, resources.block.y, resources.block.z)
+  );
   add_summary(
     state, "kernel/resources/threads_per_block", "Threads/Block", resources.threads_per_block
   );
@@ -120,6 +211,9 @@ void add_resources(nvbench::state& state, const KernelResources& resources) {
     add_summary(
       state, "kernel/resources/warps_per_sm", "Active Warps/SM", resources.active_warps_per_sm
     );
+    add_summary(
+      state, "kernel/resources/max_warps_per_sm", "Max Warps/SM", resources.max_warps_per_sm
+    );
     auto& occupancy = state.add_summary("kernel/resources/occupancy");
     occupancy.set_string("name", "Theoretical Occupancy");
     occupancy.set_string("hint", "percentage");
@@ -129,43 +223,83 @@ void add_resources(nvbench::state& state, const KernelResources& resources) {
   }
 }
 
-std::optional<std::size_t> add_traffic(
-  nvbench::state& state,
-  std::string_view prefix,
-  std::size_t reads,
-  std::size_t writes,
-  std::size_t flops
-) {
-  const auto elements = lg::checked_add(reads, writes);
-  const auto bytes = elements ? lg::checked_mul(*elements, sizeof(float)) : std::nullopt;
-  if (!bytes || *bytes == 0 ||
-      *bytes > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
-    state.skip("invalid traffic model size");
-    return std::nullopt;
-  }
-  const std::string base(prefix);
-  add_summary(
-    state, base + "/model/bytes", "Model GMEM Bytes", static_cast<nvbench::int64_t>(*bytes), "bytes"
-  );
-  auto& intensity = state.add_summary(base + "/model/intensity");
-  intensity.set_string("name", "Model FLOP/B");
-  intensity.set_float64("value", static_cast<double>(flops) / static_cast<double>(*bytes));
-  return bytes;
+namespace {
+
+std::optional<std::size_t> total(const MemoryTraffic& traffic) {
+  const auto bytes = lg::checked_add(traffic.read_bytes, traffic.write_bytes);
+  constexpr auto limit = static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max());
+  return bytes && *bytes != 0 && *bytes <= limit ? bytes : std::nullopt;
 }
 
-void finish_summaries(
-  nvbench::state& state,
-  std::string_view prefix,
-  std::size_t flops,
-  std::optional<std::size_t> model_bytes
+void add_float(
+  nvbench::state& state, std::string tag, const char* name, double value, const char* hint = ""
 ) {
+  auto& summary = state.add_summary(std::move(tag));
+  summary.set_string("name", name);
+  if (*hint != '\0') {
+    summary.set_string("hint", hint);
+  }
+  summary.set_float64("value", value);
+}
+
+void add_traffic(
+  nvbench::state& state, const std::string& tag, const char* name, std::size_t bytes, double flops
+) {
+  add_summary(state, tag + "/bytes", name, static_cast<nvbench::int64_t>(bytes), "bytes");
+  add_float(state, tag + "/intensity", "FLOP/B", flops / static_cast<double>(bytes));
+}
+
+} // namespace
+
+std::optional<MemoryTraffic> float_traffic(std::size_t reads, std::size_t writes) {
+  const auto read_bytes = lg::checked_mul(reads, sizeof(float));
+  const auto write_bytes = lg::checked_mul(writes, sizeof(float));
+  if (!read_bytes || !write_bytes) {
+    return std::nullopt;
+  }
+  return MemoryTraffic{*read_bytes, *write_bytes};
+}
+
+bool describe(nvbench::state& state, const Workload& workload) {
+  const auto minimum = total(workload.minimum);
+  const auto no_reuse = workload.no_reuse ? total(*workload.no_reuse) : std::nullopt;
+  if (!minimum || (workload.no_reuse && !no_reuse) || workload.flops == 0 ||
+      workload.flops > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
+    state.skip("invalid workload size");
+    return false;
+  }
+  for (const auto& [name, value] : workload.shape) {
+    add_summary(state, "lg/shape/" + name, name, value);
+  }
+  const auto flops = static_cast<double>(workload.flops);
+  add_summary(
+    state, "lg/work/flops", "FLOPs", static_cast<nvbench::int64_t>(workload.flops), "flops"
+  );
+  add_summary(
+    state, "lg/work/buffers", "Buffers", static_cast<nvbench::int64_t>(workload.buffer_bytes),
+    "bytes"
+  );
+  add_traffic(state, "lg/traffic/minimum", "Minimum Bytes", *minimum, flops);
+  if (no_reuse) {
+    add_traffic(state, "lg/traffic/no_reuse", "No-Reuse Bytes", *no_reuse, flops);
+  }
+  // NVBench derives GlobalMem BW and BWUtil from these.
+  state.add_global_memory_reads(workload.minimum.read_bytes);
+  state.add_global_memory_writes(workload.minimum.write_bytes);
+  return true;
+}
+
+void finish_summaries(nvbench::state& state, const Workload& workload) {
   double cold_seconds = 0.0;
   double batch_seconds = 0.0;
   double walltime = 0.0;
   double noise = std::numeric_limits<double>::infinity();
+  double iqr = std::numeric_limits<double>::infinity();
+  double iqr_seconds = std::numeric_limits<double>::infinity();
+  double clock_hz = 0.0;
   nvbench::int64_t samples = 0;
   for (auto& summary : state.get_summaries()) {
-    const auto tag = summary.get_tag();
+    const auto& tag = summary.get_tag();
     if (tag == "nv/cold/time/gpu/mean") {
       cold_seconds = summary.get_float64("value");
     } else if (tag == "nv/batch/time/gpu/mean") {
@@ -176,36 +310,27 @@ void finish_summaries(
       noise = summary.get_float64("value");
     } else if (tag == "nv/cold/sample_size") {
       samples = summary.get_int64("value");
-    }
-    if (tag == "nv/cold/sm_clock_rate/mean" || tag == "nv/cold/sm_clock_rate/scaling/percent" ||
-        tag == "nv/cold/walltime" || tag == "nv/batch/walltime" || tag == "nv/cold/time/gpu/min" ||
-        tag == "nv/cold/time/gpu/max" || tag == "nv/cold/time/gpu/median" ||
-        tag == "nv/cold/time/gpu/q1" || tag == "nv/cold/time/gpu/q3" ||
-        tag == "nv/cold/time/gpu/iqr/relative") {
-      summary.remove_value("hide");
+    } else if (tag == "nv/cold/sm_clock_rate/mean") {
+      clock_hz = summary.get_float64("value");
+    } else if (tag == "nv/cold/time/gpu/iqr/relative") {
+      iqr = summary.get_float64("value");
+    } else if (tag == "nv/cold/time/gpu/iqr/absolute") {
+      iqr_seconds = summary.get_float64("value");
     }
   }
 
-  const std::string base(prefix);
   add_rate(
-    state, base + "/cold/gflops", "Cold GFLOPs/s",
-    "Billions of floating-point operations per cold GPU second", flops, cold_seconds
+    state, "lg/cold/gflops", "Cold GFLOPs/s",
+    "Billions of floating-point operations per cold GPU second", workload.flops, cold_seconds
   );
   add_rate(
-    state, base + "/batch/gflops", "Batch GFLOPs/s",
-    "Billions of floating-point operations per batch GPU second", flops, batch_seconds
+    state, "lg/batch/gflops", "Batch GFLOPs/s",
+    "Billions of floating-point operations per batch GPU second", workload.flops, batch_seconds
   );
-  if (model_bytes) {
-    add_rate(
-      state, base + "/cold/model_gbytes", "Cold Model GB/s",
-      "Modeled global-memory bytes per cold GPU second", *model_bytes, cold_seconds
-    );
-    add_rate(
-      state, base + "/batch/model_gbytes", "Batch Model GB/s",
-      "Modeled global-memory bytes per batch GPU second", *model_bytes, batch_seconds
-    );
-  }
-  add_status(state, base + "/cold/status", walltime, noise, samples);
+  add_compute_peak(state, workload.flops, cold_seconds, clock_hz);
+  add_dram_peak(state);
+  add_cache_bounds(state, workload, cold_seconds);
+  add_status(state, "lg/cold/status", walltime, noise, iqr, iqr_seconds, samples);
   if (!std::isfinite(cold_seconds) || cold_seconds <= 0 || samples == 0 ||
       (!state.get_run_once() && samples < state.get_min_samples())) {
     state.skip("insufficient valid timing samples");
@@ -239,11 +364,9 @@ bool has_option(int argc, char** argv, std::initializer_list<std::string_view> o
 std::vector<std::string> benchmark_args(int argc, char** argv) {
   auto raw_args = nvbench::detail::main_convert_args(argc, argv);
   std::vector<std::string> args;
-  args.reserve(raw_args.size() + 4);
+  args.reserve(raw_args.size() + 2);
   args.push_back(raw_args.front());
   args.emplace_back("--devices");
-  args.emplace_back("0");
-  args.emplace_back("--throttle-threshold");
   args.emplace_back("0");
   args.insert(args.end(), raw_args.begin() + 1, raw_args.end());
   return args;

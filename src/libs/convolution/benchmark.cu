@@ -7,7 +7,6 @@
 
 #include <cstdio>
 #include <cuda/buffer>
-#include <limits>
 #include <memory>
 #include <nvbench/type_list.cuh>
 #include <optional>
@@ -24,11 +23,6 @@ struct AppArgs {
   bool bench = false;
   bool help = false;
   std::vector<char*> remaining;
-};
-
-struct Counts {
-  std::size_t device_bytes = 0;
-  std::size_t flops = 0;
 };
 
 struct DeviceData {
@@ -66,10 +60,6 @@ public:
       state.skip("benchmark correctness failed");
       return;
     }
-    lg::benchmark::add_summary(
-      state, "validation/values", "Verified Values",
-      static_cast<nvbench::int64_t>(host_.result.size())
-    );
     if (!data_ || device_ != device) {
       if (!CUDA_CHECK(cudaSetDevice(device))) {
         state.skip("CUDA device selection failed");
@@ -82,36 +72,35 @@ public:
   }
 
 private:
-  static std::optional<Counts> get_counts(Shape shape) {
+  static std::optional<lg::benchmark::Workload> get_workload(Shape shape, Kernel kernel) {
     const auto taps = checked_mul(
       valid_axis_pairs(shape.width, shape.radius), valid_axis_pairs(shape.height, shape.radius)
     );
     const auto flops = taps ? checked_mul(*taps, std::size_t{2}) : std::nullopt;
-    const auto elements = checked_mul(shape.input_size(), std::size_t{2});
-    if (!flops || !elements || *elements > static_cast<std::size_t>(-1) - shape.filter_size()) {
+    const auto reads = lg::checked_add(shape.input_size(), shape.filter_size());
+    const auto minimum =
+      reads ? lg::benchmark::float_traffic(*reads, shape.input_size()) : std::nullopt;
+    const auto buffers =
+      minimum ? lg::checked_add(minimum->read_bytes, minimum->write_bytes) : std::nullopt;
+    if (!flops || !minimum || !buffers) {
       return std::nullopt;
     }
-    const auto device_bytes = checked_mul(*elements + shape.filter_size(), sizeof(float));
-    if (!device_bytes ||
-        *flops > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
-      return std::nullopt;
+    lg::benchmark::Workload workload{{{"W", shape.width}, {"H", shape.height}, {"r", shape.radius}},
+                                     *flops,
+                                     *buffers,
+                                     *minimum,
+                                     {}};
+    if (kernel.traffic != nullptr) {
+      Traffic traffic;
+      if (!kernel.traffic(shape, traffic)) {
+        return std::nullopt;
+      }
+      workload.no_reuse = lg::benchmark::float_traffic(traffic.global_reads, traffic.global_writes);
+      if (!workload.no_reuse) {
+        return std::nullopt;
+      }
     }
-    return Counts{*device_bytes, *flops};
-  }
-
-  static std::optional<std::size_t>
-  add_traffic(nvbench::state& state, Shape shape, Kernel kernel, std::size_t flops) {
-    if (kernel.traffic == nullptr) {
-      return std::nullopt;
-    }
-    Traffic traffic;
-    if (!kernel.traffic(shape, traffic)) {
-      state.skip("convolution traffic overflow");
-      return std::nullopt;
-    }
-    return lg::benchmark::add_traffic(
-      state, "convolution", traffic.global_reads, traffic.global_writes, flops
-    );
+    return workload;
   }
 
   static bool add_resources(nvbench::state& state, Shape shape, Kernel kernel) {
@@ -142,26 +131,14 @@ private:
       state.skip("CUDA setup failed");
       return;
     }
-    const auto counts = get_counts(data.shape);
-    if (!counts) {
-      state.skip("convolution metric overflow");
+    const auto workload = get_workload(data.shape, kernel);
+    if (!workload) {
+      state.skip("convolution workload overflow");
       return;
     }
-    if (!add_resources(state, data.shape, kernel)) {
+    if (!add_resources(state, data.shape, kernel) || !lg::benchmark::describe(state, *workload)) {
       return;
     }
-    const auto model_bytes = add_traffic(state, data.shape, kernel, counts->flops);
-    if (kernel.traffic != nullptr && !model_bytes) {
-      return;
-    }
-
-    lg::benchmark::add_summary(state, "convolution/width", "Width", data.shape.width);
-    lg::benchmark::add_summary(state, "convolution/height", "Height", data.shape.height);
-    lg::benchmark::add_summary(state, "convolution/radius", "Radius", data.shape.radius);
-    lg::benchmark::add_summary(
-      state, "convolution/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops), "flops"
-    );
-    state.add_buffer_size(counts->device_bytes, "convolution/device_memory", "Memory");
 #ifdef __clang_analyzer__
     data.output.data()[0] = 0.0F;
     kernel.launch(data.input.data(), data.filter.data(), data.output.data(), data.shape, nullptr);
@@ -171,7 +148,7 @@ private:
         data.input.data(), data.filter.data(), data.output.data(), data.shape, launch.get_stream()
       );
     });
-    lg::benchmark::finish_summaries(state, "convolution", counts->flops, model_bytes);
+    lg::benchmark::finish_summaries(state, *workload);
 #endif
   }
 

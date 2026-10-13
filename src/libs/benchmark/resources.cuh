@@ -8,6 +8,7 @@ namespace lg::benchmark {
 
 /// Concrete resources assigned to one compiled kernel launch.
 struct KernelResources {
+  dim3 block{0, 0, 0};
   int threads_per_block = 0;
   int registers_per_thread = 0;
   std::size_t static_shared_bytes = 0;
@@ -49,6 +50,7 @@ inspect_kernel(dim3 block, std::size_t dynamic_shared_bytes, KernelResources& re
   if (threads > static_cast<std::size_t>(attributes.maxThreadsPerBlock)) {
     return cudaErrorInvalidConfiguration;
   }
+  resources.block = block;
   resources.threads_per_block = static_cast<int>(threads);
   resources.registers_per_thread = attributes.numRegs;
   resources.static_shared_bytes = attributes.sharedSizeBytes;

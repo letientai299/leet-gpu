@@ -116,6 +116,10 @@ const char* gpu_arch() {
   return gpu_name().c_str();
 }
 
+bool log_color() {
+  return color_enabled;
+}
+
 void write_log(const char* kind, const char* file, int line, const char* format, ...) {
   va_list args;
   va_start(args, format);

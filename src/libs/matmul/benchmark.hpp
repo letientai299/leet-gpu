@@ -27,8 +27,6 @@ public:
 
   /// Measures a kernel.
   void run(nvbench::state& state, Kernel kernel);
-  /// Reports shape before measuring.
-  void run_with_shape(nvbench::state& state, Kernel kernel);
 
 private:
   struct Impl;

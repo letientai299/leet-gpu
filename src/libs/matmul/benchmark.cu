@@ -28,7 +28,7 @@ struct FixedRunner {
   Kernel kernel;
 
   void operator()(nvbench::state& state, nvbench::type_list<>) const {
-    harness->run_with_shape(state, kernel);
+    harness->run(state, kernel);
   }
 };
 
@@ -147,30 +147,29 @@ private:
   }
 };
 
-struct Counts {
-  std::size_t elements = 0;
-  std::size_t flops = 0;
-};
-
 /// A GEMM does one multiply and one add per (output, k) pair.
-std::optional<Counts> get_counts(const GemmShape& shape) {
+std::optional<benchmark::Workload> get_workload(const GemmShape& shape, Kernel kernel) {
   const auto flops = checked_mul(shape.c_size(), std::size_t{shape.k()} * 2);
   const auto inputs = checked_add(shape.a_size(), shape.b_size());
-  if (!flops || !inputs) {
+  const auto minimum = inputs ? benchmark::float_traffic(*inputs, shape.c_size()) : std::nullopt;
+  const auto buffers =
+    minimum ? checked_add(minimum->read_bytes, minimum->write_bytes) : std::nullopt;
+  if (!flops || !minimum || !buffers) {
     return std::nullopt;
   }
-  const auto elements = checked_add(*inputs, shape.c_size());
-  if (!elements || *elements > std::numeric_limits<std::size_t>::max() / sizeof(float) ||
-      *flops > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
-    return std::nullopt;
+  benchmark::Workload workload{
+    {{"M", shape.m()}, {"N", shape.n()}, {"K", shape.k()}}, *flops, *buffers, *minimum, {}};
+  if (kernel.traffic != nullptr) {
+    Traffic traffic;
+    if (!kernel.traffic(shape, traffic)) {
+      return std::nullopt;
+    }
+    workload.no_reuse = benchmark::float_traffic(traffic.global_reads, traffic.global_writes);
+    if (!workload.no_reuse) {
+      return std::nullopt;
+    }
   }
-  return Counts{*elements, *flops};
-}
-
-void add_shape(nvbench::state& state, const GemmShape& shape) {
-  benchmark::add_summary(state, "matmul/height", "Height", shape.m());
-  benchmark::add_summary(state, "matmul/width", "Width", shape.n());
-  benchmark::add_summary(state, "matmul/k", "K", shape.k());
+  return workload;
 }
 
 void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
@@ -188,9 +187,9 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     return;
   }
 
-  const auto counts = get_counts(data.shape);
-  if (!counts) {
-    state.skip("matmul metric overflow");
+  const auto workload = get_workload(data.shape, kernel);
+  if (!workload) {
+    state.skip("matmul workload overflow");
     return;
   }
 
@@ -203,23 +202,8 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     benchmark::add_resources(state, resources);
   }
 
-  benchmark::add_summary(
-    state, "matmul/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops), "flops"
-  );
-  state.add_buffer_size(counts->elements * sizeof(float), "matmul/device_memory", "Memory");
-  std::optional<std::size_t> model_bytes;
-  if (kernel.traffic != nullptr) {
-    Traffic traffic;
-    if (!kernel.traffic(data.shape, traffic)) {
-      state.skip("matmul traffic overflow");
-      return;
-    }
-    model_bytes = benchmark::add_traffic(
-      state, "matmul", traffic.global_reads, traffic.global_writes, counts->flops
-    );
-    if (!model_bytes) {
-      return;
-    }
+  if (!benchmark::describe(state, *workload)) {
+    return;
   }
 #ifdef __clang_analyzer__
   data.c.data()[0] = 0.0F;
@@ -228,7 +212,7 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
   state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& launch) {
     kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, launch.get_stream());
   });
-  benchmark::finish_summaries(state, "matmul", counts->flops, model_bytes);
+  benchmark::finish_summaries(state, *workload);
 #endif
 }
 
@@ -333,16 +317,7 @@ void Benchmark::run(nvbench::state& state, Kernel kernel) {
     state.skip("benchmark correctness failed");
     return;
   }
-  benchmark::add_summary(
-    state, "validation/values", "Verified Values",
-    static_cast<nvbench::int64_t>(impl_->host.result.size())
-  );
   run_benchmark(state, impl_->get(state, kernel), kernel);
-}
-
-void Benchmark::run_with_shape(nvbench::state& state, Kernel kernel) {
-  add_shape(state, impl_->host.shape);
-  run(state, kernel);
 }
 
 void benchmark(nvbench::state& state, GemmShape shape, Kernel kernel) {

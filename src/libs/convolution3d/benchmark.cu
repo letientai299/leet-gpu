@@ -5,7 +5,6 @@
 
 #include <cstdio>
 #include <cuda/buffer>
-#include <limits>
 #include <memory>
 #include <nvbench/type_list.cuh>
 #include <optional>
@@ -17,11 +16,6 @@ namespace lg::convolution3d {
 namespace {
 
 using DeviceBuffer = cuda::device_buffer<float>;
-
-struct Counts {
-  std::size_t device_bytes;
-  std::size_t flops;
-};
 
 struct AppArgs {
   bool bench = false;
@@ -48,22 +42,38 @@ private:
   }
 };
 
-std::optional<Counts> get_counts(Shape shape) {
+std::optional<lg::benchmark::Workload> get_workload(Shape shape, Kernel kernel) {
   const auto xy = checked_mul(
     valid_axis_pairs(shape.width, shape.radius), valid_axis_pairs(shape.height, shape.radius)
   );
   const auto taps =
     xy ? checked_mul(*xy, valid_axis_pairs(shape.depth, shape.radius)) : std::nullopt;
   const auto flops = taps ? checked_mul(*taps, std::size_t{2}) : std::nullopt;
-  const auto elements = checked_mul(shape.input_size(), std::size_t{2});
-  if (!flops || !elements || *elements > static_cast<std::size_t>(-1) - shape.filter_size()) {
+  const auto reads = lg::checked_add(shape.input_size(), shape.filter_size());
+  const auto minimum =
+    reads ? lg::benchmark::float_traffic(*reads, shape.input_size()) : std::nullopt;
+  const auto buffers =
+    minimum ? lg::checked_add(minimum->read_bytes, minimum->write_bytes) : std::nullopt;
+  if (!flops || !minimum || !buffers) {
     return std::nullopt;
   }
-  const auto bytes = checked_mul(*elements + shape.filter_size(), sizeof(float));
-  if (!bytes || *flops > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
-    return std::nullopt;
+  lg::benchmark::Workload workload{
+    {{"W", shape.width}, {"H", shape.height}, {"D", shape.depth}, {"r", shape.radius}},
+    *flops,
+    *buffers,
+    *minimum,
+    {}};
+  if (kernel.traffic != nullptr) {
+    Traffic traffic;
+    if (!kernel.traffic(shape, traffic)) {
+      return std::nullopt;
+    }
+    workload.no_reuse = lg::benchmark::float_traffic(traffic.global_reads, traffic.global_writes);
+    if (!workload.no_reuse) {
+      return std::nullopt;
+    }
   }
-  return Counts{*bytes, *flops};
+  return workload;
 }
 
 class Benchmark {
@@ -83,10 +93,6 @@ public:
       state.skip("benchmark correctness failed");
       return;
     }
-    lg::benchmark::add_summary(
-      state, "validation/samples", "Reference Samples",
-      static_cast<nvbench::int64_t>(std::min(reference_samples, host_.result.size()))
-    );
     if (!data_ || device_ != device) {
       if (!CUDA_CHECK(cudaSetDevice(device))) {
         state.skip("CUDA device selection failed");
@@ -95,9 +101,9 @@ public:
       data_ = std::make_unique<DeviceData>(host_, device);
       device_ = device;
     }
-    const auto counts = get_counts(data_->shape);
-    if (!counts) {
-      state.skip("convolution metric overflow");
+    const auto workload = get_workload(data_->shape, kernel);
+    if (!workload) {
+      state.skip("convolution workload overflow");
       return;
     }
     if (kernel.filter_setup != nullptr &&
@@ -117,28 +123,9 @@ public:
       }
       lg::benchmark::add_resources(state, resources);
     }
-    std::optional<std::size_t> model_bytes;
-    if (kernel.traffic != nullptr) {
-      Traffic traffic;
-      if (!kernel.traffic(data_->shape, traffic)) {
-        state.skip("convolution traffic overflow");
-        return;
-      }
-      model_bytes = lg::benchmark::add_traffic(
-        state, "convolution3d", traffic.global_reads, traffic.global_writes, counts->flops
-      );
-      if (!model_bytes) {
-        return;
-      }
+    if (!lg::benchmark::describe(state, *workload)) {
+      return;
     }
-    lg::benchmark::add_summary(state, "convolution3d/width", "Width", data_->shape.width);
-    lg::benchmark::add_summary(state, "convolution3d/height", "Height", data_->shape.height);
-    lg::benchmark::add_summary(state, "convolution3d/depth", "Depth", data_->shape.depth);
-    lg::benchmark::add_summary(state, "convolution3d/radius", "Radius", data_->shape.radius);
-    lg::benchmark::add_summary(
-      state, "convolution3d/flops", "FLOPs", static_cast<nvbench::int64_t>(counts->flops), "flops"
-    );
-    state.add_buffer_size(counts->device_bytes, "convolution3d/device_memory", "Memory");
 #ifdef __clang_analyzer__
     data_->output.data()[0] = 0.0F;
     kernel.launch(
@@ -151,7 +138,7 @@ public:
         launch.get_stream()
       );
     });
-    lg::benchmark::finish_summaries(state, "convolution3d", counts->flops, model_bytes);
+    lg::benchmark::finish_summaries(state, *workload);
 #endif
   }
 

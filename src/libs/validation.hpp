@@ -8,6 +8,7 @@
 #include <limits>
 #include <optional>
 #include <stdexcept>
+#include <vector>
 
 namespace lg {
 
@@ -99,6 +100,45 @@ bool verify_values(
     );
   }
   return stats.mismatches == 0;
+}
+
+/// Spreads `checks` positions evenly over `count` values, ends included.
+inline std::size_t sample_index(std::size_t sample, std::size_t count, std::size_t checks) {
+  return checks <= 1 || checks == count
+           ? sample
+           : static_cast<std::size_t>(
+               static_cast<long double>(sample) * static_cast<long double>(count - 1) /
+               static_cast<long double>(checks - 1)
+             );
+}
+
+/// Compares every value when samples is 0. Otherwise requires every value to be
+/// finite, then compares `samples` evenly spaced positions.
+template <typename Actual, typename Expected>
+bool verify_sampled(
+  const Actual& actual, const Expected& expected, std::size_t samples, const char* name
+) {
+  if (samples == 0) {
+    return verify_values(actual, expected, name);
+  }
+  for (std::size_t index = 0; index < actual.size(); ++index) {
+    if (!std::isfinite(actual[index])) {
+      HOST_LOG("%s nonfinite output[%zu]", name, index);
+      return false;
+    }
+  }
+  const auto checks = std::min(samples, actual.size());
+  std::vector<float> picked;
+  std::vector<float> reference;
+  picked.reserve(checks);
+  reference.reserve(checks);
+  for (std::size_t sample = 0; sample < checks; ++sample) {
+    const auto index = sample_index(sample, actual.size(), checks);
+    picked.push_back(actual[index]);
+    reference.push_back(expected[index]);
+  }
+  HOST_LOG("Reference coverage: %zu/%zu values", picked.size(), actual.size());
+  return verify_values(picked, reference, name);
 }
 
 } // namespace lg

@@ -108,7 +108,7 @@ target_include_directories(
   SYSTEM
   PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
 )
-target_link_libraries(lg_benchmark PUBLIC lg_nvbench fmt::fmt)
+target_link_libraries(lg_benchmark PUBLIC lg_nvbench lg_runtime fmt::fmt)
 
 add_library(lg_runtime STATIC log.cpp)
 target_include_directories(lg_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
