@@ -36,8 +36,8 @@ jobs:
         with:
           cuda: "13.3.1"
           method: network
-          sub-packages: '["nvcc", "cudart", "nvml-dev", "profiler-api"]'
-          non-cuda-sub-packages: '["libnpp-dev"]'
+          sub-packages: '["nvcc", "cudart", "nvml-dev", "profiler-api", "cupti-dev"]'
+          non-cuda-sub-packages: '["libnpp-dev", "libcublas-dev"]'
 
       # apt indices are already fresh from the CUDA toolchain step above.
       - name: Install ccache
