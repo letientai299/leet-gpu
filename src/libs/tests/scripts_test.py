@@ -380,6 +380,92 @@ class ScriptTests(unittest.TestCase):
         source.write_text("invalid json")
         self.assertNotEqual(self.run_task("bench-compare", str(source)).returncode, 0)
 
+    def test_lock_holder_and_timeout(self):
+        lock = self.root / "lg-gpu-GPU-1234-abcd.lock"
+        process = subprocess.Popen(
+            [
+                "bash",
+                str(ROOT / ".config/mise/lib/gpu.sh"),
+                "run",
+                "0",
+                "off",
+                "85",
+                "0",
+                "--",
+                "bin/test/app",
+                "x",
+            ],
+            cwd=self.root,
+            env=self.env | {"MOCK_WAIT": "1", "LG_GPU_MAIN": "1"},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            deadline = time.monotonic() + 10
+            while "app GPU" not in self.events() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertIn("app GPU", self.events())
+            holder = lock.read_text().strip()
+            self.assertIn("user=", holder)
+            self.assertIn("app=bin/test/app", holder)
+            self.assertRegex(holder, r"started=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+            self.log.unlink()
+            start = time.monotonic()
+            run = self.run_task(
+                "deploy", "test/app", "--bench", LG_GPU_LOCK_TIMEOUT="0.2"
+            )
+            self.assertEqual(run.returncode, 1, run.stderr)
+            self.assertGreaterEqual(time.monotonic() - start, 0.2)
+            self.assertIn(holder, run.stderr)
+            self.assertIn("lock wait timed out", run.stderr)
+            self.assertEqual(lock.read_text().strip(), holder)
+            self.assertNotIn("app ", self.events())
+            self.assertNotIn("-lgc", self.events())
+            run = self.run_task("bench", "test/app")
+            self.assertEqual(run.returncode, 1, run.stderr)
+            self.assertIn(holder, run.stderr)
+        finally:
+            process.send_signal(signal.SIGTERM)
+            process.communicate(timeout=5)
+        self.assertEqual(process.returncode, 143)
+        self.assertEqual(lock.read_text(), "")
+        self.assertEqual(self.run_task("deploy", "test/app", "x").returncode, 0)
+
+    def test_invalid_lock_timeout(self):
+        for timeout in ("-1", "bad"):
+            with self.subTest(timeout=timeout):
+                run = self.run_task(
+                    "deploy", "test/app", "--bench", LG_GPU_LOCK_TIMEOUT=timeout
+                )
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertNotIn("app ", self.events())
+                self.assertNotIn("-lgc", self.events())
+
+    def test_remote_lock_timeout(self):
+        self.executable(
+            self.mock / "ssh",
+            '#!/bin/bash\nbash -c "${!#}"\n',
+        )
+        run = subprocess.run(
+            [
+                "bash",
+                "-c",
+                'source "$1"; run_gpu remote run 0 off 85 0 -- bin/test/app x',
+                "test",
+                str(ROOT / ".config/mise/lib/target.sh"),
+            ],
+            cwd=self.root,
+            env=self.env | {"LG_GPU_LOCK_TIMEOUT": "bad"},
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertIn("invalid LG_GPU_LOCK_TIMEOUT: bad", run.stderr)
+        self.assertNotIn("app ", self.events())
+
 
 if __name__ == "__main__":
     unittest.main()

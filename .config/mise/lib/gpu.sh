@@ -146,19 +146,47 @@ gpu_throttle_threshold() {
 
 # One lock file per GPU UUID serializes runs from every tool, worktree, and user.
 # Opens it on fd 9; created world-writable so other users can share it.
+gpu_lock_file=
 gpu_open_lock() {
-  local file
-  file=${LG_GPU_LOCK_DIR:-/tmp}/lg-gpu-$1.lock
-  if [ ! -e "$file" ]; then
-    (umask 000 && : >>"$file") 2>/dev/null || true
+  gpu_lock_file=${LG_GPU_LOCK_DIR:-/tmp}/lg-gpu-$1.lock
+  if [ ! -e "$gpu_lock_file" ]; then
+    (umask 000 && : >>"$gpu_lock_file") 2>/dev/null || true
   fi
-  exec 9>>"$file"
+  exec 9>>"$gpu_lock_file"
+}
+
+gpu_lock_holder() {
+  local holder
+  holder=$(cat "$gpu_lock_file" 2>/dev/null || true)
+  printf '%s\n' "${holder:-holder unavailable}"
+}
+
+gpu_record_lock() {
+  truncate -s 0 "$gpu_lock_file"
+  printf 'user=%s app=%q started=%s pid=%s\n' \
+    "$(id -un)" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" >&9
+}
+
+gpu_clear_lock() {
+  truncate -s 0 "$gpu_lock_file"
 }
 
 gpu_wait_lock() {
+  local timeout=${LG_GPU_LOCK_TIMEOUT:-}
+  if [ -n "$timeout" ] && [[ ! "$timeout" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    echo "gpu: invalid LG_GPU_LOCK_TIMEOUT: $timeout" >&2
+    return 2
+  fi
   if ! flock -n 9; then
-    echo "gpu: $(hostname) GPU $1 busy; waiting" >&2
-    flock 9
+    echo "gpu: $(hostname) GPU $1 busy; waiting; $(gpu_lock_holder)" >&2
+    if [ -n "$timeout" ]; then
+      if ! flock -w "$timeout" 9; then
+        echo "gpu: lock wait timed out: GPU $1" >&2
+        return 1
+      fi
+    else
+      flock 9
+    fi
   fi
 }
 
@@ -173,6 +201,7 @@ gpu_run_finish() {
   if [ "$run_locked" = 1 ] && [ "$run_keep" = 0 ]; then
     gpu_unlock_now "$run_gpu" || true
   fi
+  gpu_clear_lock
   exit "$status"
 }
 
@@ -202,11 +231,12 @@ gpu_run() {
     return 1
   fi
   gpu_open_lock "$uuid"
-  gpu_wait_lock "$run_gpu"
+  gpu_wait_lock "$run_gpu" || return $?
   trap gpu_run_finish EXIT
   trap 'gpu_run_stop 129' HUP
   trap 'gpu_run_stop 130' INT
   trap 'gpu_run_stop 143' TERM
+  gpu_record_lock "$1"
 
   local request=$clock
   if [ "$clock" != off ]; then
@@ -255,13 +285,15 @@ gpu_unlock_now() {
 }
 
 # Waits for any run on the GPU to finish before resetting its clock.
-gpu_unlock() {
+gpu_unlock() (
   local uuid
   uuid=$(gpu_query "$1" uuid)
   gpu_open_lock "$uuid"
-  gpu_wait_lock "$1"
+  gpu_wait_lock "$1" || return $?
+  trap gpu_clear_lock EXIT
+  gpu_record_lock unlock
   gpu_unlock_now "$1"
-}
+)
 
 if [ "${LG_GPU_MAIN:-}" = 1 ]; then
   set -euo pipefail

@@ -14,11 +14,14 @@ ssh_opts=(-o ControlMaster=auto -o ControlPath="/tmp/ssh-${CONTAINER_NAME:-leet-
 # Prints a shell command that runs gpu.sh with ARGS on a remote host. The
 # script travels as base64, which every remote shell passes through unchanged.
 remote_gpu_command() {
-  local script args
+  local script args env_prefix=
   script=$(base64 <"$target_lib_dir/gpu.sh" | tr -d '\n')
   printf -v args ' %q' "$@"
+  if [ -n "${LG_GPU_LOCK_TIMEOUT:-}" ]; then
+    printf -v env_prefix 'LG_GPU_LOCK_TIMEOUT=%q ' "$LG_GPU_LOCK_TIMEOUT"
+  fi
   # shellcheck disable=SC2016 # The remote shell expands $(...), not this one.
-  printf 'LG_GPU_MAIN=1 bash -c "$(printf %%s %s | base64 -d)" gpu.sh%s\n' "$script" "$args"
+  printf '%sLG_GPU_MAIN=1 bash -c "$(printf %%s %s | base64 -d)" gpu.sh%s\n' "$env_prefix" "$script" "$args"
 }
 
 # Runs gpu.sh ARGS on the target. Remote runs get a TTY so a dropped connection

@@ -19,6 +19,8 @@ add_test(NAME harness_cuda COMMAND harness_cuda)
 set_tests_properties(harness_cuda PROPERTIES LABELS gpu)
 add_test(NAME harness_retain COMMAND harness_cuda retain --quiet)
 set_tests_properties(harness_retain PROPERTIES LABELS gpu)
+add_test(NAME harness_timer_status COMMAND harness_cuda timer-status --quiet)
+set_tests_properties(harness_timer_status PROPERTIES LABELS gpu)
 
 foreach(mode IN ITEMS skip no-samples bad-shape)
   add_test(NAME harness_${mode} COMMAND harness_cuda ${mode} --quiet)

@@ -11,6 +11,7 @@ RUN yum install -y\
     && yum install -y \
     gdb\
     git\
+    jq\
     ccache\
     libstdc++-static\
     python3.12-pip\

@@ -8,6 +8,8 @@
 #include <exception>
 #include <fmt/format.h>
 #include <limits>
+#include <map>
+#include <nvbench/cuda_timer.cuh>
 #include <nvbench/json_printer.cuh>
 #include <nvbench/main.cuh>
 #include <nvbench/option_parser.cuh>
@@ -45,8 +47,55 @@ struct ColdTiming {
   double iqr = std::numeric_limits<double>::infinity();
   double iqr_seconds = std::numeric_limits<double>::infinity();
   double clock_hz = 0.0;
+  double timer_step = 0.0;
   nvbench::int64_t samples = 0;
 };
+
+double infer_timer_step(std::vector<double> samples) {
+  // Duration differences reveal quantization, not event overhead.
+  std::sort(samples.begin(), samples.end());
+  samples.erase(std::unique(samples.begin(), samples.end()), samples.end());
+  double step = std::numeric_limits<double>::infinity();
+  for (std::size_t index = 1; index < samples.size(); ++index) {
+    step = std::min(step, samples[index] - samples[index - 1]);
+  }
+  // Require repeated steps before relaxing the spread limit.
+  int matches = 0;
+  for (std::size_t index = 1; index < samples.size(); ++index) {
+    if (std::abs(samples[index] - samples[index - 1] - step) <= step * 0.01) {
+      ++matches;
+    }
+  }
+  return std::isfinite(step) && matches >= 3 ? step : 0.0;
+}
+
+double event_timer_step() {
+  int device = 0;
+  NVBENCH_CUDA_CALL(cudaGetDevice(&device));
+  static thread_local std::map<int, double> steps;
+  if (const auto found = steps.find(device); found != steps.end()) {
+    return found->second;
+  }
+
+  nvbench::cuda_stream const stream;
+  nvbench::cuda_timer timer;
+  std::vector<double> samples;
+  samples.reserve(256);
+  for (int sample = 0; sample < 256; ++sample) {
+    timer.start(stream);
+    // Vary intervals to expose timestamp quantization.
+    for (int event = 0; event <= sample % 16; ++event) {
+      timer.stop(stream);
+    }
+    const double seconds = timer.get_duration();
+    if (std::isfinite(seconds) && seconds > 0.0) {
+      samples.push_back(seconds);
+    }
+  }
+  const double step = infer_timer_step(std::move(samples));
+  steps.emplace(device, step);
+  return step;
+}
 
 // deploy and bench export the clock they locked (gpu.sh).
 double locked_clock_hz() {
@@ -73,8 +122,6 @@ bool clock_unhealthy(nvbench::state& state, double clock_hz) {
 // step is small next to the kernel time.
 std::string cold_status(nvbench::state& state, const ColdTiming& timing) {
   constexpr double kDefaultMaxSpread = 0.005;
-  // cudaEventElapsedTime moved in 1.024 us steps on the A100X.
-  constexpr double kTimerStep = 1.024e-6;
   constexpr double kMaxStepSpread = 0.05;
   // NVML clock samples wobble by a few MHz under a lock.
   constexpr double kClockTolerance = 0.99;
@@ -108,7 +155,8 @@ std::string cold_status(nvbench::state& state, const ColdTiming& timing) {
   }
   const double interval = 1.96 * timing.noise / std::sqrt(static_cast<double>(timing.samples));
   const bool stable = timing.iqr <= max_spread ||
-                      (timing.iqr_seconds <= kTimerStep * 1.01 && timing.iqr <= kMaxStepSpread);
+                      (timing.timer_step > 0.0 && timing.iqr_seconds <= timing.timer_step * 1.01 &&
+                       timing.iqr <= kMaxStepSpread);
   return fmt::format(
     "{} · IQR {:.2f}% · mean ±{:.2f}% (95% CI)", stable ? "stable" : "UNSTABLE", timing.iqr * 100.0,
     interval * 100.0
@@ -310,6 +358,9 @@ bool describe(nvbench::state& state, const Workload& workload) {
     state.skip("invalid workload size");
     return false;
   }
+  if (!state.get_run_once()) {
+    add_float(state, "lg/cold/timer_step", "Event Timer Step", event_timer_step(), "duration");
+  }
   for (const auto& [name, value] : workload.shape) {
     add_summary(state, "lg/shape/" + name, name, value);
   }
@@ -353,6 +404,8 @@ void finish_summaries(nvbench::state& state, const Workload& workload) {
       timing.iqr = summary.get_float64("value");
     } else if (tag == "nv/cold/time/gpu/iqr/absolute") {
       timing.iqr_seconds = summary.get_float64("value");
+    } else if (tag == "lg/cold/timer_step") {
+      timing.timer_step = summary.get_float64("value");
     }
   }
 

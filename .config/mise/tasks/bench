@@ -71,7 +71,7 @@ fi
 # Shares deploy's per-GPU lock; bench refuses instead of waiting.
 gpu_open_lock "$gpu"
 if ! flock -n 9; then
-  echo "bench: GPU already benchmarked: $gpu" >&2
+  echo "bench: GPU already benchmarked: $gpu; $(gpu_lock_holder)" >&2
   exit 1
 fi
 
@@ -102,6 +102,7 @@ restore() {
       status=1
     fi
   fi
+  gpu_clear_lock
   exit "$status"
 }
 interrupt() {
@@ -116,6 +117,7 @@ interrupt() {
 trap restore EXIT
 trap 'interrupt 130' INT
 trap 'interrupt 143' TERM
+gpu_record_lock "$binary"
 
 processes=$(nvidia-smi -i "$gpu" --query-compute-apps=pid --format=csv,noheader)
 if [ -n "$processes" ] && [ "${BENCH_FORCE:-0}" != 1 ]; then

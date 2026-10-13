@@ -182,6 +182,44 @@ void check_device(int device) {
   );
 }
 
+void check_timer_status(nvbench::state& state) {
+  const auto check = [&state](double step, bool stable) {
+    state.get_summaries().clear();
+    const auto add = [&state](const char* tag, double value) {
+      state.add_summary(tag).set_float64("value", value);
+    };
+    add("nv/cold/time/gpu/mean", 40e-6);
+    add("nv/cold/time/gpu/stdev/relative", 0.02);
+    add("nv/cold/time/gpu/iqr/relative", 0.02);
+    add("nv/cold/time/gpu/iqr/absolute", 0.8e-6);
+    add("lg/cold/timer_step", step);
+    state.add_summary("nv/cold/sample_size").set_int64("value", 100);
+    lg::benchmark::finish_summaries(state, lg::benchmark::Workload{{}, 1, 4, {4, 0}, {}});
+    require(!state.is_skipped());
+    for (const auto& summary : state.get_summaries()) {
+      if (summary.get_tag() == "lg/cold/status") {
+        const auto status = summary.get_string("value");
+        require(status.find(stable ? "stable" : "UNSTABLE") == 0);
+        return;
+      }
+    }
+    require(false);
+  };
+  check(1.024e-6, true);
+  check(0.512e-6, false);
+  check(0.0, false);
+}
+
+void check_benchmark_status(nvbench::state& state, std::string_view mode) {
+  if (mode == "timer-status") {
+    check_timer_status(state);
+  } else if (mode == "skip") {
+    state.skip("injected failure");
+  } else {
+    lg::benchmark::finish_summaries(state, lg::benchmark::Workload{{}, 1, 4, {4, 0}, {}});
+  }
+}
+
 } // namespace
 
 int main(int argc, char** argv) try {
@@ -234,11 +272,7 @@ int main(int argc, char** argv) try {
       );
     }
     lg::benchmark::add("failure", [mode](nvbench::state& state, nvbench::type_list<>) {
-      if (mode == "skip") {
-        state.skip("injected failure");
-      } else {
-        lg::benchmark::finish_summaries(state, lg::benchmark::Workload{{}, 1, 4, {4, 0}, {}});
-      }
+      check_benchmark_status(state, mode);
     });
     if (mode == "retain") {
       float* buffer = nullptr;
