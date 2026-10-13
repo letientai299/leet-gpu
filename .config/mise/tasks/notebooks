@@ -17,7 +17,29 @@ if [ "$(git branch --show-current)" != "main" ]; then
   offset=$(((hash % 100) * 10))
 fi
 
-exec uv run --project src/notebooks --locked jupyter lab \
+server_pid=
+stop_server() {
+  trap - EXIT
+  trap '' HUP INT TERM
+  if [ -n "$server_pid" ]; then
+    kill -TERM "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+  fi
+  exit "$1"
+}
+trap 'stop_server "$?"' EXIT
+trap 'stop_server 130' INT
+trap 'stop_server 143' TERM
+
+# Handle HUP through the supervisor.
+trap '' HUP
+src/notebooks/.venv/bin/python -m jupyterlab \
   --ServerApp.root_dir="$PWD/src/notebooks" \
   --ServerApp.ip=127.0.0.1 \
-  --ServerApp.port="${NOTEBOOK_PORT:-$((8888 + offset))}" "$@"
+  --ServerApp.port="${NOTEBOOK_PORT:-$((8888 + offset))}" "$@" <&0 &
+server_pid=$!
+trap 'stop_server 129' HUP
+status=0
+wait "$server_pid" || status=$?
+server_pid=
+stop_server "$status"

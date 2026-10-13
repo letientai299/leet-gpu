@@ -1,5 +1,7 @@
 {
   "ServerApp": {
+    "answer_yes": true,
+    "port_retries": 0,
     "jpserver_extensions": {
       "jupyterlab_plugin_playground": false
     }
