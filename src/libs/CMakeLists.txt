@@ -157,6 +157,13 @@ target_link_libraries(
   PUBLIC lg_convolution3d lg_benchmark
 )
 
+add_library(lg_stencil STATIC stencil/correctness.cu)
+target_include_directories(lg_stencil PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(lg_stencil PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL)
+
+add_library(lg_stencil_nvbench STATIC stencil/benchmark.cu)
+target_link_libraries(lg_stencil_nvbench PUBLIC lg_stencil lg_benchmark)
+
 add_library(
   lg_matmul
   STATIC
