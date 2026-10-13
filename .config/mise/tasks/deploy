@@ -120,12 +120,11 @@ for candidate in /opt/homebrew/bin/rsync /usr/local/bin/rsync; do
 done
 
 # rsync sends only the changed blocks of the recompiled binary (delta, against
-# the previous copy at $REMOTE_BIN) and -z compresses them — far less than the
-# ~1 MB a fresh scp pushes every time. --inplace rewrites the changed blocks
-# directly into the remote file instead of building a full temp copy and
-# renaming it, which matters more as the binary grows; --partial keeps a
-# half-sent file around so an interrupted transfer resumes as a delta baseline.
-"$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" "$binary" \
-  "$remote:$remote_bin"
+# the previous copy at $remote_bin) and -z compresses them — far less than the
+# ~1 MB a fresh scp pushes every time. rsync writes a temporary file and renames
+# it into place, so a run of the old binary keeps its inode instead of failing
+# the transfer with ETXTBSY (--inplace would). No --partial: an interrupted
+# transfer would rename a truncated binary into place.
+"$rsync_bin" -z -e "ssh ${ssh_opts[*]}" "$binary" "$remote:$remote_bin"
 
 run_gpu "$target" "${gpu_args[@]}" "$remote_bin" "${args[@]+"${args[@]}"}"
