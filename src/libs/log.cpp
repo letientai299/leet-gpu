@@ -15,7 +15,6 @@
 
 namespace {
 
-constexpr std::size_t source_width = 16;
 bool color_enabled = false;
 std::size_t kind_width = 4;
 
@@ -45,7 +44,6 @@ const char* kind_color(std::string_view kind) {
 void append_column(std::string& output, std::string_view value, std::size_t width) {
   output.append(value);
   output.append(value.size() < width ? width - value.size() : 0, ' ');
-  output.push_back(' ');
 }
 
 void append_colored(
@@ -85,11 +83,11 @@ add_metadata(std::string_view kind, std::string_view file, int line, std::string
   const auto slash = file.find_last_of('/');
   const auto basename = slash == std::string_view::npos ? file : file.substr(slash + 1);
   std::string output;
-  append_colored(
-    output, std::string(basename) + ":" + std::to_string(line), source_width, color::source
-  );
   append_colored(output, kind, kind_width, kind_color(kind));
+  output.push_back(' ');
   output.append(message);
+  output.push_back(' ');
+  append_colored(output, std::string(basename) + ":" + std::to_string(line), 0, color::source);
   return output;
 }
 
