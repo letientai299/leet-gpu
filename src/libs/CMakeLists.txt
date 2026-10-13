@@ -107,6 +107,21 @@ add_library(lg_nvbench INTERFACE)
 target_compile_definitions(lg_nvbench INTERFACE LG_HAS_NVBENCH)
 target_link_libraries(lg_nvbench INTERFACE nvbench::nvbench)
 
+# Runs every build; a stale binary then shows an old revision.
+set(LG_REVISION_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
+add_custom_target(
+  lg_revision_stamp
+  COMMAND
+    "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}"
+    "-DOUTPUT=${LG_REVISION_SOURCE}" -P
+    "${PROJECT_SOURCE_DIR}/src/cmake/build_revision.cmake"
+  BYPRODUCTS "${LG_REVISION_SOURCE}"
+  VERBATIM
+)
+add_library(lg_revision STATIC "${LG_REVISION_SOURCE}")
+target_include_directories(lg_revision PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+add_dependencies(lg_revision lg_revision_stamp)
+
 add_library(lg_benchmark STATIC benchmark/format.cpp benchmark/runner.cu)
 target_include_directories(lg_benchmark PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(
@@ -117,6 +132,7 @@ target_include_directories(
 target_link_libraries(
   lg_benchmark
   PUBLIC lg_nvbench lg_runtime CCCL::CCCL fmt::fmt
+  PRIVATE lg_revision
 )
 
 # Driver API reads kernels that libraries launch inside a captured graph.

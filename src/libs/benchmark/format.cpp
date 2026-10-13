@@ -1,6 +1,7 @@
 #include "benchmark/format.hpp"
 
 #include "log.hpp"
+#include "revision.hpp"
 
 #include <algorithm>
 #include <array>
@@ -499,7 +500,10 @@ void print_state(const Json& root, const Json& bench, const Json& state) {
   const std::string gpu = device_name(root, device);
   fmt::print(
     "\n{}  {}\n", paint(bench.value("name", "Benchmark"), ansi::bold),
-    paint(fmt::format("{}{}[{}]", gpu, gpu.empty() ? "" : " ", device), ansi::dim)
+    paint(
+      fmt::format("{}{}[{}] · build {}", gpu, gpu.empty() ? "" : " ", device, build_revision()),
+      ansi::dim
+    )
   );
   if (state.value("is_skipped", false)) {
     print_row(

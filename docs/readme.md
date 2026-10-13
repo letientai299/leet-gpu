@@ -14,7 +14,7 @@ over macOS `openrsync` for `deploy`.
 
 ### Linux GPU host
 
-NVIDIA driver, CUDA toolkit (`nvcc`), CMake 3.22+, Ninja, and ccache. With
+NVIDIA driver, CUDA toolkit (`nvcc`), CMake 3.22+, Ninja 1.12+, and ccache. With
 `BUILD_ENV=auto` and empty `SSH_HOST`, build and run locally. `build` looks for
 `nvcc` on `PATH`, then under `CUDACXX`, `CUDA_HOME`, `CUDA_PATH`, and a toolkit
 prefix such as `/usr/local/cuda`, and exports `CUDACXX` for CMake; point
