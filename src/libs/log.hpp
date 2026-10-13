@@ -1,9 +1,12 @@
 #pragma once
 
+#include <cstdio>
+
 void init_log();
 void set_gpu_arch(int major, int minor);
 const char* gpu_arch();
-bool log_color();
+/// True when `stream` is a terminal and NO_COLOR is unset.
+bool use_color(std::FILE* stream);
 
 // printf attribute makes the compiler type-check the varargs.
 // https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html

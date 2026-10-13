@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <exception>
 #include <fmt/format.h>
 #include <limits>
 #include <nvbench/json_printer.cuh>
@@ -261,6 +262,18 @@ void add_resources(nvbench::state& state, const KernelResources& resources) {
   }
 }
 
+bool add_resources(
+  nvbench::state& state, const std::function<cudaError_t(KernelResources&)>& query
+) {
+  KernelResources resources;
+  if (!CUDA_CHECK(query(resources))) {
+    state.skip("CUDA kernel resource query failed");
+    return false;
+  }
+  add_resources(state, resources);
+  return true;
+}
+
 namespace {
 
 std::optional<std::size_t> total(const MemoryTraffic& traffic) {
@@ -288,15 +301,6 @@ void add_traffic(
 }
 
 } // namespace
-
-std::optional<MemoryTraffic> float_traffic(std::size_t reads, std::size_t writes) {
-  const auto read_bytes = lg::checked_mul(reads, sizeof(float));
-  const auto write_bytes = lg::checked_mul(writes, sizeof(float));
-  if (!read_bytes || !write_bytes) {
-    return std::nullopt;
-  }
-  return MemoryTraffic{*read_bytes, *write_bytes};
-}
 
 bool describe(nvbench::state& state, const Workload& workload) {
   const auto minimum = total(workload.minimum);
@@ -456,7 +460,7 @@ int run_captured(int argc, char** argv, std::string& output) try {
 }
 NVBENCH_MAIN_CATCH_EXCEPTIONS
 
-int run_args(int argc, char** argv) {
+int run_args(int argc, char** argv) try {
   if (has_option(
         argc, argv,
         {"--help", "-h", "--help-axis", "--help-axes", "--version", "--list", "-l",
@@ -475,6 +479,9 @@ int run_args(int argc, char** argv) {
     print_result(output);
   }
   return result;
+} catch (const std::exception& error) {
+  fmt::print(stderr, "{}\n", error.what());
+  return 1;
 }
 
 } // namespace lg::benchmark

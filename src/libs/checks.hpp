@@ -25,6 +25,18 @@ inline bool cuda_check(cudaError_t error, const char* file, int line) {
 
 #define CUDA_CHECK(expression) cuda_check((expression), __FILE__, __LINE__)
 
+// Clears stale errors first so a failure belongs to this launch.
+#define LAUNCH_CHECK(launch)                                                                       \
+  (CUDA_CHECK(cudaGetLastError()) && ((launch), CUDA_CHECK(cudaGetLastError())))
+
+// cudaGetDeviceProperties fills every field and can take milliseconds.
+// https://developer.nvidia.com/blog/cuda-pro-tip-the-fast-way-to-query-device-properties/
+inline cudaError_t device_attribute(cudaDeviceAttr attribute, int& value) {
+  int device = 0;
+  const auto status = cudaGetDevice(&device);
+  return status != cudaSuccess ? status : cudaDeviceGetAttribute(&value, attribute, device);
+}
+
 #ifdef LG_HAS_NPP
 #include <nppdefs.h>
 
@@ -190,18 +202,22 @@ inline bool help_requested(int argc, char** argv) {
   return argc == 2 && std::strcmp(argv[1], "--help") == 0;
 }
 
-template <typename Fn> int run_host(int argc, char** argv, Fn&& body) try {
-  if (help_requested(argc, argv)) {
-    std::printf("Usage: %s\n", argv[0]);
-    return 0;
-  }
-  if (!init_host()) {
-    return 1;
-  }
-  return std::forward<Fn>(body)();
+/// Turns an escaped exception into exit status 1.
+template <typename Body> int guarded(Body&& body) try {
+  return std::forward<Body>(body)();
 } catch (const std::exception& error) {
   std::fprintf(stderr, "%s\n", error.what());
   return 1;
+}
+
+template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
+  return guarded([&] {
+    if (help_requested(argc, argv)) {
+      std::printf("Usage: %s\n", argv[0]);
+      return 0;
+    }
+    return init_host() ? std::forward<Fn>(body)() : 1;
+  });
 }
 
 inline void log_image_launch(dim3 grid, dim3 block, std::size_t pixels) {

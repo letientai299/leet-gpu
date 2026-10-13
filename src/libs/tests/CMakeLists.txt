@@ -9,7 +9,11 @@ set_target_properties(
 )
 target_link_libraries(
   harness_cuda
-  PRIVATE lg_matmul_nvbench lg_convolution_nvbench lg_convolution3d_nvbench
+  PRIVATE
+    lg_matmul_nvbench
+    lg_convolution_nvbench
+    lg_convolution3d_nvbench
+    lg_stencil_nvbench
 )
 add_test(NAME harness_cuda COMMAND harness_cuda)
 set_tests_properties(harness_cuda PROPERTIES LABELS gpu)

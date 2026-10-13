@@ -1,6 +1,7 @@
 #pragma once
 
 #include "benchmark/resources.cuh"
+#include "benchmark/workload.hpp"
 #include "validation.hpp"
 
 #include <cstddef>
@@ -55,10 +56,7 @@ using Launch = void (*)(
   const float* input, float* output, Shape shape, Coefficients coefficients, cudaStream_t stream
 );
 
-struct Traffic {
-  std::size_t global_reads = 0;
-  std::size_t global_writes = 0;
-};
+using lg::benchmark::Traffic;
 
 using TrafficCallback = bool (*)(Shape, Traffic&);
 using ResourcesCallback = cudaError_t (*)(const Shape&, lg::benchmark::KernelResources& resources);

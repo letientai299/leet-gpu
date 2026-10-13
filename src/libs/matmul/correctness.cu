@@ -72,11 +72,7 @@ bool run_kernel(Problem& problem, Kernel kernel) {
   return on_device(
     inputs.a(), inputs.b(), problem.result,
     [&](const DeviceMatrix& a, const DeviceMatrix& b, DeviceMatrix& c) {
-      if (!CUDA_CHECK(cudaGetLastError())) {
-        return false;
-      }
-      kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr);
-      return CUDA_CHECK(cudaGetLastError());
+      return LAUNCH_CHECK(kernel.launch(a.data(), b.data(), c.data(), problem.shape, nullptr));
     }
   );
 }

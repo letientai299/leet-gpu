@@ -11,9 +11,7 @@ constexpr int kMaxFilterWidth = kMaxFilterRadius * 2 + 1;
 static __constant__ float gFilter[kMaxFilterWidth * kMaxFilterWidth]{};
 
 inline bool traffic(Shape shape, Traffic& traffic) {
-  const auto reads = checked_mul(
-    valid_axis_pairs(shape.width, shape.radius), valid_axis_pairs(shape.height, shape.radius)
-  );
+  const auto reads = taps(shape);
   if (!reads) {
     return false;
   }

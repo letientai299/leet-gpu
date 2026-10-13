@@ -6,6 +6,7 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -58,7 +59,8 @@ constexpr auto cyan = "\033[36m";
 } // namespace ansi
 
 std::string paint(std::string_view text, const char* tint) {
-  if (!log_color()) {
+  static const bool color = use_color(stdout);
+  if (!color) {
     return std::string(text);
   }
   return fmt::format("{}{}{}", tint, text, ansi::reset);

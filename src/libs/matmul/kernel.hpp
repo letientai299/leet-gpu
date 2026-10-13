@@ -1,6 +1,7 @@
 #pragma once
 
 #include "benchmark/resources.cuh"
+#include "benchmark/workload.hpp"
 #include "matmul/matrix.hpp"
 #include "validation.hpp"
 
@@ -60,11 +61,7 @@ using lg::checked_mul;
 /// Adds counts without overflow.
 using lg::checked_add;
 
-/// Bytes a kernel moves through global memory, for NVBench bandwidth columns.
-struct Traffic {
-  std::size_t global_reads = 0;
-  std::size_t global_writes = 0;
-};
+using lg::benchmark::Traffic;
 
 using TrafficCallback = bool (*)(const GemmShape&, Traffic&);
 using ResourcesCallback =

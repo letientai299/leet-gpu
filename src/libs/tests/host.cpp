@@ -1,3 +1,4 @@
+#include "benchmark/workload.hpp"
 #include "convolution/kernel.hpp"
 #include "convolution3d/kernel.hpp"
 #include "matmul/matrix.hpp"
@@ -6,6 +7,7 @@
 #include <climits>
 #include <cstdio>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -90,6 +92,26 @@ int main() try {
   require(!lg::verify_values(actual, zeros, "mismatch"));
   actual.pop_back();
   require(!lg::verify_values(actual, zeros, "size"));
+  const std::vector<float> longer(8, 0);
+  require(!lg::verify_sampled(longer, zeros, 2, "sampled size"));
+  require(lg::verify_sampled(longer, longer, 3, "sampled"));
+
+  const auto workload = lg::benchmark::float_workload({}, 1, 1, 1);
+  require(workload && workload->buffer_bytes == 8 && !workload->no_reuse);
+  require(!lg::benchmark::float_workload({}, 1, max, 1));
+  require(!lg::benchmark::float_workload({}, std::nullopt, 1, 1));
+  const auto overflow = +[](int, lg::benchmark::Traffic& traffic) {
+    traffic = {max, 0};
+    return true;
+  };
+  require(!lg::benchmark::with_no_reuse(workload, overflow, 0));
+  const auto doubled = +[](int, lg::benchmark::Traffic& traffic) {
+    traffic = {2, 1};
+    return true;
+  };
+  const auto modeled = lg::benchmark::with_no_reuse(workload, doubled, 0);
+  require(modeled && modeled->no_reuse && modeled->no_reuse->read_bytes == 8);
+
   lg::ErrorStats stats;
   stats.add(1, 0, 1.0e-5, 1.0e-4);
   stats.add(3, 1, 1.0e-5, 1.0e-4);

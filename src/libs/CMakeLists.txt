@@ -114,7 +114,10 @@ target_include_directories(
   SYSTEM
   PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
 )
-target_link_libraries(lg_benchmark PUBLIC lg_nvbench lg_runtime fmt::fmt)
+target_link_libraries(
+  lg_benchmark
+  PUBLIC lg_nvbench lg_runtime CCCL::CCCL fmt::fmt
+)
 
 # Driver API reads kernels that libraries launch inside a captured graph.
 add_library(lg_benchmark_captured STATIC benchmark/captured.cu)

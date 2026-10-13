@@ -88,11 +88,9 @@ int check(Problem& problem, Kernel kernel, std::size_t samples) {
     return 1;
   }
 
-  if (!CUDA_CHECK(cudaGetLastError())) {
-    return 1;
-  }
-  kernel.launch(input.data(), filter.data(), result.data(), problem.shape, nullptr);
-  return CUDA_CHECK(cudaGetLastError()) && COPY_CHECK(result, problem.result) &&
+  return LAUNCH_CHECK(
+           kernel.launch(input.data(), filter.data(), result.data(), problem.shape, nullptr)
+         ) && COPY_CHECK(result, problem.result) &&
              lg::verify_sampled(problem.result, problem.expected, samples, kernel.name)
            ? 0
            : 1;

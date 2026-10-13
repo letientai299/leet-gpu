@@ -6,6 +6,8 @@
 #include "convolution3d/correctness.hpp"
 #include "matmul/benchmark.hpp"
 #include "matmul/correctness.hpp"
+#include "stencil/benchmark.hpp"
+#include "stencil/correctness.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -105,6 +107,37 @@ void launch_3d(
 void missing_3d(const float*, const float*, float*, lg::convolution3d::Shape, cudaStream_t) {
 }
 
+__global__ void
+stencil(const float* input, float* output, lg::stencil::Shape shape, lg::stencil::Coefficients c) {
+  const auto index = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const auto plane = shape.plane_size();
+  const auto x = static_cast<int>(index % shape.width);
+  const auto y = static_cast<int>(index / shape.width % shape.height);
+  const auto z = static_cast<int>(index / plane);
+  if (index >= shape.grid_size() || x == 0 || y == 0 || z == 0 || x == shape.width - 1 ||
+      y == shape.height - 1 || z == shape.depth - 1) {
+    return;
+  }
+  output[index] = c.c0 * input[index] + c.c1 * input[index - 1] + c.c2 * input[index + 1] +
+                  c.c3 * input[index - shape.width] + c.c4 * input[index + shape.width] +
+                  c.c5 * input[index - plane] + c.c6 * input[index + plane];
+}
+
+void launch_stencil(
+  const float* input,
+  float* output,
+  lg::stencil::Shape shape,
+  lg::stencil::Coefficients coefficients,
+  cudaStream_t stream
+) {
+  stencil<<<(shape.grid_size() + 127) / 128, 128, 0, stream>>>(input, output, shape, coefficients);
+}
+
+void missing_stencil(
+  const float*, float*, lg::stencil::Shape, lg::stencil::Coefficients, cudaStream_t
+) {
+}
+
 void check_device(int device) {
   require(CUDA_CHECK(cudaSetDevice(device)));
   for (const auto shape : {lg::matmul::GemmShape{1, 1, 1}, {17, 9, 13}}) {
@@ -133,6 +166,13 @@ void check_device(int device) {
     std::fill(problem.input.begin(), problem.input.end(), 0.0F);
     require(lg::convolution3d::check(problem, {"missing", missing_3d}) != 0);
     require(lg::convolution3d::check(problem, {"missing", missing_3d}, 17) != 0);
+  }
+  for (const auto shape : {lg::stencil::Shape{3, 3, 3}, {17, 9, 5}}) {
+    lg::stencil::Problem problem{shape, {}, {}, {}, {}};
+    lg::stencil::fill_problem(problem);
+    require(lg::stencil::check(problem, {"good", launch_stencil}) == 0);
+    require(lg::stencil::check(problem, {"good", launch_stencil}, 7) == 0);
+    require(lg::stencil::check(problem, {"missing", missing_stencil}) != 0);
   }
   lg::benchmark::KernelResources resources;
   require(lg::benchmark::inspect_kernel<gemm>(dim3{128}, 0, resources) == cudaSuccess);
@@ -165,6 +205,14 @@ int main(int argc, char** argv) try {
         {"convolution3d", launch_3d, lg::convolution3d::basic_traffic,
          lg::benchmark::fixed_resources<lg::convolution3d::Shape, convolution, 128>},
         {64, 33, 17, 3}
+      );
+    }
+    if (mode == "stencil-bench") {
+      return lg::stencil::run_app(
+        argc - 1, argv + 1,
+        {"stencil", launch_stencil, lg::stencil::basic_traffic,
+         lg::benchmark::fixed_resources<lg::stencil::Shape, stencil, 128>},
+        {64, 33, 17}
       );
     }
     if (mode == "bad-shape") {

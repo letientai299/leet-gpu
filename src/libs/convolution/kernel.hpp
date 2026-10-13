@@ -1,6 +1,7 @@
 #pragma once
 
 #include "benchmark/resources.cuh"
+#include "benchmark/workload.hpp"
 #include "validation.hpp"
 
 #include <cstddef>
@@ -41,11 +42,7 @@ using Launch = void (*)(
 
 using FilterSetup = cudaError_t (*)(const float* filter, Shape shape, cudaStream_t stream);
 
-/// Logical global-memory operations performed by a kernel.
-struct Traffic {
-  std::size_t global_reads = 0;
-  std::size_t global_writes = 0;
-};
+using lg::benchmark::Traffic;
 
 using TrafficCallback = bool (*)(Shape, Traffic&);
 
@@ -57,12 +54,17 @@ using lg::checked_mul;
 /// Counts in-bounds filter positions along one axis.
 using lg::valid_axis_pairs;
 
-/// Estimates the basic kernel's logical GMEM traffic.
-inline bool basic_traffic(Shape shape, Traffic& traffic) {
-  const auto taps = checked_mul(
+/// Counts in-bounds (output, filter) pairs; each is one multiply-add.
+inline std::optional<std::size_t> taps(Shape shape) {
+  return checked_mul(
     valid_axis_pairs(shape.width, shape.radius), valid_axis_pairs(shape.height, shape.radius)
   );
-  const auto reads = taps ? checked_mul(*taps, std::size_t{2}) : std::nullopt;
+}
+
+/// Estimates the basic kernel's logical GMEM traffic.
+inline bool basic_traffic(Shape shape, Traffic& traffic) {
+  const auto count = taps(shape);
+  const auto reads = count ? checked_mul(*count, std::size_t{2}) : std::nullopt;
   if (!reads) {
     return false;
   }

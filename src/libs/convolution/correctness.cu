@@ -13,31 +13,25 @@ namespace {
 using DeviceBuffer = cuda::device_buffer<float>;
 
 bool make_npp_context(NppStreamContext& context) {
-  constexpr cudaStream_t stream = nullptr;
-  int device = 0;
-  int major = 0;
-  int minor = 0;
-  unsigned int stream_flags = 0;
-  cudaDeviceProp properties{};
-  if (!CUDA_CHECK(cudaGetDevice(&device)) ||
-      !CUDA_CHECK(cudaGetDeviceProperties(&properties, device)) ||
-      !CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device)) ||
-      !CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device)) ||
-      !CUDA_CHECK(cudaStreamGetFlags(stream, &stream_flags))) {
-    return false;
-  }
-
   context = {};
-  context.hStream = stream;
-  context.nCudaDeviceId = device;
-  context.nMultiProcessorCount = properties.multiProcessorCount;
-  context.nMaxThreadsPerMultiProcessor = properties.maxThreadsPerMultiProcessor;
-  context.nMaxThreadsPerBlock = properties.maxThreadsPerBlock;
-  context.nSharedMemPerBlock = properties.sharedMemPerBlock;
-  context.nCudaDevAttrComputeCapabilityMajor = major;
-  context.nCudaDevAttrComputeCapabilityMinor = minor;
-  context.nStreamFlags = stream_flags;
-  return true;
+  int shared_per_block = 0;
+  const bool ok =
+    CUDA_CHECK(cudaGetDevice(&context.nCudaDeviceId)) &&
+    CUDA_CHECK(device_attribute(cudaDevAttrMultiProcessorCount, context.nMultiProcessorCount)) &&
+    CUDA_CHECK(
+      device_attribute(cudaDevAttrMaxThreadsPerMultiProcessor, context.nMaxThreadsPerMultiProcessor)
+    ) &&
+    CUDA_CHECK(device_attribute(cudaDevAttrMaxThreadsPerBlock, context.nMaxThreadsPerBlock)) &&
+    CUDA_CHECK(device_attribute(cudaDevAttrMaxSharedMemoryPerBlock, shared_per_block)) &&
+    CUDA_CHECK(device_attribute(
+      cudaDevAttrComputeCapabilityMajor, context.nCudaDevAttrComputeCapabilityMajor
+    )) &&
+    CUDA_CHECK(device_attribute(
+      cudaDevAttrComputeCapabilityMinor, context.nCudaDevAttrComputeCapabilityMinor
+    )) &&
+    CUDA_CHECK(cudaStreamGetFlags(context.hStream, &context.nStreamFlags));
+  context.nSharedMemPerBlock = static_cast<std::size_t>(shared_per_block);
+  return ok;
 }
 
 bool run_reference(
@@ -92,11 +86,9 @@ bool run_kernel(
     return false;
   }
 
-  if (!CUDA_CHECK(cudaGetLastError())) {
-    return false;
-  }
-  kernel.launch(input.data(), filter.data(), output.data(), problem.shape, nullptr);
-  return CUDA_CHECK(cudaGetLastError());
+  return LAUNCH_CHECK(
+    kernel.launch(input.data(), filter.data(), output.data(), problem.shape, nullptr)
+  );
 }
 
 bool verify(const Problem& problem, Kernel kernel) {

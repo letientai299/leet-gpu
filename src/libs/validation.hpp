@@ -8,9 +8,11 @@
 #include <limits>
 #include <optional>
 #include <stdexcept>
-#include <vector>
 
 namespace lg {
+
+inline constexpr double kDefaultAtol = 1.0e-5;
+inline constexpr double kDefaultRtol = 1.0e-4;
 
 inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
   if (right != 0 && left > std::numeric_limits<std::size_t>::max() / right) {
@@ -67,20 +69,20 @@ struct ErrorStats {
   }
 };
 
-template <typename Actual, typename Expected>
-bool verify_values(
+/// Compares `checks` positions picked by `index_of(sample)`.
+template <typename Actual, typename Expected, typename IndexOf>
+bool verify_at(
   const Actual& actual,
   const Expected& expected,
+  std::size_t checks,
+  IndexOf index_of,
   const char* name,
-  double atol = 1.0e-5,
-  double rtol = 1.0e-4
+  double atol,
+  double rtol
 ) {
-  if (actual.size() != expected.size() || actual.size() == 0) {
-    HOST_LOG("%s invalid result size: %zu/%zu", name, actual.size(), expected.size());
-    return false;
-  }
   ErrorStats stats;
-  for (std::size_t index = 0; index < actual.size(); ++index) {
+  for (std::size_t sample = 0; sample < checks; ++sample) {
+    const auto index = index_of(sample);
     stats.add(actual.data()[index], expected.data()[index], atol, rtol);
   }
   HOST_LOG(
@@ -94,12 +96,40 @@ bool verify_values(
     )
   );
   if (stats.mismatches != 0) {
+    const auto index = index_of(stats.first);
     HOST_LOG(
-      "First mismatch[%zu]: actual=%g expected=%g atol=%g rtol=%g", stats.first,
-      actual.data()[stats.first], expected.data()[stats.first], atol, rtol
+      "First mismatch[%zu]: actual=%g expected=%g atol=%g rtol=%g", index,
+      static_cast<double>(actual.data()[index]), static_cast<double>(expected.data()[index]), atol,
+      rtol
     );
   }
   return stats.mismatches == 0;
+}
+
+template <typename Actual, typename Expected>
+bool same_size(const Actual& actual, const Expected& expected, const char* name) {
+  if (actual.size() != expected.size() || actual.size() == 0) {
+    HOST_LOG("%s invalid result size: %zu/%zu", name, actual.size(), expected.size());
+    return false;
+  }
+  return true;
+}
+
+template <typename Actual, typename Expected>
+bool verify_values(
+  const Actual& actual,
+  const Expected& expected,
+  const char* name,
+  double atol = kDefaultAtol,
+  double rtol = kDefaultRtol
+) {
+  return same_size(actual, expected, name) && verify_at(
+                                                actual, expected, actual.size(),
+                                                [](std::size_t index) {
+                                                  return index;
+                                                },
+                                                name, atol, rtol
+                                              );
 }
 
 /// Spreads `checks` positions evenly over `count` values, ends included.
@@ -121,24 +151,25 @@ bool verify_sampled(
   if (samples == 0) {
     return verify_values(actual, expected, name);
   }
-  for (std::size_t index = 0; index < actual.size(); ++index) {
-    if (!std::isfinite(actual[index])) {
+  if (!same_size(actual, expected, name)) {
+    return false;
+  }
+  const auto count = actual.size();
+  for (std::size_t index = 0; index < count; ++index) {
+    if (!std::isfinite(actual.data()[index])) {
       HOST_LOG("%s nonfinite output[%zu]", name, index);
       return false;
     }
   }
-  const auto checks = std::min(samples, actual.size());
-  std::vector<float> picked;
-  std::vector<float> reference;
-  picked.reserve(checks);
-  reference.reserve(checks);
-  for (std::size_t sample = 0; sample < checks; ++sample) {
-    const auto index = sample_index(sample, actual.size(), checks);
-    picked.push_back(actual[index]);
-    reference.push_back(expected[index]);
-  }
-  HOST_LOG("Reference coverage: %zu/%zu values", picked.size(), actual.size());
-  return verify_values(picked, reference, name);
+  const auto checks = std::min(samples, count);
+  HOST_LOG("Reference coverage: %zu/%zu values", checks, count);
+  return verify_at(
+    actual, expected, checks,
+    [count, checks](std::size_t sample) {
+      return sample_index(sample, count, checks);
+    },
+    name, kDefaultAtol, kDefaultRtol
+  );
 }
 
 } // namespace lg

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "checks.hpp"
+
 #include <cstddef>
 #include <cuda_runtime.h>
-#include <limits>
+#include <utility>
 
 namespace lg::benchmark {
 
@@ -29,20 +31,23 @@ cudaError_t fill_resources(
   Occupancy&& occupancy,
   KernelResources& resources
 ) {
-  int device = 0;
-  cudaDeviceProp properties{};
-  auto status = cudaGetDevice(&device);
-  if (status != cudaSuccess) {
-    return status;
+  int max_x = 0;
+  int max_y = 0;
+  int max_z = 0;
+  int warp_size = 0;
+  int max_sm_threads = 0;
+  for (const auto& [attribute, value] :
+       {std::pair{cudaDevAttrMaxBlockDimX, &max_x},
+        {cudaDevAttrMaxBlockDimY, &max_y},
+        {cudaDevAttrMaxBlockDimZ, &max_z},
+        {cudaDevAttrWarpSize, &warp_size},
+        {cudaDevAttrMaxThreadsPerMultiProcessor, &max_sm_threads}}) {
+    if (const auto status = device_attribute(attribute, *value); status != cudaSuccess) {
+      return status;
+    }
   }
-  status = cudaGetDeviceProperties(&properties, device);
-  if (status != cudaSuccess) {
-    return status;
-  }
-  if (block.x == 0 || block.y == 0 || block.z == 0 ||
-      block.x > static_cast<unsigned>(properties.maxThreadsDim[0]) ||
-      block.y > static_cast<unsigned>(properties.maxThreadsDim[1]) ||
-      block.z > static_cast<unsigned>(properties.maxThreadsDim[2])) {
+  if (block.x == 0 || block.y == 0 || block.z == 0 || block.x > static_cast<unsigned>(max_x) ||
+      block.y > static_cast<unsigned>(max_y) || block.z > static_cast<unsigned>(max_z)) {
     return cudaErrorInvalidConfiguration;
   }
   const auto threads = static_cast<std::size_t>(block.x) * block.y * block.z;
@@ -56,11 +61,10 @@ cudaError_t fill_resources(
   resources.dynamic_shared_bytes = dynamic_shared_bytes;
   resources.constant_bytes = attributes.constSizeBytes;
   resources.local_bytes_per_thread = attributes.localSizeBytes;
-  status = occupancy(resources.threads_per_block, resources.active_blocks_per_sm);
+  const auto status = occupancy(resources.threads_per_block, resources.active_blocks_per_sm);
   resources.active_warps_per_sm =
-    resources.active_blocks_per_sm *
-    ((resources.threads_per_block + properties.warpSize - 1) / properties.warpSize);
-  resources.max_warps_per_sm = properties.maxThreadsPerMultiProcessor / properties.warpSize;
+    resources.active_blocks_per_sm * ((resources.threads_per_block + warp_size - 1) / warp_size);
+  resources.max_warps_per_sm = max_sm_threads / warp_size;
   return status;
 }
 

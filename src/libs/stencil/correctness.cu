@@ -106,11 +106,9 @@ int check(Problem& problem, Kernel kernel, std::size_t samples) {
   const DeviceBuffer input{stream, pool, problem.input};
   DeviceBuffer result{stream, pool, problem.result};
 
-  if (!CUDA_CHECK(cudaGetLastError())) {
-    return 1;
-  }
-  kernel.launch(input.data(), result.data(), problem.shape, problem.coefficients, nullptr);
-  return CUDA_CHECK(cudaGetLastError()) && COPY_CHECK(result, problem.result) &&
+  return LAUNCH_CHECK(
+           kernel.launch(input.data(), result.data(), problem.shape, problem.coefficients, nullptr)
+         ) && COPY_CHECK(result, problem.result) &&
              lg::verify_sampled(problem.result, problem.expected, samples, kernel.name)
            ? 0
            : 1;

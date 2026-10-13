@@ -1,3 +1,4 @@
+#include "benchmark/app.hpp"
 #include "benchmark/runner.hpp"
 #include "checks.hpp"
 #include "log.hpp"
@@ -8,7 +9,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <cuda/buffer>
-#include <iterator>
 #include <memory>
 #include <nvbench/type_list.cuh>
 #include <stdexcept>
@@ -135,41 +135,24 @@ struct DeviceData {
   DeviceMatrix b;
   DeviceMatrix c;
 
-  DeviceData(const Problem& problem, InputTransforms transforms, int device)
-      : DeviceData(problem, transforms, cuda::device_default_memory_pool(cuda::devices[device])) {
-  }
-
-private:
-  template <typename Pool>
-  DeviceData(const Problem& problem, InputTransforms transforms, Pool& pool)
-      : shape(problem.shape), inputs(problem, transforms), a(default_stream(), pool, inputs.a()),
-        b(default_stream(), pool, inputs.b()), c(default_stream(), pool, problem.result) {
+  DeviceData(const Problem& problem, InputTransforms transforms)
+      : shape(problem.shape), inputs(problem, transforms),
+        a(default_stream(), device_pool(), inputs.a()),
+        b(default_stream(), device_pool(), inputs.b()),
+        c(default_stream(), device_pool(), problem.shape.c_size(), cuda::no_init) {
   }
 };
 
 /// A GEMM does one multiply and one add per (output, k) pair.
 std::optional<benchmark::Workload> get_workload(const GemmShape& shape, Kernel kernel) {
-  const auto flops = checked_mul(shape.c_size(), std::size_t{shape.k()} * 2);
-  const auto inputs = checked_add(shape.a_size(), shape.b_size());
-  const auto minimum = inputs ? benchmark::float_traffic(*inputs, shape.c_size()) : std::nullopt;
-  const auto buffers =
-    minimum ? checked_add(minimum->read_bytes, minimum->write_bytes) : std::nullopt;
-  if (!flops || !minimum || !buffers) {
-    return std::nullopt;
-  }
-  benchmark::Workload workload{
-    {{"M", shape.m()}, {"N", shape.n()}, {"K", shape.k()}}, *flops, *buffers, *minimum, {}};
-  if (kernel.traffic != nullptr) {
-    Traffic traffic;
-    if (!kernel.traffic(shape, traffic)) {
-      return std::nullopt;
-    }
-    workload.no_reuse = benchmark::float_traffic(traffic.global_reads, traffic.global_writes);
-    if (!workload.no_reuse) {
-      return std::nullopt;
-    }
-  }
-  return workload;
+  return benchmark::with_no_reuse(
+    benchmark::float_workload(
+      {{"M", shape.m()}, {"N", shape.n()}, {"K", shape.k()}},
+      checked_mul(shape.c_size(), std::size_t{shape.k()} * 2),
+      checked_add(shape.a_size(), shape.b_size()), shape.c_size()
+    ),
+    kernel.traffic, shape
+  );
 }
 
 void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
@@ -177,43 +160,12 @@ void run_benchmark(nvbench::state& state, DeviceData& data, Kernel kernel) {
     state.skip("kernel callback is null");
     return;
   }
-  const auto& device = state.get_device();
-  if (!device.has_value()) {
-    state.skip("CUDA device is unavailable");
-    return;
-  }
-  if (!CUDA_CHECK(cudaSetDevice(device.value().get_id())) || !CUDA_CHECK(cudaDeviceSynchronize())) {
-    state.skip("CUDA setup failed");
-    return;
-  }
-
-  const auto workload = get_workload(data.shape, kernel);
-  if (!workload) {
-    state.skip("matmul workload overflow");
-    return;
-  }
-
-  if (kernel.resources != nullptr) {
-    benchmark::KernelResources resources;
-    if (!CUDA_CHECK(kernel.resources(data.shape, resources))) {
-      state.skip("CUDA kernel resource query failed");
-      return;
+  benchmark::measure(
+    state, get_workload(data.shape, kernel), kernel.resources, data.shape,
+    [&](cudaStream_t stream) {
+      kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, stream);
     }
-    benchmark::add_resources(state, resources);
-  }
-
-  if (!benchmark::describe(state, *workload)) {
-    return;
-  }
-#ifdef __clang_analyzer__
-  data.c.data()[0] = 0.0F;
-  kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, nullptr);
-#else
-  state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& launch) {
-    kernel.launch(data.a.data(), data.b.data(), data.c.data(), data.shape, launch.get_stream());
-  });
-  benchmark::finish_summaries(state, *workload);
-#endif
+  );
 }
 
 /// Shared prologue: parse, honour --help, then bring up the host.
@@ -236,13 +188,6 @@ std::optional<int> prepare(int argc, char** argv, AppArgs& args, PrintUsage prin
   return start() ? std::nullopt : std::optional<int>(1);
 }
 
-template <typename Body> int guarded(Body&& body) try {
-  return body();
-} catch (const std::exception& error) {
-  std::fprintf(stderr, "%s\n", error.what());
-  return 1;
-}
-
 int launch_nvbench(std::vector<char*>& argv) {
   return benchmark::run_args(static_cast<int>(argv.size()), argv.data());
 }
@@ -254,52 +199,20 @@ void log_shape(const GemmShape& shape) {
 } // namespace
 
 struct Benchmark::Impl {
-  struct DeviceEntry {
-    int device;
-    InputTransforms inputs;
-    std::unique_ptr<DeviceData> data;
-  };
-
   explicit Impl(Problem problem) : host(std::move(problem)) {
   }
 
-  ~Impl() {
-    for (auto& entry : devices) {
-      CUDA_CHECK(cudaSetDevice(entry.device));
-      entry.data.reset();
+  /// Runs the reference once; every kernel compares against it.
+  bool check(Kernel kernel) {
+    if (!reference_ready) {
+      reference_ready = run_reference(host);
     }
-  }
-
-  Impl(const Impl&) = delete;
-  Impl& operator=(const Impl&) = delete;
-  Impl(Impl&&) = delete;
-  Impl& operator=(Impl&&) = delete;
-
-  /// Uploads once per device, then hands the same buffers to every state.
-  DeviceData& get(nvbench::state& state, Kernel kernel) {
-    const auto& selected_device = state.get_device();
-    if (!selected_device.has_value()) {
-      throw std::runtime_error("CUDA device is unavailable");
-    }
-    const int device = selected_device.value().get_id();
-    auto found = std::find_if(devices.begin(), devices.end(), [&](const auto& entry) {
-      return entry.device == device && entry.inputs == kernel.inputs;
-    });
-    if (found == devices.end()) {
-      if (!CUDA_CHECK(cudaSetDevice(device))) {
-        throw std::runtime_error("CUDA device selection failed");
-      }
-      devices.push_back(
-        DeviceEntry{device, kernel.inputs,
-                    std::make_unique<DeviceData>(host, kernel.inputs, device)}
-      );
-      found = std::prev(devices.end());
-    }
-    return *found->data;
+    return reference_ready && run_kernel(host, kernel) && verify(host);
   }
 
   Problem host;
-  std::vector<DeviceEntry> devices;
+  bool reference_ready = false;
+  benchmark::DeviceCache<DeviceData, InputTransforms> devices;
 };
 
 Benchmark::Benchmark(Problem problem) : impl_(std::make_unique<Impl>(std::move(problem))) {
@@ -313,11 +226,12 @@ Benchmark& Benchmark::operator=(Benchmark&&) noexcept = default;
 
 void Benchmark::run(nvbench::state& state, Kernel kernel) {
   const auto& device = state.get_device();
-  if (!device || !CUDA_CHECK(cudaSetDevice(device->get_id())) || check(impl_->host, kernel) != 0) {
+  if (!device || !CUDA_CHECK(cudaSetDevice(device->get_id())) || !impl_->check(kernel)) {
     state.skip("benchmark correctness failed");
     return;
   }
-  run_benchmark(state, impl_->get(state, kernel), kernel);
+  auto& data = impl_->devices.get(device->get_id(), kernel.inputs, impl_->host, kernel.inputs);
+  run_benchmark(state, data, kernel);
 }
 
 void benchmark(nvbench::state& state, GemmShape shape, Kernel kernel) {

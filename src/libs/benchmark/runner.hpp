@@ -1,17 +1,17 @@
 #pragma once
 
 #include "benchmark/resources.cuh"
+#include "benchmark/workload.hpp"
+#include "checks.hpp"
 
-#include <cstddef>
+#include <functional>
 #include <memory>
 #include <nvbench/benchmark.cuh>
 #include <nvbench/benchmark_manager.cuh>
 #include <nvbench/nvbench.cuh>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 namespace lg::benchmark {
 
@@ -38,31 +38,51 @@ void add_summary(
 /// Adds concrete compiled-kernel and launch resources.
 void add_resources(nvbench::state& state, const KernelResources& resources);
 
-/// Bytes moved through global memory.
-struct MemoryTraffic {
-  std::size_t read_bytes = 0;
-  std::size_t write_bytes = 0;
-};
-
-/// What one benchmark state computes and moves; every app reports the same fields.
-struct Workload {
-  std::vector<std::pair<std::string, nvbench::int64_t>> shape;
-  std::size_t flops = 0;
-  std::size_t buffer_bytes = 0;
-  // Each input read once and each output written once.
-  MemoryTraffic minimum;
-  // Every operand access reaches DRAM: no cache or shared-memory reuse.
-  std::optional<MemoryTraffic> no_reuse;
-};
-
-/// Converts float element counts to bytes.
-std::optional<MemoryTraffic> float_traffic(std::size_t reads, std::size_t writes);
+/// Adds the resources `query` reports; skips the state when it fails.
+bool add_resources(
+  nvbench::state& state, const std::function<cudaError_t(KernelResources&)>& query
+);
 
 /// Adds workload columns before timing; skips the state when invalid.
 bool describe(nvbench::state& state, const Workload& workload);
 
 /// Adds throughput, utilization, and convergence columns.
 void finish_summaries(nvbench::state& state, const Workload& workload);
+
+/// Reports resources and workload, then times `launch(stream)` on NVBench's stream.
+template <typename Shape, typename Launch>
+void measure(
+  nvbench::state& state,
+  const std::optional<Workload>& workload,
+  cudaError_t (*resources)(const Shape&, KernelResources&),
+  const Shape& shape,
+  Launch&& launch
+) {
+  if (!CUDA_CHECK(cudaDeviceSynchronize())) {
+    state.skip("CUDA setup failed");
+    return;
+  }
+  if (!workload) {
+    state.skip("workload overflow");
+    return;
+  }
+  if (resources != nullptr && !add_resources(state, [resources, &shape](KernelResources& found) {
+        return resources(shape, found);
+      })) {
+    return;
+  }
+  if (!describe(state, *workload)) {
+    return;
+  }
+#ifdef __clang_analyzer__
+  launch(cudaStream_t{});
+#else
+  state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& timed) {
+    launch(timed.get_stream());
+  });
+  finish_summaries(state, *workload);
+#endif
+}
 
 /// Runs NVBench with forwarded arguments.
 int run_args(int argc, char** argv);

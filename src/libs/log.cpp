@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include <string>
 #include <string_view>
+#include <unistd.h>
 #include <utility>
 
 namespace {
@@ -97,7 +98,7 @@ void init_log() {
   if (spdlog::get("cuda") != nullptr) {
     return;
   }
-  color_enabled = std::getenv("NO_COLOR") == nullptr;
+  color_enabled = use_color(stderr);
   auto logger = spdlog::stderr_color_mt("cuda");
   const std::string stamp =
     color_enabled ? std::string(color::time) + "%T.%e" + color::reset : std::string("%T.%e");
@@ -114,8 +115,9 @@ const char* gpu_arch() {
   return gpu_name().c_str();
 }
 
-bool log_color() {
-  return color_enabled;
+// https://no-color.org/
+bool use_color(std::FILE* stream) {
+  return std::getenv("NO_COLOR") == nullptr && isatty(fileno(stream)) != 0;
 }
 
 void write_log(const char* kind, const char* file, int line, const char* format, ...) {
