@@ -122,17 +122,26 @@ add_library(lg_revision STATIC "${LG_REVISION_SOURCE}")
 target_include_directories(lg_revision PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 add_dependencies(lg_revision lg_revision_stamp)
 
-add_library(lg_benchmark STATIC benchmark/format.cpp benchmark/runner.cu)
+add_library(
+  lg_benchmark
+  STATIC
+  benchmark/format.cpp
+  benchmark/profiler.cpp
+  benchmark/runner.cu
+)
 target_include_directories(lg_benchmark PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(lg_benchmark PRIVATE LG_HAS_CUDA_DRIVER LG_HAS_CUPTI)
 target_include_directories(
   lg_benchmark
   SYSTEM
   PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
 )
+# Shared CUPTI comes from the GPU host's toolkit; static adds about 35 MB per
+# app.
 target_link_libraries(
   lg_benchmark
   PUBLIC lg_nvbench lg_runtime CCCL::CCCL fmt::fmt
-  PRIVATE lg_revision
+  PRIVATE lg_revision CUDA::cuda_driver CUDA::cupti
 )
 
 # Driver API reads kernels that libraries launch inside a captured graph.

@@ -28,8 +28,9 @@ load them (CUDA 12.4+ for `--compress-mode=size`).
 [cmake-lists]: ../CMakeLists.txt
 
 `deploy` copies only the binary, so an app must not need a CUDA shared library
-at run time. The run host has its own toolkit, and its version rarely matches
-the container's.
+at run time that the host toolkit lacks. Benchmark apps load the host's
+`libcupti.so.13`, and cuBLAS apps its `libcublas.so.13`. The run host has its
+own toolkit, and its version rarely matches the container's.
 
 ## Environment
 

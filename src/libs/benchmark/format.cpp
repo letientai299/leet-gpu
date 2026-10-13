@@ -460,13 +460,25 @@ std::vector<Meter> collect_meters(Summaries& summaries) {
   }
   const std::string warps = summaries.text("kernel/resources/warps_per_sm");
   const std::string max_warps = summaries.text("kernel/resources/max_warps_per_sm");
-  if (const auto occupancy = summaries.number("kernel/resources/occupancy")) {
+  const std::string limit = warps.empty() || max_warps.empty()
+                              ? std::string{}
+                              : fmt::format("{}/{} warps/SM", warps, max_warps);
+  const auto theoretical = summaries.number("kernel/resources/occupancy");
+  // Shading spans the gap up to the theoretical limit.
+  if (const auto achieved = summaries.number("lg/occupancy/achieved")) {
+    std::string detail = "achieved";
+    if (theoretical) {
+      append(detail, fmt::format("{} theoretical", percent(*theoretical)));
+    }
+    append(detail, limit);
     meters.push_back(
-      {"Occupancy", bar(*occupancy), percent(*occupancy),
-       warps.empty() || max_warps.empty() ? std::string{}
-                                          : fmt::format("{}/{} warps/SM", warps, max_warps),
-       ansi::blue}
+      {"Occupancy", range_bar(*achieved, theoretical.value_or(*achieved)), percent(*achieved),
+       detail, ansi::blue}
     );
+  } else if (theoretical) {
+    std::string detail = "theoretical";
+    append(detail, limit);
+    meters.push_back({"Occupancy", bar(*theoretical), percent(*theoretical), detail, ansi::blue});
   }
   return meters;
 }
@@ -475,7 +487,7 @@ void print_meters(const std::vector<Meter>& meters) {
   if (meters.empty()) {
     return;
   }
-  print_section("utilization", "cold runs; occupancy is theoretical");
+  print_section("utilization", "cold runs, except occupancy");
   for (const auto& meter : meters) {
     fmt::print(
       "  {} {} {}  {}\n", label_cell(meter.label, meter.tint), paint(meter.bar, meter.tint),

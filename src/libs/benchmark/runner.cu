@@ -1,4 +1,5 @@
 #include "benchmark/format.hpp"
+#include "benchmark/profiler.hpp"
 #include "benchmark/runner.hpp"
 #include "validation.hpp"
 
@@ -427,6 +428,25 @@ void finish_summaries(nvbench::state& state, const Workload& workload) {
   } else if (clock_unhealthy(state, timing.clock_hz)) {
     state.skip("GPU clock under half of max");
   }
+}
+
+void add_achieved_occupancy(
+  nvbench::state& state, const std::function<void(cudaStream_t)>& launch
+) {
+  const auto& device = state.get_device();
+  if (state.is_skipped() || !device.has_value()) {
+    return;
+  }
+  const auto value =
+    achieved_occupancy(device->get_id(), state.get_cuda_stream().get_stream(), launch);
+  if (!value) {
+    return;
+  }
+  auto& summary = state.add_summary("lg/occupancy/achieved");
+  summary.set_string("name", "Achieved Occupancy");
+  summary.set_string("hint", "percentage");
+  summary.set_string("description", "Active warps per active SM cycle over the SM maximum");
+  summary.set_float64("value", *value);
 }
 
 inline int run_impl(int argc, char** argv) try {

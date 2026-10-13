@@ -86,6 +86,25 @@ inline bool driver_check(CUresult result, const char* file, int line) {
 #define DRIVER_CHECK(expression) driver_check((expression), __FILE__, __LINE__)
 #endif
 
+#ifdef LG_HAS_CUPTI
+#include <cupti_result.h>
+
+inline bool cupti_check(CUptiResult result, const char* file, int line) {
+  if (result == CUPTI_SUCCESS) {
+    return true;
+  }
+
+  const char* text = nullptr;
+  if (cuptiGetResultString(result, &text) != CUPTI_SUCCESS) {
+    text = "unknown";
+  }
+  write_log("CUPTI", file, line, "%s", text);
+  return false;
+}
+
+#define CUPTI_CHECK(expression) cupti_check((expression), __FILE__, __LINE__)
+#endif
+
 #ifdef LG_HAS_CUBLAS
 #include <cublas_v2.h>
 

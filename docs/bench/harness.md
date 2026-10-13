@@ -93,8 +93,14 @@ prove absence of out-of-bounds writes, races, or input mutation.
   variation. A timeout or noise warning needs investigation even if usable
   samples remain. Skipped states and insufficient samples return failure.
 - Registers, local memory, shared memory, and theoretical active warps help
-  explain resource limits. [Occupancy][occupancy] is a launch capacity
-  estimate; it does not measure achieved occupancy or guarantee throughput.
+  explain resource limits. [Theoretical occupancy][occupancy] is a launch
+  capacity estimate. After timing, one extra launch under the [CUPTI range
+  profiler][cupti] measures achieved occupancy: Nsight Compute's
+  `sm__warps_active.avg.pct_of_peak_sustained_active`. The Occupancy meter
+  fills to achieved and shades up to theoretical; the gap comes from tail
+  waves and uneven blocks. The row falls back to theoretical when counters
+  are unavailable, such as under `ncu` or `nsys`, or without [profiling
+  permission][counters].
 - Model GMEM bytes, GB/s, and FLOP/B describe the callback's logical traffic
   model. Caches and reuse can make this differ from measured DRAM traffic.
 
@@ -103,3 +109,5 @@ prove absence of out-of-bounds writes, races, or input mutation.
 [visibility]: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/environment-variables.html
 [smi]: https://docs.nvidia.com/deploy/nvidia-smi/
 [occupancy]: https://developer.nvidia.com/blog/cuda-pro-tip-occupancy-api-simplifies-launch-configuration/
+[cupti]: https://docs.nvidia.com/cupti/main/main.html#cupti-range-profiling-api
+[counters]: https://developer.nvidia.com/nvidia-development-tools-solutions-err_nvgpuctrperm-permission-issue-performance-counters
