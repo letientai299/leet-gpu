@@ -143,6 +143,34 @@ tools.
 [clang-tidy]: https://clang.llvm.org/extra/clang-tidy/
 [prek]: https://prek.j178.dev/
 
+## Notebooks
+
+[JupyterLab][jupyterlab] uses an isolated [uv][uv] environment under
+`src/notebooks/`. Group notebooks by topic, starting with `stencils/`.
+
+```sh
+mise run nb
+```
+
+Double-click `stencils/intro.md` to run it directly as a notebook through
+[Jupytext][jupytext]. Saving writes MyST Markdown without creating an `.ipynb`.
+Outputs live in the browser session and are lost when the notebook is reopened.
+Run the cells again to regenerate them.
+
+Edit the Markdown in Neovim. The local [reload plugin][reload-plugin] checks
+open Markdown notebooks every second and loads external saves automatically.
+It preserves the running kernel and outputs for unchanged code cells. Changed
+code cells lose their old outputs; run them again to update results.
+
+Reload pauses while the kernel runs or the browser has unsaved source edits.
+Save or discard browser edits before switching editors. Browser autosave is
+disabled. **File → Reload from Disk** remains available for manual reload.
+
+[jupyterlab]: https://jupyterlab.readthedocs.io/en/stable/
+[uv]: https://docs.astral.sh/uv/
+[jupytext]: https://jupytext.org/getting-started/text-notebooks/
+[reload-plugin]: ../.config/jupyter/autoreload.js
+
 ## macOS: CLion Intellisense
 
 CLion runs on the Mac without `nvcc`. Point it at the Docker toolchain so it

@@ -11,6 +11,14 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 *.egg-info/
+src/notebooks/**/*.ipynb
+.ipynb_checkpoints/
+
+# JupyterLab preferences
+.config/jupyter/lab/user-settings/**
+!.config/jupyter/lab/user-settings/**/
+!.config/jupyter/lab/user-settings/@axlair/jupyterlab_vim/plugin.jupyterlab-settings
+!.config/jupyter/lab/user-settings/@jupyterlab/docmanager-extension/plugin.jupyterlab-settings
 
 # OS / editor / LSP cruft
 .DS_Store

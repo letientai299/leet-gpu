@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="Run JupyterLab with Vim bindings"
+#MISE alias="nb"
+#MISE raw=true
+set -euo pipefail
+
+cd "$MISE_PROJECT_ROOT"
+export JUPYTERLAB_SETTINGS_DIR="$PWD/.config/jupyter/lab/user-settings"
+export JUPYTERLAB_WORKSPACES_DIR="$PWD/.cache/jupyter/lab/workspaces"
+export JUPYTER_CONFIG_PATH="$PWD/.config/jupyter${JUPYTER_CONFIG_PATH:+:$JUPYTER_CONFIG_PATH}"
+
+uv run --project src/notebooks --locked python .config/jupyter/configure.py
+
+offset=0
+if [ "$(git branch --show-current)" != "main" ]; then
+  hash=$(basename "$PWD" | tr -d '\n' | cksum | cut -d ' ' -f 1)
+  offset=$(((hash % 100) * 10))
+fi
+
+exec uv run --project src/notebooks --locked jupyter lab \
+  --ServerApp.root_dir="$PWD/src/notebooks" \
+  --ServerApp.ip=127.0.0.1 \
+  --ServerApp.port="${NOTEBOOK_PORT:-$((8888 + offset))}" "$@"

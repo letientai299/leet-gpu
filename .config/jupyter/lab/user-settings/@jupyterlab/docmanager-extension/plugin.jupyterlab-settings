@@ -1,0 +1,7 @@
+{
+  "autosave": false,
+  "defaultViewers": {
+    "markdown": "Jupytext Notebook",
+    "myst": "Jupytext Notebook"
+  }
+}

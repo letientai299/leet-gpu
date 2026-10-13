@@ -7,6 +7,7 @@ shfmt = "3.14.1"
 shellcheck = "0.11.0"
 watchexec = "latest"
 prek = "latest"
+uv = "latest"
 
 [hooks]
 postinstall = "prek --config .config/prek.toml install"
