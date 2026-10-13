@@ -197,6 +197,10 @@ Double-click `stencils/intro.md` to run it directly as a notebook through
 Outputs live in the browser session and are lost when the notebook is reopened.
 Run the cells again to regenerate them.
 
+Markdown notebooks open with code inputs collapsed and outputs visible.
+Input visibility stays in the browser; saving does not add per-cell visibility
+metadata. Markdown cells render automatically after edits.
+
 Edit the Markdown in Neovim. The local [reload plugin][reload-plugin] checks
 open Markdown notebooks every second and loads external saves automatically.
 It preserves the running kernel and outputs for unchanged code cells. Changed

@@ -2,6 +2,7 @@ import {Notification} from "@jupyterlab/apputils";
 import {INotebookTracker} from "@jupyterlab/notebook";
 
 let timer;
+let stop;
 
 function cellKey(cell) {
   const source = Array.isArray(cell.source) ? cell.source.join("") : cell.source;
@@ -41,12 +42,43 @@ const plugin = {
   requires : [ INotebookTracker ],
   activate : (app, tracker) => {
     const states = new WeakMap();
+    const viewed = new WeakSet();
+    let active = true;
+
+    function showOutputs(panel) {
+      if (!active || panel.isDisposed || !panel.context.path.endsWith(".md"))
+        return;
+      for (const cell of panel.content.widgets) {
+        if (cell.model.type !== "code" || viewed.has(cell))
+          continue;
+        cell.syncCollapse = false;
+        cell.inputHidden = true;
+        cell.outputHidden = false;
+        viewed.add(cell);
+      }
+    }
+
+    function initialize(panel) {
+      panel.context.ready.then(() => showOutputs(panel))
+        .catch(
+          (error) => console.warn("Notebook view failed", error),
+        );
+    }
+
+    const notebookAdded = (_, panel) => initialize(panel);
+    tracker.widgetAdded.connect(notebookAdded);
+    stop = () => {
+      active = false;
+      clearInterval(timer);
+      tracker.widgetAdded.disconnect(notebookAdded);
+    };
 
     async function reload(panel) {
       const context = panel.context;
       if (panel.isDisposed || !context.path.endsWith(".md"))
         return;
       await context.ready;
+      showOutputs(panel);
       let state = states.get(panel);
       if (!state) {
         state = {
@@ -117,8 +149,10 @@ const plugin = {
           panel.content.widgets.length - 1,
         );
         requestAnimationFrame(() => {
-          if (!panel.isDisposed)
+          if (!panel.isDisposed) {
+            showOutputs(panel);
             panel.content.node.scrollTop = scroll;
+          }
         });
         state.sources = sources(context.model.toJSON());
         state.modified = context.contentsModel.last_modified;
@@ -129,6 +163,9 @@ const plugin = {
     }
 
     app.restored.then(() => {
+      if (!active)
+        return;
+      tracker.forEach(initialize);
       timer = setInterval(() => {
         tracker.forEach((panel) => {
           reload(panel).catch(
@@ -138,7 +175,7 @@ const plugin = {
       }, 1000);
     });
   },
-  deactivate : () => clearInterval(timer),
+  deactivate : () => stop?.(),
 };
 
 export default plugin;
