@@ -1,0 +1,11 @@
+[lint]
+extend-select = ["C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-args = 5
+max-returns = 6
+max-branches = 12
+max-statements = 50

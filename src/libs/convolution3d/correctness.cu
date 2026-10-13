@@ -13,8 +13,32 @@ std::size_t offset(Shape shape, int x, int y, int z) {
   return (static_cast<std::size_t>(z) * shape.height + y) * shape.width + x;
 }
 
-void run_reference(Problem& problem, std::size_t samples) {
+float reference_value(const Problem& problem, int x, int y, int z) {
   const int side = problem.shape.filter_width();
+  float sum = 0.0F;
+  for (int fz = 0; fz < side; ++fz) {
+    const int iz = z + fz - problem.shape.radius;
+    if (iz < 0 || iz >= problem.shape.depth) {
+      continue;
+    }
+    for (int fy = 0; fy < side; ++fy) {
+      const int iy = y + fy - problem.shape.radius;
+      if (iy < 0 || iy >= problem.shape.height) {
+        continue;
+      }
+      for (int fx = 0; fx < side; ++fx) {
+        const int ix = x + fx - problem.shape.radius;
+        if (ix >= 0 && ix < problem.shape.width) {
+          const auto filter_index = (static_cast<std::size_t>(fz) * side + fy) * side + fx;
+          sum += problem.input[offset(problem.shape, ix, iy, iz)] * problem.filter[filter_index];
+        }
+      }
+    }
+  }
+  return sum;
+}
+
+void run_reference(Problem& problem, std::size_t samples) {
   const auto count = problem.shape.input_size();
   const auto checks = samples == 0 ? count : std::min(samples, count);
   for (std::size_t sample = 0; sample < checks; ++sample) {
@@ -22,27 +46,7 @@ void run_reference(Problem& problem, std::size_t samples) {
     const int x = static_cast<int>(index % problem.shape.width);
     const int y = static_cast<int>(index / problem.shape.width % problem.shape.height);
     const int z = static_cast<int>(index / problem.shape.width / problem.shape.height);
-    float sum = 0.0F;
-    for (int fz = 0; fz < side; ++fz) {
-      const int iz = z + fz - problem.shape.radius;
-      if (iz < 0 || iz >= problem.shape.depth) {
-        continue;
-      }
-      for (int fy = 0; fy < side; ++fy) {
-        const int iy = y + fy - problem.shape.radius;
-        if (iy < 0 || iy >= problem.shape.height) {
-          continue;
-        }
-        for (int fx = 0; fx < side; ++fx) {
-          const int ix = x + fx - problem.shape.radius;
-          if (ix >= 0 && ix < problem.shape.width) {
-            const auto filter_index = (static_cast<std::size_t>(fz) * side + fy) * side + fx;
-            sum += problem.input[offset(problem.shape, ix, iy, iz)] * problem.filter[filter_index];
-          }
-        }
-      }
-    }
-    problem.expected[offset(problem.shape, x, y, z)] = sum;
+    problem.expected[index] = reference_value(problem, x, y, z);
   }
 }
 

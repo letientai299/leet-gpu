@@ -10,6 +10,7 @@ Checks: >
   modernize-use-nodiscard, modernize-use-using,
   readability-braces-around-statements,
   readability-container-size-empty, readability-misleading-indentation,
+  readability-function-cognitive-complexity, readability-function-size,
   readability-make-member-function-const, readability-qualified-auto,
   readability-non-const-parameter, readability-simplify-boolean-expr,
   -bugprone-easily-swappable-parameters,
@@ -22,6 +23,10 @@ Checks: >
 HeaderFilterRegex: "/app/src/"
 WarningsAsErrors: ""
 CheckOptions:
+  readability-function-cognitive-complexity.Threshold: 25
+  readability-function-size.StatementThreshold: 50
+  readability-function-size.BranchThreshold: 12
+  readability-function-size.NestingThreshold: 5
   # CCCL aliases hide providers from include-cleaner.
   misc-include-cleaner.IgnoreHeaders: "cstdlib;cuda/buffer;cuda/cmath"
   misc-include-cleaner.MissingIncludes: false
