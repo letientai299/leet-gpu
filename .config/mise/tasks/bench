@@ -83,6 +83,7 @@ restore_clock=${BENCH_RESTORE_CLOCK:-off}
 restore() {
   local status=$?
   trap - EXIT INT TERM
+  gpu_stop_watch
   if [ "$locked" = 1 ]; then
     local restored=0
     if [ "$restore_clock" = off ]; then
@@ -184,8 +185,8 @@ printf ' %q' "$binary" "$@" >&2
 printf '\n' >&2
 sha256sum "$binary" >&2
 export CUDA_VISIBLE_DEVICES=$gpu
-if [ "$locked" = 1 ]; then
-  mark=$(gpu_power_mark "$gpu")
+if [ "$locked" = 1 ] && [ "$request" = auto ]; then
+  gpu_watch_clock "$gpu"
 fi
 "$binary" "$@" &
 child=$!
@@ -193,7 +194,7 @@ status=0
 wait "$child" || status=$?
 child=
 if [ "$locked" = 1 ] && [ "$request" = auto ]; then
-  gpu_review_power "$gpu" "$gpu" "$clock" "$max_clock" "$mark"
+  gpu_review_clock "$gpu" "$gpu" "$clock" "$max_clock"
 fi
 # restore (EXIT trap) reports this status.
 (exit "$status")

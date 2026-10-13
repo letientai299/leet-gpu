@@ -51,7 +51,7 @@ gpu_clock_at_most() {
   printf '%s\n' "$clock"
 }
 
-# A power-capped auto lock lowers this per-GPU ceiling; later auto locks start
+# A throttled auto lock lowers this per-GPU ceiling; later auto locks start
 # below it. It only moves down, so kernels compared in later runs share a clock.
 # Delete the file to reset.
 gpu_ceiling_file() {
@@ -87,34 +87,53 @@ gpu_check_health() {
   done
 }
 
-# Prints "<power-capped microseconds> <now in microseconds>".
-gpu_power_mark() {
-  local fields capped brake
-  fields=$(gpu_fields "$1" clocks_event_reasons_counters.sw_power_cap,clocks_event_reasons_counters.hw_power_brake_slowdown)
-  IFS=, read -r capped brake <<<"$fields"
-  [[ "$capped" =~ ^[0-9]+$ ]] || capped=0
-  [[ "$brake" =~ ^[0-9]+$ ]] || brake=0
-  printf '%s %s\n' "$((capped + brake))" "$(($(date +%s%N) / 1000))"
+clock_watch_pid=
+clock_watch_file=
+
+# Samples the SM clock in the background until gpu_stop_watch. The
+# power-cap counter is unreliable: on H100 it grows while the clock holds the
+# lock, and on A100X it barely moves while the clock sags.
+gpu_watch_clock() {
+  clock_watch_file=$(mktemp "${TMPDIR:-/tmp}/lg-clock.XXXXXX")
+  (
+    while :; do
+      gpu_query "$1" clocks.sm >>"$clock_watch_file" 2>/dev/null || true
+      sleep "${LG_CLOCK_SAMPLE_SECONDS:-0.5}"
+    done
+  ) &
+  clock_watch_pid=$!
 }
 
-# gpu_review_power GPU UUID CLOCK MAX_CLOCK START_MARK
-# Steps the ceiling down one supported clock when the power cap held the clock
-# for more than 1% of the run. Stops at half the max clock: below that the GPU
-# is unhealthy, not merely busy.
-gpu_review_power() {
-  local gpu=$1 uuid=$2 clock=$3 max_clock=$4 start_capped start_time capped now permille next
-  read -r start_capped start_time <<<"$5"
-  read -r capped now <<<"$(gpu_power_mark "$gpu")"
-  ((now > start_time)) || return 0
-  permille=$(((capped - start_capped) * 1000 / (now - start_time)))
-  ((permille > 10)) || return 0
+gpu_stop_watch() {
+  if [ -n "$clock_watch_pid" ]; then
+    kill "$clock_watch_pid" 2>/dev/null || true
+    wait "$clock_watch_pid" 2>/dev/null || true
+    clock_watch_pid=
+  fi
+  if [ -n "$clock_watch_file" ]; then
+    rm -f "$clock_watch_file"
+    clock_watch_file=
+  fi
+}
+
+# gpu_review_clock GPU UUID CLOCK MAX_CLOCK
+# Steps the ceiling down one supported clock when over 5% of the SM clock
+# samples fell below 99% of the lock, the runner's THROTTLED test. Stops at
+# half the max clock: below that the GPU is unhealthy, not merely busy.
+gpu_review_clock() {
+  local gpu=$1 uuid=$2 clock=$3 max_clock=$4 total slow next
+  read -r total slow <<<"$(awk -v floor="$((clock * 99))" \
+    '$1 ~ /^[0-9]+$/ {n++; if ($1 * 100 < floor) s++} END {print n + 0, s + 0}' \
+    "$clock_watch_file")"
+  gpu_stop_watch
+  ((total >= 10 && slow * 20 > total)) || return 0
   next=$(gpu_clock_at_most "$gpu" "$((clock - 1))") || return 0
   if ((next * 2 < max_clock)); then
-    echo "gpu: $(hostname) GPU $gpu unhealthy: power cap holds below half the max clock" >&2
+    echo "gpu: $(hostname) GPU $gpu unhealthy: throttled below half the max clock" >&2
     return 0
   fi
   (umask 000 && printf '%s\n' "$next" >"$(gpu_ceiling_file "$uuid")")
-  echo "gpu: power cap held ${clock}MHz for $((permille / 10)).$((permille % 10))% of the run; next runs lock to ${next}MHz" >&2
+  echo "gpu: clock under ${clock}MHz in $((slow * 100 / total))% of samples; next runs lock to ${next}MHz" >&2
 }
 
 # NVBench discards samples below this percent of max; keep it just under the
@@ -150,6 +169,7 @@ run_child=
 gpu_run_finish() {
   local status=$?
   trap - EXIT HUP INT TERM
+  gpu_stop_watch
   if [ "$run_locked" = 1 ] && [ "$run_keep" = 0 ]; then
     gpu_unlock_now "$run_gpu" || true
   fi
@@ -170,7 +190,7 @@ gpu_run_stop() {
 # Waits for the GPU, locks its clock unless CLOCK is off, runs APP pinned to the
 # GPU, and unlocks afterward unless KEEP is 1 (a dev session keeps the lock).
 gpu_run() {
-  local clock=$2 fraction=$3 info uuid max_clock persistence has_threshold=0 arg mark status=0
+  local clock=$2 fraction=$3 info uuid max_clock persistence has_threshold=0 arg status=0
   run_gpu=$1
   run_keep=$4
   shift 4
@@ -213,15 +233,15 @@ gpu_run() {
       echo "gpu: clock lock failed; running unlocked: $(hostname) GPU $run_gpu" >&2
     fi
   fi
-  if [ "$run_locked" = 1 ]; then
-    mark=$(gpu_power_mark "$run_gpu")
+  if [ "$run_locked" = 1 ] && [ "$request" = auto ]; then
+    gpu_watch_clock "$run_gpu"
   fi
   CUDA_VISIBLE_DEVICES=$uuid "$@" <&0 &
   run_child=$!
   wait "$run_child" || status=$?
   run_child=
   if [ "$run_locked" = 1 ] && [ "$request" = auto ]; then
-    gpu_review_power "$run_gpu" "$uuid" "$clock" "$max_clock" "$mark"
+    gpu_review_clock "$run_gpu" "$uuid" "$clock" "$max_clock"
   fi
   return "$status"
 }

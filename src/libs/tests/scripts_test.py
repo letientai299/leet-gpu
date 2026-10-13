@@ -14,7 +14,7 @@ TASKS = ROOT / ".config/mise/tasks"
 ARTIFACTS = ROOT / ".ai/benchmark-harness"
 
 SMI = """#!/usr/bin/env python3
-import os, sys, time
+import os, sys
 with open(os.environ['MOCK_LOG'], 'a') as log:
     log.write('smi ' + ' '.join(sys.argv[1:]) + '\\n')
 args = ' '.join(sys.argv[1:])
@@ -28,14 +28,12 @@ elif '--query-gpu=' in args:
               'persistence_mode': 'Disabled', 'power.draw': '64.5',
               'temperature.gpu': os.environ.get('MOCK_TEMP', '32'),
               'name': 'Mock GPU', 'driver_version': 'test',
-              'power.limit': '300', 'clocks.sm': '1000', 'clocks.mem': '1215'}
-    capped = int(time.time() * 1e6) if os.environ.get('MOCK_POWER_CAP') else 0
+              'power.limit': '300', 'clocks.mem': '1215',
+              'clocks.sm': os.environ.get('MOCK_SM_CLOCK', '1000')}
     for reason in ('hw_slowdown', 'hw_thermal_slowdown', 'sw_thermal_slowdown',
                    'hw_power_brake_slowdown'):
         values['clocks_event_reasons.' + reason] = (
             'Active' if os.environ.get('MOCK_UNHEALTHY') == reason else 'Not Active')
-    values['clocks_event_reasons_counters.sw_power_cap'] = str(capped)
-    values['clocks_event_reasons_counters.hw_power_brake_slowdown'] = '0'
     print(', '.join(values[f] for f in field.split(',')))
 elif '-rgc' in sys.argv and os.environ.get('MOCK_RESTORE_FAIL'):
     sys.exit(1)
@@ -53,6 +51,7 @@ if os.environ.get('MOCK_WAIT'):
         sys.exit(143)
     signal.signal(signal.SIGTERM, stop)
     while True: time.sleep(0.01)
+time.sleep(float(os.environ.get('MOCK_SLEEP', '0')))
 print(json.dumps({'args': sys.argv[1:],
                   'locked': os.environ.get('LG_LOCKED_CLOCK_MHZ')}))
 sys.exit(int(os.environ.get('MOCK_EXIT', '0')))
@@ -241,13 +240,26 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("running unlocked", run.stderr)
 
-    def test_power_cap_lowers_ceiling(self):
+    def test_throttle_lowers_ceiling(self):
         ceiling = self.root / "lg-gpu-GPU-1234-abcd.clock"
-        run = self.run_task("deploy", "test/app", "--bench", MOCK_POWER_CAP="1")
+        sampled = {
+            "LG_CLOCK_SAMPLE_SECONDS": "0.01",
+            "MOCK_SLEEP": "1",
+            "TMPDIR": str(self.root),
+        }
+        run = self.run_task("deploy", "test/app", "--bench", **sampled)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertNotIn("next runs lock", run.stderr)
+        self.assertFalse(ceiling.exists())
+
+        run = self.run_task(
+            "deploy", "test/app", "--bench", MOCK_SM_CLOCK="985", **sampled
+        )
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(json.loads(run.stdout)["locked"], "1000")
         self.assertIn("next runs lock to 900MHz", run.stderr)
         self.assertEqual(ceiling.read_text().strip(), "900")
+        self.assertEqual(list(self.root.glob("lg-clock.*")), [])
 
         run = self.run_task("deploy", "test/app", "--bench")
         self.assertEqual(run.returncode, 0, run.stderr)
