@@ -29,9 +29,13 @@ fi
 
 # Entropy stops about 10x sooner than stdrel with the same median; bench
 # keeps stdrel. NVBench rejects a criterion that follows its parameters, so it
-# goes right after --bench, and any explicit criterion flag opts out.
+# goes right after --bench (first for *.bench apps, which always benchmark),
+# and any explicit criterion flag opts out. Help and listing runs skip both.
 has_bench=0
 has_criterion=0
+if [[ "$app" == *.bench ]]; then
+  has_bench=1
+fi
 for arg in "${args[@]+"${args[@]}"}"; do
   case "$arg" in
     --bench) has_bench=1 ;;
@@ -40,12 +44,23 @@ for arg in "${args[@]+"${args[@]}"}"; do
       ;;
   esac
 done
+for arg in "${args[@]+"${args[@]}"}"; do
+  case "$arg" in
+    --help | -h | --list | -l | --version) has_bench=0 ;;
+  esac
+done
 if [ "$has_bench" = 1 ] && [ "$has_criterion" = 0 ]; then
   with_criterion=()
-  for arg in "${args[@]}"; do
+  inserted=0
+  if [[ "$app" == *.bench ]]; then
+    with_criterion=(--stopping-criterion entropy)
+    inserted=1
+  fi
+  for arg in "${args[@]+"${args[@]}"}"; do
     with_criterion+=("$arg")
-    if [ "$arg" = --bench ]; then
+    if [ "$arg" = --bench ] && [ "$inserted" = 0 ]; then
       with_criterion+=(--stopping-criterion entropy)
+      inserted=1
     fi
   done
   args=("${with_criterion[@]}")

@@ -240,6 +240,7 @@ class ScriptTests(unittest.TestCase):
             (["--bench"], ["--bench", *entropy]),
             (["--bench", "--quiet"], ["--bench", *entropy, "--quiet"]),
             (["--bench", "--max-noise", "1"], ["--bench", "--max-noise", "1"]),
+            (["--bench", "--help"], ["--bench", "--help"]),
             (
                 ["--bench", "--stopping-criterion", "stdrel"],
                 ["--bench", "--stopping-criterion", "stdrel"],
@@ -250,6 +251,23 @@ class ScriptTests(unittest.TestCase):
                 run = self.run_task("deploy", "test/app", *args, GPU_CLOCK="off")
                 self.assertEqual(run.returncode, 0, run.stderr)
                 self.assertEqual(json.loads(run.stdout)["args"], expected)
+
+    def test_deploy_bench_app(self):
+        self.executable(self.root / "bin/test/app.bench", APP)
+        run = self.run_task("deploy", "test/app.bench", "--quiet", "--bench")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(
+            json.loads(run.stdout)["args"],
+            [
+                "--stopping-criterion",
+                "entropy",
+                "--quiet",
+                "--bench",
+                "--throttle-threshold",
+                "69",
+            ],
+        )
+        self.assertIn("-lgc 1000,1000", self.events())
 
     def test_deploy_session(self):
         session = self.root / "session"
