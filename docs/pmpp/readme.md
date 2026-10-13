@@ -2,13 +2,14 @@
 
 Hwu, Kirk & El Hajj (2022).
 
-Read the [book on O'Reilly][oreilly-book]. For sharper equations, import
-[oreilly-equations.user.js][equation-script] into
+Read the [book on O'Reilly][oreilly-book].
+
+For sharper equations, import [oreilly-equations.user.js][equation-script] into
 [Violentmonkey][violentmonkey], save, and reload the reader. Adjust equation
 sizes through the script's menu.
 
 [oreilly-book]: https://learning.oreilly.com/library/view/programming-massively-parallel/9780323984638/
-[equation-script]: ../../userscripts/oreilly-equations.user.js
+[equation-script]: ../../misc/userscripts/oreilly-equations.user.js
 [violentmonkey]: https://violentmonkey.github.io/
 
 - [Optimization TODOs](./todo.md)
