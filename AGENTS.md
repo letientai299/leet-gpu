@@ -7,9 +7,16 @@ understanding and might be incorrect. Do not read them unless the user asks
 about them. Base answers on books, official CUDA guides, and verified public
 knowledge instead.
 
-When adding C++ or CUDA libraries, update `.clangd` for required include paths
-or flags missing from the compilation database. Check an affected translation
-unit with container clangd and run `mise run lsp:check`.
+## CUDA libraries
+
+- When adding C++ or CUDA libraries, update `.clangd` for required include
+  paths or flags missing from the compilation database. Check an affected
+  translation unit with container clangd and run `mise run lsp:check`.
+- **cuBLAS:** Link apps to shared cuBLAS through `lg_cublas`, not
+  `cublas_static`. Static cuBLAS adds about 230 MB per app, mostly host code and
+  kernel metadata; pruning GPU architectures saves only about 10%. The GPU host
+  provides `libcublas.so.13`, so log the loaded version with
+  `cublasGetVersion`.
 
 ## Exercises
 
