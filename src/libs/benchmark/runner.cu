@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <fmt/format.h>
 #include <limits>
 #include <nvbench/json_printer.cuh>
@@ -37,50 +38,87 @@ void add_rate(
   summary.set_float64("value", static_cast<double>(work) / seconds / 1.0e9);
 }
 
-// Rare slow runs inflate the per-sample stdev without moving the result, so
-// stability is judged by IQR / median and the mean's 95% confidence interval.
-// An IQR of one timer step is the finest spread events can report, but only
-// counts when that step is small next to the kernel time.
-void add_status(
-  nvbench::state& state,
-  std::string tag,
-  double walltime,
-  double noise,
-  double iqr,
-  double iqr_seconds,
-  nvbench::int64_t samples
-) {
+struct ColdTiming {
+  double walltime = 0.0;
+  double noise = std::numeric_limits<double>::infinity();
+  double iqr = std::numeric_limits<double>::infinity();
+  double iqr_seconds = std::numeric_limits<double>::infinity();
+  double clock_hz = 0.0;
+  nvbench::int64_t samples = 0;
+};
+
+// deploy and bench export the clock they locked (gpu.sh).
+double locked_clock_hz() {
+  const char* value = std::getenv("LG_LOCKED_CLOCK_MHZ");
+  if (value == nullptr) {
+    return 0.0;
+  }
+  char* end = nullptr;
+  const double mhz = std::strtod(value, &end);
+  return end != value && std::isfinite(mhz) && mhz > 0.0 ? mhz * 1.0e6 : 0.0;
+}
+
+// A GPU that cannot hold half its max clock is faulty, not busy.
+bool clock_unhealthy(nvbench::state& state, double clock_hz) {
+  const auto& device = state.get_device();
+  return device.has_value() && clock_hz > 0.0 &&
+         clock_hz * 2.0 < static_cast<double>(device->get_sm_default_clock_rate());
+}
+
+// Clock problems come first: they invalidate every other verdict. Rare slow
+// runs inflate the per-sample stdev without moving the result, so stability is
+// judged by IQR / median and the mean's 95% confidence interval. An IQR of one
+// timer step is the finest spread events can report, but only counts when that
+// step is small next to the kernel time.
+std::string cold_status(nvbench::state& state, const ColdTiming& timing) {
   constexpr double kDefaultMaxSpread = 0.005;
   // cudaEventElapsedTime moved in 1.024 us steps on the A100X.
   constexpr double kTimerStep = 1.024e-6;
   constexpr double kMaxStepSpread = 0.05;
+  // NVML clock samples wobble by a few MHz under a lock.
+  constexpr double kClockTolerance = 0.99;
   const auto params = state.get_criterion_params();
   const double max_spread =
     params.has_value("max-noise") ? params.get_float64("max-noise") : kDefaultMaxSpread;
-  std::string status;
-  if (samples == 0) {
-    status = "NO SAMPLES";
-  } else if (state.get_run_once()) {
-    status = "single run, spread n/a";
-  } else if (samples < state.get_min_samples()) {
-    status = "INSUFFICIENT SAMPLES";
-  } else if (state.get_timeout() > 0 && walltime >= state.get_timeout()) {
-    status = fmt::format("TIMED OUT {:.0f}s", walltime);
-  } else if (!std::isfinite(noise) || noise < 0 || !std::isfinite(iqr) || iqr < 0) {
-    status = "spread unavailable";
-  } else {
-    const double interval = 1.96 * noise / std::sqrt(static_cast<double>(samples));
-    status = fmt::format(
-      "{} · IQR {:.2f}% · mean ±{:.2f}% (95% CI)",
-      iqr <= max_spread || (iqr_seconds <= kTimerStep * 1.01 && iqr <= kMaxStepSpread) ? "stable"
-                                                                                       : "UNSTABLE",
-      iqr * 100.0, interval * 100.0
+  const double locked_hz = locked_clock_hz();
+  if (timing.samples == 0) {
+    return "NO SAMPLES";
+  }
+  if (state.get_run_once()) {
+    return "single run, spread n/a";
+  }
+  if (timing.samples < state.get_min_samples()) {
+    return "INSUFFICIENT SAMPLES";
+  }
+  if (clock_unhealthy(state, timing.clock_hz)) {
+    return fmt::format("UNHEALTHY · clock {:.3f} GHz, under half of max", timing.clock_hz / 1e9);
+  }
+  if (locked_hz > 0.0 && timing.clock_hz > 0.0 && timing.clock_hz < locked_hz * kClockTolerance) {
+    return fmt::format(
+      "THROTTLED · {:.3f}/{:.3f} GHz locked", timing.clock_hz / 1e9, locked_hz / 1e9
     );
   }
-  auto& summary = state.add_summary(std::move(tag));
+  if (state.get_timeout() > 0 && timing.walltime >= state.get_timeout()) {
+    return fmt::format("TIMED OUT {:.0f}s", timing.walltime);
+  }
+  if (!std::isfinite(timing.noise) || timing.noise < 0 || !std::isfinite(timing.iqr) ||
+      timing.iqr < 0) {
+    return "spread unavailable";
+  }
+  const double interval = 1.96 * timing.noise / std::sqrt(static_cast<double>(timing.samples));
+  const bool stable = timing.iqr <= max_spread ||
+                      (timing.iqr_seconds <= kTimerStep * 1.01 && timing.iqr <= kMaxStepSpread);
+  return fmt::format(
+    "{} · IQR {:.2f}% · mean ±{:.2f}% (95% CI)", stable ? "stable" : "UNSTABLE", timing.iqr * 100.0,
+    interval * 100.0
+  );
+}
+
+void add_status(nvbench::state& state, const ColdTiming& timing) {
+  auto& summary = state.add_summary("lg/cold/status");
   summary.set_string("name", "Status");
-  summary.set_string("description", "Whether the cold median is stable");
-  summary.set_string("value", status);
+  summary.set_string("description", "Whether the cold median is stable and clock-valid");
+  summary.set_string("value", cold_status(state, timing));
 }
 
 // Non-Tensor Core FP32 FMA results per clock per SM.
@@ -292,12 +330,7 @@ bool describe(nvbench::state& state, const Workload& workload) {
 void finish_summaries(nvbench::state& state, const Workload& workload) {
   double cold_seconds = 0.0;
   double batch_seconds = 0.0;
-  double walltime = 0.0;
-  double noise = std::numeric_limits<double>::infinity();
-  double iqr = std::numeric_limits<double>::infinity();
-  double iqr_seconds = std::numeric_limits<double>::infinity();
-  double clock_hz = 0.0;
-  nvbench::int64_t samples = 0;
+  ColdTiming timing;
   for (auto& summary : state.get_summaries()) {
     const auto& tag = summary.get_tag();
     if (tag == "nv/cold/time/gpu/mean") {
@@ -305,17 +338,17 @@ void finish_summaries(nvbench::state& state, const Workload& workload) {
     } else if (tag == "nv/batch/time/gpu/mean") {
       batch_seconds = summary.get_float64("value");
     } else if (tag == "nv/cold/walltime") {
-      walltime = summary.get_float64("value");
+      timing.walltime = summary.get_float64("value");
     } else if (tag == "nv/cold/time/gpu/stdev/relative") {
-      noise = summary.get_float64("value");
+      timing.noise = summary.get_float64("value");
     } else if (tag == "nv/cold/sample_size") {
-      samples = summary.get_int64("value");
+      timing.samples = summary.get_int64("value");
     } else if (tag == "nv/cold/sm_clock_rate/mean") {
-      clock_hz = summary.get_float64("value");
+      timing.clock_hz = summary.get_float64("value");
     } else if (tag == "nv/cold/time/gpu/iqr/relative") {
-      iqr = summary.get_float64("value");
+      timing.iqr = summary.get_float64("value");
     } else if (tag == "nv/cold/time/gpu/iqr/absolute") {
-      iqr_seconds = summary.get_float64("value");
+      timing.iqr_seconds = summary.get_float64("value");
     }
   }
 
@@ -327,13 +360,15 @@ void finish_summaries(nvbench::state& state, const Workload& workload) {
     state, "lg/batch/gflops", "Batch GFLOPs/s",
     "Billions of floating-point operations per batch GPU second", workload.flops, batch_seconds
   );
-  add_compute_peak(state, workload.flops, cold_seconds, clock_hz);
+  add_compute_peak(state, workload.flops, cold_seconds, timing.clock_hz);
   add_dram_peak(state);
   add_cache_bounds(state, workload, cold_seconds);
-  add_status(state, "lg/cold/status", walltime, noise, iqr, iqr_seconds, samples);
-  if (!std::isfinite(cold_seconds) || cold_seconds <= 0 || samples == 0 ||
-      (!state.get_run_once() && samples < state.get_min_samples())) {
+  add_status(state, timing);
+  if (!std::isfinite(cold_seconds) || cold_seconds <= 0 || timing.samples == 0 ||
+      (!state.get_run_once() && timing.samples < state.get_min_samples())) {
     state.skip("insufficient valid timing samples");
+  } else if (clock_unhealthy(state, timing.clock_hz)) {
+    state.skip("GPU clock under half of max");
   }
 }
 

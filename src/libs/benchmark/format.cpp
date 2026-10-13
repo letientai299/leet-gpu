@@ -376,7 +376,8 @@ std::string status_value(Summaries& summaries) {
   if (starts_with(status, "stable") || starts_with(status, "single run")) {
     tint = ansi::green;
   } else if (starts_with(status, "TIMED OUT") || starts_with(status, "INSUFFICIENT") ||
-             starts_with(status, "NO SAMPLES")) {
+             starts_with(status, "NO SAMPLES") || starts_with(status, "THROTTLED") ||
+             starts_with(status, "UNHEALTHY")) {
     tint = ansi::red;
   }
   return paint(status, tint);
