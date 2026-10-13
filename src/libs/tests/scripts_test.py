@@ -29,8 +29,10 @@ elif '--query-gpu=' in args:
               'temperature.gpu': os.environ.get('MOCK_TEMP', '32'),
               'name': 'Mock GPU', 'driver_version': 'test',
               'power.limit': '300', 'clocks.sm': '1000', 'clocks.mem': '1215'}
-    print(values[field])
+    print(', '.join(values[f] for f in field.split(',')))
 elif '-rgc' in sys.argv and os.environ.get('MOCK_RESTORE_FAIL'):
+    sys.exit(1)
+elif '-lgc' in sys.argv and os.environ.get('MOCK_LOCK_FAIL'):
     sys.exit(1)
 """
 
@@ -72,11 +74,12 @@ class ScriptTests(unittest.TestCase):
         self.log = self.root / "events.log"
         self.env = dict(os.environ)
         for key in list(self.env):
-            if key.startswith(("BENCH_", "MOCK_")):
+            if key.startswith(("BENCH_", "MOCK_", "GPU_", "CLOCK_SESSION", "LG_")):
                 del self.env[key]
         self.env.update(
             PATH=f"{self.mock}:{os.environ['PATH']}",
             MISE_PROJECT_ROOT=str(self.root),
+            LG_GPU_LOCK_DIR=str(self.root),
             MOCK_LOG=str(self.log),
             SSH_HOST="local",
         )
@@ -112,7 +115,7 @@ class ScriptTests(unittest.TestCase):
         return self.log.read_text() if self.log.exists() else ""
 
     def test_uuid_and_stdout(self):
-        run = self.run_task("bench", "test/app", "--json", "stdout")
+        run = self.run_task("bench", "test/app", "--json", "stdout", BENCH_CLOCK="off")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(json.loads(run.stdout)["args"], ["--json", "stdout"])
         self.assertIn("app GPU-1234-abcd", self.events())
@@ -120,13 +123,18 @@ class ScriptTests(unittest.TestCase):
         self.assertNotIn("-rgc", self.events())
 
     def test_auto_clock_restore(self):
-        run = self.run_task(
-            "bench", "test/app", BENCH_CLOCK="auto", BENCH_RESTORE_CLOCK="off"
-        )
+        run = self.run_task("bench", "test/app")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("-lgc 1000,1000", self.events())
         self.assertIn("-rgc", self.events())
         self.assertIn("-pm 0", self.events())
+
+    def test_lock_failure_runs_unlocked(self):
+        run = self.run_task("bench", "test/app", MOCK_LOCK_FAIL="1")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("running unlocked", run.stderr)
+        self.assertIn("app GPU-1234-abcd", self.events())
+        self.assertNotIn("-rgc", self.events())
 
     def test_prior_clock_and_exit(self):
         run = self.run_task(
@@ -154,7 +162,7 @@ class ScriptTests(unittest.TestCase):
         for env in (
             {"BENCH_CLOCK_FRACTION": "x"},
             {"BENCH_CLOCK_FRACTION": "101"},
-            {"BENCH_CLOCK": "auto"},
+            {"BENCH_RESTORE_CLOCK": "x"},
             {"BENCH_IDLE_TIMEOUT": "-1"},
         ):
             with self.subTest(env=env):
@@ -201,6 +209,77 @@ class ScriptTests(unittest.TestCase):
             if process.poll() is None:
                 process.kill()
                 process.communicate()
+
+    def test_deploy_clock(self):
+        run = self.run_task("deploy", "test/app", "--bench")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        events = self.events()
+        self.assertLess(events.index("-lgc 1000,1000"), events.index("app "))
+        self.assertLess(events.index("app "), events.index("-rgc"))
+        self.assertIn("app GPU-1234-abcd", events)
+        args = json.loads(run.stdout)["args"]
+        self.assertEqual(args[-2:], ["--throttle-threshold", "69"])
+
+        for args, env in ((["x"], {}), (["--bench"], {"GPU_CLOCK": "off"})):
+            with self.subTest(args=args, env=env):
+                self.log.unlink()
+                run = self.run_task("deploy", "test/app", *args, **env)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertNotIn("-lgc", self.events())
+                self.assertNotIn("-rgc", self.events())
+                self.assertNotIn("--throttle-threshold", run.stdout)
+
+        run = self.run_task("deploy", "test/app", "--bench", MOCK_LOCK_FAIL="1")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("running unlocked", run.stderr)
+
+    def test_deploy_criterion(self):
+        entropy = ["--stopping-criterion", "entropy"]
+        cases = (
+            (["x"], ["x"]),
+            (["--bench"], ["--bench", *entropy]),
+            (["--bench", "--quiet"], ["--bench", *entropy, "--quiet"]),
+            (["--bench", "--max-noise", "1"], ["--bench", "--max-noise", "1"]),
+            (
+                ["--bench", "--stopping-criterion", "stdrel"],
+                ["--bench", "--stopping-criterion", "stdrel"],
+            ),
+        )
+        for args, expected in cases:
+            with self.subTest(args=args):
+                run = self.run_task("deploy", "test/app", *args, GPU_CLOCK="off")
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(json.loads(run.stdout)["args"], expected)
+
+    def test_deploy_session(self):
+        session = self.root / "session"
+        session.touch()
+        for env in ({}, {"GPU_CLOCK": "900"}, {"GPU_INDEX": "1"}):
+            run = self.run_task(
+                "deploy", "test/app", "--bench", CLOCK_SESSION=str(session), **env
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+        events = self.events()
+        self.assertEqual(events.count("-lgc"), 3)
+        self.assertEqual(events.count("-rgc"), 1)
+        self.assertLess(events.index("-lgc 900,900"), events.index("-rgc"))
+        self.assertLess(events.index("-rgc"), events.rindex("-lgc"))
+        self.assertEqual(session.read_text().split(), ["local", "1"])
+
+    def test_deploy_waits_for_gpu(self):
+        holder = subprocess.Popen(
+            ["flock", str(self.root / "lg-gpu-GPU-1234-abcd.lock"), "sleep", "2"]
+        )
+        try:
+            time.sleep(0.3)
+            start = time.monotonic()
+            run = self.run_task("deploy", "test/app", "x")
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertIn("busy; waiting", run.stderr)
+            self.assertGreater(time.monotonic() - start, 1.0)
+        finally:
+            holder.kill()
+            holder.wait()
 
     def test_compare_cleanup(self):
         source = self.root / "run.json"

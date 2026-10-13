@@ -89,6 +89,36 @@ loop.
 
 Every binary supports `--help` without initializing CUDA.
 
+With `--bench`, `deploy`, `try`, and `dev` lock the target GPU's SM clock so
+timings compare at one clock. The default picks the highest supported clock at
+or below 85% of the maximum, under the point where the power cap throttles. A
+lone `deploy` or `try` locks for its own run and unlocks afterward. `dev` keeps
+the lock between runs, unlocks the old GPU when `.env` points at another target
+or GPU, and unlocks on exit. The run is pinned to the locked GPU through
+`CUDA_VISIBLE_DEVICES`, since `nvidia-smi` and CUDA can number GPUs differently.
+Locking runs `nvidia-smi -lgc` on the target, through passwordless `sudo` or as
+root; when that fails, the run continues unlocked. `GPU_CLOCK` takes `auto`, a
+MHz value, or `off`; `GPU_CLOCK_FRACTION` and `GPU_INDEX` adjust `auto` and the
+GPU.
+
+Every run waits while another run holds the same GPU, through a per-GPU lock
+file in the host's `/tmp`; `bench` refuses instead of waiting. A locked run
+passes NVBench a `--throttle-threshold` just under the locked clock, while
+unlocked runs keep NVBench's 75% check. Remote runs get a TTY, so `Ctrl-C` or a
+`dev` restart stops the remote process and releases its lock.
+
+They also pass NVBench `--stopping-criterion entropy`, which settles the median
+in about a tenth of the samples that the default `stdrel` criterion takes.
+`bench` keeps `stdrel`. Passing `--stopping-criterion` or any criterion
+parameter such as `--max-noise` keeps NVBench's own choice.
+
+The Status row judges stability by the cold IQR relative to the median, not the
+per-sample standard deviation. Rare slow runs inflate the standard deviation
+without moving the median. An IQR of one CUDA event timer step (1.024 µs on
+the A100X) also counts as stable when it stays within 5% of the median, since
+events cannot resolve less. Status also
+prints the 95% confidence interval of the mean.
+
 Run a benchmark under a prepared GPU, on the GPU host itself:
 
 ```sh
@@ -100,7 +130,9 @@ the SM clock below the point where the power cap throttles, so repeated runs
 compare at the same clock. Every change is reverted when the run ends, including
 on failure or `Ctrl-C`. Locking needs root; without it the run continues and
 warns. `BENCH_GPU`, `BENCH_CLOCK`, and `BENCH_IDLE_TEMP` override the defaults,
-and `BENCH_CLOCK=off` skips locking entirely.
+and `BENCH_CLOCK=off` skips locking entirely. The run resets the clock to the
+driver default afterward; set `BENCH_RESTORE_CLOCK` to a MHz range to restore a
+prior lock instead.
 
 Comparing two kernels by eye does not account for clock drift. Record one run,
 then let NVBench classify the gap:

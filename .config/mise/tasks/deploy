@@ -5,6 +5,8 @@ set -euo pipefail
 task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=.config/mise/lib/app.sh
 source "$task_dir/../lib/app.sh"
+# shellcheck source=.config/mise/lib/target.sh
+source "$task_dir/../lib/target.sh"
 
 target=${SSH_HOST:-local}
 app=${APP:-}
@@ -25,17 +27,63 @@ if [ "${#args[@]}" -eq 0 ] && [ -n "${ARGS:-}" ]; then
   eval "args=($ARGS)"
 fi
 
+# Entropy stops about 10x sooner than stdrel with the same median; bench
+# keeps stdrel. NVBench rejects a criterion that follows its parameters, so it
+# goes right after --bench, and any explicit criterion flag opts out.
+has_bench=0
+has_criterion=0
+for arg in "${args[@]+"${args[@]}"}"; do
+  case "$arg" in
+    --bench) has_bench=1 ;;
+    --stopping-criterion* | --max-noise* | --min-time* | --max-angle* | --min-r2*)
+      has_criterion=1
+      ;;
+  esac
+done
+if [ "$has_bench" = 1 ] && [ "$has_criterion" = 0 ]; then
+  with_criterion=()
+  for arg in "${args[@]}"; do
+    with_criterion+=("$arg")
+    if [ "$arg" = --bench ]; then
+      with_criterion+=(--stopping-criterion entropy)
+    fi
+  done
+  args=("${with_criterion[@]}")
+fi
+
 binary=bin/$app
 if [ ! -x "$binary" ]; then
   echo "app not built: $app" >&2
   exit 1
 fi
 
-if [ "$target" = local ] || [ "$target" = localhost ]; then
-  if [ "${#args[@]}" -eq 0 ]; then
-    exec "$binary"
+# Every run waits for the GPU (gpu.sh holds a per-GPU host lock), and --bench
+# runs lock the SM clock. A lone run unlocks afterward. A dev session
+# (CLOCK_SESSION) keeps the lock, records its key, and unlocks the old target
+# when the key changes; dev unlocks the last one on exit.
+clock=off
+if [ "$has_bench" = 1 ]; then
+  clock=${GPU_CLOCK:-auto}
+fi
+keep=0
+if [ -n "${CLOCK_SESSION:-}" ] && [ "$has_bench" = 1 ]; then
+  key=
+  if [ "$clock" != off ]; then
+    keep=1
+    key=$(clock_key "$target")
   fi
-  exec "$binary" "${args[@]}"
+  held=$(cat "$CLOCK_SESSION" 2>/dev/null || true)
+  if [ -n "$held" ] && [ "$held" != "$key" ]; then
+    clock_unlock "$held" || true
+  fi
+  # Recorded before locking, so an interrupt cannot leak the lock.
+  printf '%s\n' "$key" >"$CLOCK_SESSION"
+fi
+gpu_args=(run "${GPU_INDEX:-0}" "$clock" "${GPU_CLOCK_FRACTION:-85}" "$keep" --)
+
+if is_local_target "$target"; then
+  run_gpu "$target" "${gpu_args[@]}" "$binary" "${args[@]+"${args[@]}"}"
+  exit
 fi
 
 : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
@@ -43,11 +91,6 @@ fi
 remote=$target
 remote_name=${app//\//-}
 remote_bin=/tmp/${CONTAINER_NAME}-${remote_name}
-
-# Reuse one multiplexed SSH connection across the rsync + run round trips and
-# across dev-loop iterations, so the connection/auth handshake is paid once
-# instead of on every deploy. ControlPersist keeps the master warm between edits.
-ssh_opts=(-o ControlMaster=auto -o ControlPath="/tmp/ssh-${CONTAINER_NAME}-%r@%h" -o ControlPersist=1h)
 
 # Prefer a modern rsync (3.2+) over macOS's bundled openrsync at /usr/bin/rsync:
 # with 3.2+ on both ends, -z negotiates zstd (much better/faster than zlib) and
@@ -70,12 +113,4 @@ done
 "$rsync_bin" -z --inplace --partial -e "ssh ${ssh_opts[*]}" "$binary" \
   "$remote:$remote_bin"
 
-if [ "${#args[@]}" -eq 0 ]; then
-  printf -v remote_command '%q ' "$remote_bin"
-else
-  printf -v remote_command '%q ' "$remote_bin" "${args[@]}"
-fi
-
-# The command is shell-escaped before crossing the SSH boundary.
-# shellcheck disable=SC2029
-ssh "${ssh_opts[@]}" "$remote" "$remote_command"
+run_gpu "$target" "${gpu_args[@]}" "$remote_bin" "${args[@]+"${args[@]}"}"

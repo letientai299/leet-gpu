@@ -5,9 +5,11 @@ set -euo pipefail
 task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=.config/mise/lib/app.sh
 source "$task_dir/../lib/app.sh"
+# shellcheck source=.config/mise/lib/gpu.sh
+source "$task_dir/../lib/gpu.sh"
 
 gpu=${BENCH_GPU:-0}
-clock=${BENCH_CLOCK:-off}
+clock=${BENCH_CLOCK:-auto}
 clock_fraction=${BENCH_CLOCK_FRACTION:-85}
 idle_watts=${BENCH_IDLE_WATTS:-120}
 idle_temp=${BENCH_IDLE_TEMP:-45}
@@ -57,8 +59,7 @@ if [[ "$clock" != off && "$clock" != auto && ! "$clock" =~ ^[1-9][0-9]{0,5}$ ]];
 fi
 
 query() {
-  nvidia-smi -i "$gpu" --query-gpu="$1" --format=csv,noheader,nounits \
-    | sed 's/^ *//; s/ *$//'
+  gpu_query "$gpu" "$1"
 }
 
 # UUIDs avoid CUDA and NVML ordinal differences.
@@ -67,32 +68,27 @@ if [[ ! "$gpu" =~ ^GPU-[a-fA-F0-9-]+$ ]]; then
   echo "bench: select one physical GPU" >&2
   exit 2
 fi
-lock_dir=${MISE_PROJECT_ROOT:-$PWD}/.ai/benchmark-harness/locks
-mkdir -p "$lock_dir"
-exec 9>"$lock_dir/$gpu.lock"
+# Shares deploy's per-GPU lock; bench refuses instead of waiting.
+gpu_open_lock "$gpu"
 if ! flock -n 9; then
   echo "bench: GPU already benchmarked: $gpu" >&2
   exit 1
 fi
 
-gpu_admin() {
-  nvidia-smi -i "$gpu" "$@" >/dev/null 2>&1 \
-    || sudo -n nvidia-smi -i "$gpu" "$@" >/dev/null 2>&1
-}
-
 locked=0
 persistence_restore=
 child=
-restore_clock=${BENCH_RESTORE_CLOCK:-}
+# NVML cannot query a prior locked range; off resets to the driver default.
+restore_clock=${BENCH_RESTORE_CLOCK:-off}
 restore() {
   local status=$?
   trap - EXIT INT TERM
   if [ "$locked" = 1 ]; then
     local restored=0
     if [ "$restore_clock" = off ]; then
-      gpu_admin -rgc && restored=1
+      gpu_admin "$gpu" -rgc && restored=1
     else
-      gpu_admin -lgc "$restore_clock" && restored=1
+      gpu_admin "$gpu" -lgc "$restore_clock" && restored=1
     fi
     if [ "$restored" = 0 ]; then
       echo "bench: clock restoration failed: $gpu" >&2
@@ -100,7 +96,7 @@ restore() {
     fi
   fi
   if [ -n "$persistence_restore" ]; then
-    if ! gpu_admin -pm "$persistence_restore"; then
+    if ! gpu_admin "$gpu" -pm "$persistence_restore"; then
       echo "bench: persistence restoration failed: $gpu" >&2
       status=1
     fi
@@ -127,49 +123,30 @@ if [ -n "$processes" ] && [ "${BENCH_FORCE:-0}" != 1 ]; then
 fi
 
 if [ "$clock" != off ]; then
-  # NVML cannot query the previous locked range.
   if [[ "$restore_clock" != off && ! "$restore_clock" =~ ^[1-9][0-9]{0,5}(,[1-9][0-9]{0,5})?$ ]]; then
-    echo "bench: set BENCH_RESTORE_CLOCK=off or prior MHz range" >&2
+    echo "bench: BENCH_RESTORE_CLOCK needs off or a MHz range" >&2
     exit 2
   fi
   max_clock=$(query clocks.max.sm)
-  if [[ ! "$max_clock" =~ ^[1-9][0-9]{0,5}$ ]]; then
-    echo "bench: maximum SM clock unavailable" >&2
-    exit 1
-  fi
-  if [ "$clock" = auto ]; then
-    target_clock=$((max_clock * clock_fraction / 100))
-    clock=$(nvidia-smi -i "$gpu" --query-supported-clocks=gr --format=csv,noheader,nounits \
-      | awk -v t="$target_clock" '$1 ~ /^[0-9]+$/ && $1 <= t && $1 > best {best=$1} END {print best}')
-    if [ -z "$clock" ]; then
-      echo "bench: supported SM clocks unavailable" >&2
-      exit 1
-    fi
-  fi
-  previous_persistence=$(query persistence_mode)
-  if [ "$previous_persistence" = Disabled ]; then
+  # Locking needs root; without it, warn and measure at whatever clock runs.
+  if [ "$(query persistence_mode)" = Disabled ] && gpu_admin "$gpu" -pm 1; then
     persistence_restore=0
-    if ! gpu_admin -pm 1; then
-      echo "bench: persistence change failed: $gpu" >&2
-      exit 1
+  fi
+  if clock=$(gpu_pick_clock "$gpu" "$clock" "$clock_fraction" "$max_clock") \
+    && gpu_admin "$gpu" -lgc "$clock,$clock"; then
+    locked=1
+    echo "bench: $gpu locked to ${clock}MHz" >&2
+    has_threshold=0
+    for arg in "$@"; do
+      case "$arg" in
+        --throttle-threshold | --throttle-threshold=*) has_threshold=1 ;;
+      esac
+    done
+    if [ "$has_threshold" = 0 ] && [[ "$max_clock" =~ ^[1-9][0-9]{0,5}$ ]]; then
+      set -- "$@" --throttle-threshold "$(gpu_throttle_threshold "$clock" "$max_clock")"
     fi
-  fi
-  locked=1
-  if ! gpu_admin -lgc "$clock,$clock"; then
-    echo "bench: clock lock failed: $gpu" >&2
-    exit 1
-  fi
-  echo "bench: $gpu locked to ${clock}MHz" >&2
-  has_threshold=0
-  for arg in "$@"; do
-    case "$arg" in
-      --throttle-threshold | --throttle-threshold=*) has_threshold=1 ;;
-    esac
-  done
-  if [ "$has_threshold" = 0 ]; then
-    threshold=$((clock * 100 / max_clock - 2))
-    ((threshold >= 0)) || threshold=0
-    set -- "$@" --throttle-threshold "$threshold"
+  else
+    echo "bench: clock lock failed; running unlocked: $gpu" >&2
   fi
 fi
 

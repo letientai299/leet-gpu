@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="Watch, rebuild, then deploy one app"
+#MISE description="Watch, rebuild, then deploy one app with a locked GPU clock"
 set -euo pipefail
+
+task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=.config/mise/lib/target.sh
+source "$task_dir/../lib/target.sh"
 
 app=
 if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
@@ -24,4 +28,20 @@ if [ -n "$app" ]; then
 fi
 run_args+=("$@")
 
-exec watchexec -I --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"
+# deploy records the lock it holds here and swaps it when .env retargets;
+# see the session format in deploy.
+CLOCK_SESSION=$(mktemp "${TMPDIR:-/tmp}/lg-clock.XXXXXX")
+export CLOCK_SESSION
+release_clock() {
+  local held
+  held=$(cat "$CLOCK_SESSION" 2>/dev/null || true)
+  if [ -n "$held" ]; then
+    clock_unlock "$held" || true
+  fi
+  rm -f "$CLOCK_SESSION"
+}
+trap release_clock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+watchexec -I --project-origin . "${watch_args[@]}" --restart -- "${run_args[@]}"
