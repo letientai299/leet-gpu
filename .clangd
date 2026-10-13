@@ -9,13 +9,15 @@ CompileFlags:
   CompilationDatabase: build/docker
   Add:
     - --cuda-path=/usr/local/cuda
+    # Matches the Dockerfile's gcc-toolset; nvcc entries name no host compiler.
+    - --gcc-toolchain=/opt/rh/gcc-toolset-14/root/usr
     - -I/app/.cache/fetchcontent/cccl-src/libcudacxx/include
     - -I/app/.cache/fetchcontent/cccl-src/cub
     - -I/app/.cache/fetchcontent/cccl-src/thrust
     - -I/app/.cache/fetchcontent/cutlass-src/include
     - -I/app/.cache/fetchcontent/nvbench-src
     - -I/app/build/docker/_deps/nvbench-build
-    - -std=c++17
+    - -std=c++20
   # build/docker/compile_commands.json drives nvcc; strip its nvcc-only flags that
   # clang(d) rejects. Path-specific fragments restore one analysis target.
   # Trailing * is a clangd glob. Add more here as nvcc flags appear in the build.

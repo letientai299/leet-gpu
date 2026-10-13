@@ -24,4 +24,4 @@ call the library. See `src/pmpp/ch03/matmul.cu`.
   precision or a different memory order. For floats, compare with `atol` and
   `rtol`, not bitwise `==`.
 - Use the host STL to fill and verify small inputs. Do not add CUDA libraries
-  for that. Stay on C++17; `nvcc` has no C++26 support.
+  for that. Stay on C++20; `nvcc` has no C++26 support.

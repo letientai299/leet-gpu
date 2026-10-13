@@ -27,6 +27,7 @@ require("lib.container_files").setup({
     "/usr/local/include",
     "/usr/include",
     "/usr/lib/gcc",
+    "/opt/rh",
     "/usr/lib/llvm-21",
   },
 })

@@ -42,10 +42,13 @@ if(
   add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compress-mode=size>")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+# C++20 turns on module scanning, which adds GCC-only flags clang-tidy rejects.
+# https://cmake.org/cmake/help/latest/variable/CMAKE_CXX_SCAN_FOR_MODULES.html
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

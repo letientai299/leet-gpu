@@ -2,6 +2,7 @@
 
 import json
 import shlex
+import shutil
 import sys
 from pathlib import Path
 
@@ -14,6 +15,10 @@ def cuda_args(args: list[str]) -> list[str]:
         "--cuda-gpu-arch=sm_86",
         "-Wno-unknown-cuda-version",
     ]
+    # nvcc entries name no host compiler, so clang would pick the system GCC.
+    cxx = shutil.which("c++")
+    if cxx:
+        output.append(f"--gcc-toolchain={Path(cxx).parents[1]}")
     index = 1
     while index < len(args):
         arg = args[index]

@@ -124,6 +124,14 @@ if [ -f "$build_dir/CMakeCache.txt" ] \
   rm -rf "$build_dir"
 fi
 
+# CMake caches the compiler, so a new default needs a fresh configure. Keep
+# objects and ccache; only the cache resets.
+cxx=$(command -v "${CXX:-c++}" || true)
+if [ -n "$cxx" ] && [ -f "$build_dir/CMakeCache.txt" ] \
+  && ! grep -qx "CMAKE_CXX_COMPILER:[A-Z]*=$cxx" "$build_dir/CMakeCache.txt"; then
+  rm -rf "$build_dir/CMakeCache.txt" "$build_dir/CMakeFiles"
+fi
+
 if [ ! -f "$build_dir/CMakeCache.txt" ]; then
   cmake -S "$root" -B "$build_dir" -G Ninja \
     -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"

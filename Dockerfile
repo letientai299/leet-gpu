@@ -11,6 +11,7 @@ RUN yum install -y\
     epel-release\
     && yum-config-manager --set-enabled powertools \
     && yum install -y \
+    gcc-toolset-14-gcc-c++\
     gdb\
     git\
     jq\
@@ -55,8 +56,9 @@ RUN python3.12 -m pip install --no-cache-dir --root-user-action=ignore\
     && ln -sf /usr/local/bin/ctest /usr/bin/ctest \
     && ln -sf /usr/local/bin/cpack /usr/bin/cpack
 
+# Rocky 8's GCC 8 lacks C++20. The toolset keeps glibc 2.28 for deploys.
 ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_CACHE_DIR=/usr/local/share/mise/cache \
-    PATH=/opt/clangd_${CLANGD_VERSION}/bin:/usr/local/share/mise/shims:/usr/local/bin:$PATH
+    PATH=/opt/rh/gcc-toolset-14/root/usr/bin:/opt/clangd_${CLANGD_VERSION}/bin:/usr/local/share/mise/shims:/usr/local/bin:$PATH
 
 RUN mise activate bash >>/etc/bash.bashrc

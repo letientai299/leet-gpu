@@ -23,11 +23,6 @@ constexpr DimensionOption kDimensions[] = {
   {"--k", &AppArgs::k},
 };
 
-/// std::string_view::starts_with is C++20; this file targets C++17.
-bool starts_with(std::string_view text, std::string_view prefix) {
-  return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
-}
-
 bool parse_dimension(std::string_view text, std::optional<unsigned>& value) {
   unsigned parsed = 0;
   const auto* first = text.data();
@@ -48,7 +43,7 @@ parse_dimension_arg(std::string_view arg, int& index, int argc, char** argv, App
       ++index;
       return index < argc && parse_dimension(argv[index], args.*option.field);
     }
-    if (starts_with(arg, option.flag) && arg[option.flag.size()] == '=') {
+    if (arg.starts_with(option.flag) && arg[option.flag.size()] == '=') {
       return parse_dimension(arg.substr(option.flag.size() + 1), args.*option.field);
     }
   }
