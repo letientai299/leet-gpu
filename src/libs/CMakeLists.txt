@@ -97,6 +97,12 @@ target_compile_options(
   INTERFACE "$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>"
 )
 
+# Library baseline, not an oracle. Shared, so the GPU host's toolkit supplies
+# it; static cuBLAS adds about 230 MB of host code and kernel metadata per app.
+add_library(lg_cublas INTERFACE)
+target_compile_definitions(lg_cublas INTERFACE LG_HAS_CUBLAS)
+target_link_libraries(lg_cublas INTERFACE CUDA::cublas)
+
 add_library(lg_nvbench INTERFACE)
 target_compile_definitions(lg_nvbench INTERFACE LG_HAS_NVBENCH)
 target_link_libraries(lg_nvbench INTERFACE nvbench::nvbench)
@@ -109,6 +115,15 @@ target_include_directories(
   PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
 )
 target_link_libraries(lg_benchmark PUBLIC lg_nvbench lg_runtime fmt::fmt)
+
+# Driver API reads kernels that libraries launch inside a captured graph.
+add_library(lg_benchmark_captured STATIC benchmark/captured.cu)
+target_compile_definitions(lg_benchmark_captured PRIVATE LG_HAS_CUDA_DRIVER)
+target_link_libraries(
+  lg_benchmark_captured
+  PUBLIC lg_benchmark CCCL::CCCL
+  PRIVATE CUDA::cuda_driver
+)
 
 add_library(lg_runtime STATIC log.cpp)
 target_include_directories(lg_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

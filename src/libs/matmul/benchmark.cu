@@ -369,7 +369,9 @@ int run_app(int argc, char** argv, const AppConfig& config) {
     Problem bench_problem(bench_shape);
     fill_random(bench_problem);
     Benchmark harness(std::move(bench_problem));
-    add_fixed(harness, config.baseline);
+    if (config.baseline) {
+      add_fixed(harness, *config.baseline);
+    }
     add_fixed(harness, config.kernel);
     log_shape(bench_shape);
     return launch_nvbench(args.remaining);

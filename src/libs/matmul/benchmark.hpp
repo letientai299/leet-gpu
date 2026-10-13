@@ -33,10 +33,10 @@ private:
   std::unique_ptr<Impl> impl_;
 };
 
-/// One kernel measured against a baseline at a fixed shape.
+/// One kernel, optionally measured against a baseline, at a fixed shape.
 struct AppConfig {
   Kernel kernel;
-  Kernel baseline;
+  std::optional<Kernel> baseline;
   GemmShape bench_shape;
 };
 

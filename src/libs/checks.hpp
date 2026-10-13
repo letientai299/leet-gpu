@@ -55,6 +55,62 @@ inline bool cutlass_check(cutlass::Status status, const char* file, int line) {
 #define CUTLASS_CHECK(expression) cutlass_check((expression), __FILE__, __LINE__)
 #endif
 
+#ifdef LG_HAS_CUDA_DRIVER
+#include <cuda.h>
+
+inline bool driver_check(CUresult result, const char* file, int line) {
+  if (result == CUDA_SUCCESS) {
+    return true;
+  }
+
+  const char* name = nullptr;
+  if (cuGetErrorName(result, &name) != CUDA_SUCCESS) {
+    name = "unknown";
+  }
+  write_log("CUDA", file, line, "driver %s", name);
+  return false;
+}
+
+#define DRIVER_CHECK(expression) driver_check((expression), __FILE__, __LINE__)
+#endif
+
+#ifdef LG_HAS_CUBLAS
+#include <cublas_v2.h>
+
+inline bool cublas_check(cublasStatus_t status, const char* file, int line) {
+  if (status == CUBLAS_STATUS_SUCCESS) {
+    return true;
+  }
+
+  write_log("CUBLAS", file, line, "%s", cublasGetStatusString(status));
+  return false;
+}
+
+#define CUBLAS_CHECK(expression) cublas_check((expression), __FILE__, __LINE__)
+
+/// Owns a cuBLAS handle bound to the device current at creation.
+class CublasHandle {
+public:
+  CublasHandle() {
+    if (!CUBLAS_CHECK(cublasCreate(&handle_))) {
+      throw std::runtime_error("cuBLAS handle creation failed");
+    }
+  }
+  ~CublasHandle() {
+    CUBLAS_CHECK(cublasDestroy(handle_));
+  }
+  CublasHandle(const CublasHandle&) = delete;
+  CublasHandle& operator=(const CublasHandle&) = delete;
+
+  [[nodiscard]] cublasHandle_t get() const {
+    return handle_;
+  }
+
+private:
+  cublasHandle_t handle_ = nullptr;
+};
+#endif
+
 inline cuda::stream_ref default_stream() {
   return cuda::stream_ref{cudaStream_t{nullptr}};
 }

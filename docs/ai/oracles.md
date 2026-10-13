@@ -5,9 +5,9 @@ call the library. See `src/pmpp/ch03/matmul.cu`.
 
 - Do not call the oracle from the kernel under test.
 - Prefer a header-only library such as CUTLASS over a precompiled toolkit
-  library. `deploy` copies only the binary, and the GPU host has no matching
-  toolkit. A toolkit library must therefore be static; cuBLAS alone adds about
-  280 MB per app.
+  library. `deploy` copies only the binary, so a static toolkit library lands in
+  every app; static cuBLAS adds about 230 MB. A speed baseline such as
+  `matmul.cublas` links the GPU host's shared cuBLAS instead (see `AGENTS.md`).
 - Wrap each library with an INTERFACE target in `src/libs`.
   `find_package(CUDAToolkit)` lives there because imported `CUDA::*` targets are
   not visible to `src/pmpp`. Link only apps that need the library.

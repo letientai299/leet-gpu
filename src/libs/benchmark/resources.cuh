@@ -20,16 +20,15 @@ struct KernelResources {
   int max_warps_per_sm = 0;
 };
 
-/// Queries launch resources without executing the kernel.
-template <auto DeviceKernel>
-cudaError_t
-inspect_kernel(dim3 block, std::size_t dynamic_shared_bytes, KernelResources& resources) {
-  cudaFuncAttributes attributes{};
-  const cudaError_t result = cudaFuncGetAttributes(&attributes, DeviceKernel);
-  if (result != cudaSuccess) {
-    return result;
-  }
-
+/// Fills resources from compiled attributes; `occupancy` reports blocks/SM.
+template <typename Occupancy>
+cudaError_t fill_resources(
+  const cudaFuncAttributes& attributes,
+  dim3 block,
+  std::size_t dynamic_shared_bytes,
+  Occupancy&& occupancy,
+  KernelResources& resources
+) {
   int device = 0;
   cudaDeviceProp properties{};
   auto status = cudaGetDevice(&device);
@@ -57,14 +56,29 @@ inspect_kernel(dim3 block, std::size_t dynamic_shared_bytes, KernelResources& re
   resources.dynamic_shared_bytes = dynamic_shared_bytes;
   resources.constant_bytes = attributes.constSizeBytes;
   resources.local_bytes_per_thread = attributes.localSizeBytes;
-  status = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-    &resources.active_blocks_per_sm, DeviceKernel, resources.threads_per_block, dynamic_shared_bytes
-  );
+  status = occupancy(resources.threads_per_block, resources.active_blocks_per_sm);
   resources.active_warps_per_sm =
     resources.active_blocks_per_sm *
     ((resources.threads_per_block + properties.warpSize - 1) / properties.warpSize);
   resources.max_warps_per_sm = properties.maxThreadsPerMultiProcessor / properties.warpSize;
   return status;
+}
+
+/// Queries launch resources without executing the kernel.
+template <auto DeviceKernel>
+cudaError_t
+inspect_kernel(dim3 block, std::size_t dynamic_shared_bytes, KernelResources& resources) {
+  cudaFuncAttributes attributes{};
+  const cudaError_t result = cudaFuncGetAttributes(&attributes, DeviceKernel);
+  if (result != cudaSuccess) {
+    return result;
+  }
+  const auto occupancy = [dynamic_shared_bytes](int threads, int& blocks) {
+    return cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &blocks, DeviceKernel, threads, dynamic_shared_bytes
+    );
+  };
+  return fill_resources(attributes, block, dynamic_shared_bytes, occupancy, resources);
 }
 
 /// Adapts a fixed launch configuration to a shape-aware resource callback.

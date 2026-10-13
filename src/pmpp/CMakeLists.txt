@@ -10,6 +10,10 @@ add_cuda_app(
   LIBRARIES lg_matmul_kernels lg_matmul_nvbench
 )
 add_cuda_app(pmpp/ch03/matmul.vec LIBRARIES lg_matmul_kernels)
+add_cuda_app(
+  pmpp/ch03/matmul.cublas
+  LIBRARIES lg_matmul_nvbench lg_benchmark_captured lg_cublas
+)
 add_cuda_app(pmpp/ch04/limits LIBRARIES lg_cuda_runtime)
 add_cuda_app(pmpp/ch07/conv.basic LIBRARIES lg_convolution_nvbench)
 add_cuda_app(pmpp/ch07/conv.constant LIBRARIES lg_convolution_nvbench)
