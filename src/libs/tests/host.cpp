@@ -32,10 +32,10 @@ template <typename Function> void rejects(Function function) {
 constexpr auto kMaxSize = std::numeric_limits<std::size_t>::max();
 
 void check_arithmetic() {
-  require(!lg::checked_mul(kMaxSize, 2));
-  require(lg::checked_mul(kMaxSize, 0) == 0);
-  require(!lg::checked_add(kMaxSize, 1));
-  require(lg::checked_add(kMaxSize, 0) == kMaxSize);
+  static_assert(!lg::checked_mul(kMaxSize, 2));
+  static_assert(lg::checked_mul(kMaxSize, 0) == 0);
+  static_assert(!lg::checked_add(kMaxSize, 1));
+  static_assert(lg::checked_add(kMaxSize, 0) == kMaxSize);
   for (int length = 1; length < 40; ++length) {
     for (int radius = 0; radius < 50; ++radius) {
       std::size_t pairs = 0;

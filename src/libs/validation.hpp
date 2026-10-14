@@ -12,24 +12,24 @@
 
 namespace lg {
 
-inline constexpr double kDefaultAtol = 1.0e-5;
-inline constexpr double kDefaultRtol = 1.0e-4;
+constexpr double kDefaultAtol = 1.0e-5;
+constexpr double kDefaultRtol = 1.0e-4;
 
-inline std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
+constexpr std::optional<std::size_t> checked_mul(std::size_t left, std::size_t right) {
   if (right != 0 && left > std::numeric_limits<std::size_t>::max() / right) {
     return std::nullopt;
   }
   return left * right;
 }
 
-inline std::optional<std::size_t> checked_add(std::size_t left, std::size_t right) {
+constexpr std::optional<std::size_t> checked_add(std::size_t left, std::size_t right) {
   if (left > std::numeric_limits<std::size_t>::max() - right) {
     return std::nullopt;
   }
   return left + right;
 }
 
-inline std::size_t valid_axis_pairs(int length, int radius) {
+constexpr std::size_t valid_axis_pairs(int length, int radius) {
   if (length <= 0 || radius < 0) {
     throw std::invalid_argument("invalid convolution dimensions");
   }

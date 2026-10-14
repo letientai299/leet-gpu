@@ -116,8 +116,7 @@ bool parse_choice_args(
         return false;
       }
       name = argv[index];
-    } else if (arg.size() > flag.size() && arg.substr(0, flag.size()) == flag &&
-               arg[flag.size()] == '=') {
+    } else if (arg.starts_with(flag) && arg.size() > flag.size() && arg[flag.size()] == '=') {
       name = arg.substr(flag.size() + 1);
     } else {
       remaining.push_back(argv[index]);

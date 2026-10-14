@@ -67,10 +67,6 @@ std::string paint(std::string_view text, const char* tint) {
   return fmt::format("{}{}{}", tint, text, ansi::reset);
 }
 
-bool starts_with(std::string_view text, std::string_view prefix) {
-  return text.substr(0, prefix.size()) == prefix;
-}
-
 Unit pick_unit(double value, const Units& units) {
   for (const auto& unit : units) {
     if (std::fabs(value) >= unit.scale) {
@@ -191,7 +187,7 @@ public:
   std::vector<std::pair<std::string, std::string>> with_prefix(std::string_view prefix) {
     std::vector<std::pair<std::string, std::string>> found;
     for (const Json* summary : entries_) {
-      if (starts_with(summary->value("tag", ""), prefix)) {
+      if (summary->value("tag", "").starts_with(prefix)) {
         used_.insert(summary);
         found.emplace_back(summary->value("name", ""), format_value(*summary));
       }
@@ -202,7 +198,7 @@ public:
   [[nodiscard]] std::vector<const Json*> rest() const {
     std::vector<const Json*> rest;
     for (const Json* summary : entries_) {
-      if (used_.count(summary) == 0 && !summary->contains("hide")) {
+      if (!used_.contains(summary) && !summary->contains("hide")) {
         rest.push_back(summary);
       }
     }
@@ -376,11 +372,11 @@ std::string status_value(Summaries& summaries) {
     return {};
   }
   const char* tint = ansi::yellow;
-  if (starts_with(status, "stable") || starts_with(status, "single run")) {
+  if (status.starts_with("stable") || status.starts_with("single run")) {
     tint = ansi::green;
-  } else if (starts_with(status, "TIMED OUT") || starts_with(status, "INSUFFICIENT") ||
-             starts_with(status, "NO SAMPLES") || starts_with(status, "THROTTLED") ||
-             starts_with(status, "UNHEALTHY")) {
+  } else if (status.starts_with("TIMED OUT") || status.starts_with("INSUFFICIENT") ||
+             status.starts_with("NO SAMPLES") || status.starts_with("THROTTLED") ||
+             status.starts_with("UNHEALTHY")) {
     tint = ansi::red;
   }
   return paint(status, tint);

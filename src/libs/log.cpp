@@ -32,7 +32,7 @@ constexpr auto cuda = "\033[1;31m";
 } // namespace color
 
 const char* kind_color(std::string_view kind) {
-  if (kind.substr(0, 3) == "sm_") {
+  if (kind.starts_with("sm_")) {
     return color::gpu;
   }
   return kind == "CUDA" ? color::cuda : color::host;

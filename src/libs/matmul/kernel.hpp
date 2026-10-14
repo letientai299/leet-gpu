@@ -21,9 +21,7 @@ struct InputTransforms {
   MatrixTransform a = nullptr;
   MatrixTransform b = nullptr;
 
-  [[nodiscard]] bool operator==(const InputTransforms& other) const {
-    return a == other.a && b == other.b;
-  }
+  [[nodiscard]] bool operator==(const InputTransforms&) const = default;
 };
 
 /// Owns any kernel-specific input layouts.
