@@ -45,11 +45,11 @@ bool add_on_gpu(const std::vector<float>& a, const std::vector<float>& b, std::v
 bool verify_output(const std::vector<float>& c, const std::vector<float>& expected) {
   for (std::size_t index = 0; index < c.size(); ++index) {
     if (c[index] != expected[index]) {
-      HOST_LOG("Mismatch at %zu: %.1f != %.1f", index, c[index], expected[index]);
+      HOST_LOG("Mismatch at {}: {:.1f} != {:.1f}", index, c[index], expected[index]);
       return false;
     }
   }
-  HOST_LOG("Vector addition passed: %zu values", c.size());
+  HOST_LOG("Vector addition passed: {} values", c.size());
   return true;
 }
 

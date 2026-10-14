@@ -86,10 +86,10 @@ bool verify_at(
     stats.add(actual.data()[index], expected.data()[index], atol, rtol);
   }
   HOST_LOG(
-    "%s: mismatches=%zu/%zu nonfinite=%zu", name, stats.mismatches, stats.count, stats.nonfinite
+    "{}: mismatches={}/{} nonfinite={}", name, stats.mismatches, stats.count, stats.nonfinite
   );
   HOST_LOG(
-    "Finite errors: max_abs=%g max_rel=%g rms=%g", stats.max_absolute, stats.max_relative,
+    "Finite errors: max_abs={:g} max_rel={:g} rms={:g}", stats.max_absolute, stats.max_relative,
     std::sqrt(
       stats.squared_error /
       static_cast<double>(std::max(std::size_t{1}, stats.count - stats.nonfinite))
@@ -98,7 +98,7 @@ bool verify_at(
   if (stats.mismatches != 0) {
     const auto index = index_of(stats.first);
     HOST_LOG(
-      "First mismatch[%zu]: actual=%g expected=%g atol=%g rtol=%g", index,
+      "First mismatch[{}]: actual={:g} expected={:g} atol={:g} rtol={:g}", index,
       static_cast<double>(actual.data()[index]), static_cast<double>(expected.data()[index]), atol,
       rtol
     );
@@ -109,7 +109,7 @@ bool verify_at(
 template <typename Actual, typename Expected>
 bool same_size(const Actual& actual, const Expected& expected, const char* name) {
   if (actual.size() != expected.size() || actual.size() == 0) {
-    HOST_LOG("%s invalid result size: %zu/%zu", name, actual.size(), expected.size());
+    HOST_LOG("{} invalid result size: {}/{}", name, actual.size(), expected.size());
     return false;
   }
   return true;
@@ -157,12 +157,12 @@ bool verify_sampled(
   const auto count = actual.size();
   for (std::size_t index = 0; index < count; ++index) {
     if (!std::isfinite(actual.data()[index])) {
-      HOST_LOG("%s nonfinite output[%zu]", name, index);
+      HOST_LOG("{} nonfinite output[{}]", name, index);
       return false;
     }
   }
   const auto checks = std::min(samples, count);
-  HOST_LOG("Reference coverage: %zu/%zu values", checks, count);
+  HOST_LOG("Reference coverage: {}/{} values", checks, count);
   return verify_at(
     actual, expected, checks,
     [count, checks](std::size_t sample) {

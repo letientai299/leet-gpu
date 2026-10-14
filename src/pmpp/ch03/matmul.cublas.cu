@@ -48,7 +48,7 @@ Cublas& get_cublas() {
     // The host's shared cuBLAS may differ from the build toolkit.
     int version = 0;
     if (CUBLAS_CHECK(cublasGetVersion(slot->handle.get(), &version))) {
-      HOST_LOG("cuBLAS %d on device %d", version, device);
+      HOST_LOG("cuBLAS {} on device {}", version, device);
     }
   }
   return *slot;

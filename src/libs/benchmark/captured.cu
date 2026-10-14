@@ -92,7 +92,7 @@ cudaError_t inspect_graph(cudaGraph_t graph, KernelResources& resources) {
       name = "unknown";
     }
     HOST_LOG(
-      "Captured kernel %s grid %ux%ux%u block %ux%ux%u dyn %u B", name, params.gridDimX,
+      "Captured kernel {} grid {}x{}x{} block {}x{}x{} dyn {} B", name, params.gridDimX,
       params.gridDimY, params.gridDimZ, params.blockDimX, params.blockDimY, params.blockDimZ,
       params.sharedMemBytes
     );
@@ -102,7 +102,7 @@ cudaError_t inspect_graph(cudaGraph_t graph, KernelResources& resources) {
     return cudaErrorInvalidValue;
   }
   if (kernels.size() > 1) {
-    HOST_LOG("Resources show the first launched of %zu kernels", kernels.size());
+    HOST_LOG("Resources show the first launched of {} kernels", kernels.size());
   }
 
   const auto& first = kernels.front();

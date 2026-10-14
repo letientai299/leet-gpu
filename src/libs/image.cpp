@@ -46,7 +46,7 @@ bool load_rgb_png(const char* path, Image& image) {
     lodepng_decode_file(&decoded, &image.width, &image.height, path, LCT_RGB, 8);
   image.pixels.reset(decoded);
   if (error != 0) {
-    HOST_LOG("PNG decode failed: %s", lodepng_error_text(error));
+    HOST_LOG("PNG decode failed: {}", lodepng_error_text(error));
     return false;
   }
   image.size = image.pixel_count() * 3;
@@ -57,9 +57,7 @@ bool save_png(const char* path, const Image& image) {
   const auto channels = image.channels();
   if (channels == 0 || channels > kColorTypes.size() ||
       channels * image.pixel_count() != image.size) {
-    HOST_LOG(
-      "PNG encode failed: invalid size %zu for %ux%u", image.size, image.width, image.height
-    );
+    HOST_LOG("PNG encode failed: invalid size {} for {}x{}", image.size, image.width, image.height);
     return false;
   }
 
@@ -67,10 +65,10 @@ bool save_png(const char* path, const Image& image) {
     path, image.pixels.get(), image.width, image.height, kColorTypes[channels - 1], 8
   );
   if (error != 0) {
-    HOST_LOG("PNG encode failed: %s", lodepng_error_text(error));
+    HOST_LOG("PNG encode failed: {}", lodepng_error_text(error));
     return false;
   }
-  HOST_LOG("Wrote %ux%u %s", image.width, image.height, path);
+  HOST_LOG("Wrote {}x{} {}", image.width, image.height, path);
   return true;
 }
 
@@ -90,7 +88,7 @@ bool ImageBytes::upload(const Image& input, std::size_t output_size) {
 bool ImageBytes::download(Image& output, unsigned width, unsigned height) const {
   output.pixels.reset(static_cast<ImageByte*>(std::malloc(output_size_)));
   if (output.pixels == nullptr) {
-    HOST_LOG("Image allocation failed: %zu bytes", output_size_);
+    HOST_LOG("Image allocation failed: {} bytes", output_size_);
     return false;
   }
   output.width = width;

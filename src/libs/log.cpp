@@ -1,12 +1,8 @@
 #include "log.hpp"
 
 #include <algorithm>
-#include <array>
-#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
-#include <memory>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -59,26 +55,6 @@ void append_colored(
   output.append(color::reset);
 }
 
-std::string format_message(const char* format, va_list args) {
-  std::array<char, 512> buffer{};
-  va_list retry;
-  va_copy(retry, args);
-  const int size = std::vsnprintf(buffer.data(), buffer.size(), format, args);
-  if (size < 0) {
-    va_end(retry);
-    return {};
-  }
-  std::string message(static_cast<std::size_t>(size), '\0');
-  if (message.size() < buffer.size()) {
-    message.assign(buffer.data(), message.size());
-  } else {
-    // vsnprintf always writes a terminator, so it needs room for size + 1.
-    std::vsnprintf(message.data(), message.size() + 1, format, retry);
-  }
-  va_end(retry);
-  return message;
-}
-
 std::string
 add_metadata(std::string_view kind, std::string_view file, int line, std::string_view message) {
   const auto slash = file.find_last_of('/');
@@ -120,11 +96,7 @@ bool use_color(std::FILE* stream) {
   return std::getenv("NO_COLOR") == nullptr && isatty(fileno(stream)) != 0;
 }
 
-void write_log(const char* kind, const char* file, int line, const char* format, ...) {
-  va_list args;
-  va_start(args, format);
-  const auto message = format_message(format, args);
-  va_end(args);
+void write_log_message(const char* kind, const char* file, int line, std::string_view message) {
   spdlog::default_logger_raw()->log(
     {file, line, ""}, spdlog::level::info, add_metadata(kind, file, line, message)
   );

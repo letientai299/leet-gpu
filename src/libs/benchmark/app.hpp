@@ -180,7 +180,7 @@ int run_app(
     add(kernel.name, [&harness, kernel](nvbench::state& state, nvbench::type_list<>) {
       harness.run(state, kernel);
     });
-    HOST_LOG("Benchmark shape: %s", label.c_str());
+    HOST_LOG("Benchmark shape: {}", label);
     return run_args(static_cast<int>(args.remaining.size()), args.remaining.data());
   });
 }

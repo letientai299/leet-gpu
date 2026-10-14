@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdio>
+#include <fmt/format.h>
+#include <string_view>
+#include <utility>
 
 void init_log();
 void set_gpu_arch(int major, int minor);
@@ -8,16 +11,14 @@ const char* gpu_arch();
 /// True when `stream` is a terminal and NO_COLOR is unset.
 bool use_color(std::FILE* stream);
 
-// printf attribute makes the compiler type-check the varargs.
-// https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html
-#if defined(__GNUC__) || defined(__clang__)
-#define LG_PRINTF_FORMAT(fmt, first) __attribute__((format(printf, fmt, first)))
-#else
-#define LG_PRINTF_FORMAT(fmt, first)
-#endif
+void write_log_message(const char* kind, const char* file, int line, std::string_view message);
 
-LG_PRINTF_FORMAT(4, 5)
-void write_log(const char* kind, const char* file, int line, const char* format, ...);
+template <typename... Args>
+void write_log(
+  const char* kind, const char* file, int line, fmt::format_string<Args...> format, Args&&... args
+) {
+  write_log_message(kind, file, line, fmt::format(format, std::forward<Args>(args)...));
+}
 
 #define HOST_LOG(...) write_log("HOST", __FILE__, __LINE__, __VA_ARGS__)
 #define GPU_LOG(...) write_log(gpu_arch(), __FILE__, __LINE__, __VA_ARGS__)

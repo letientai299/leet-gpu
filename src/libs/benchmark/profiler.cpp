@@ -134,7 +134,7 @@ const Host* host_for(int device, CUcontext context) {
   }();
   auto host = std::make_unique<Host>();
   if (!initialized || !host->init(device, context)) {
-    HOST_LOG("Achieved occupancy unavailable on device %d", device);
+    HOST_LOG("Achieved occupancy unavailable on device {}", device);
     host.reset();
   }
   return hosts.emplace(device, std::move(host)).first->second.get();

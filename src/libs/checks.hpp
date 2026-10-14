@@ -19,7 +19,7 @@ inline bool cuda_check(cudaError_t error, const char* file, int line) {
     return true;
   }
 
-  write_log("CUDA", file, line, "%s: %s", cudaGetErrorName(error), cudaGetErrorString(error));
+  write_log("CUDA", file, line, "{}: {}", cudaGetErrorName(error), cudaGetErrorString(error));
   return false;
 }
 
@@ -45,7 +45,7 @@ inline bool npp_check(NppStatus status, const char* file, int line) {
     return true;
   }
 
-  write_log("NPP", file, line, "status %d", static_cast<int>(status));
+  write_log("NPP", file, line, "status {}", static_cast<int>(status));
   return false;
 }
 
@@ -60,7 +60,7 @@ inline bool cutlass_check(cutlass::Status status, const char* file, int line) {
     return true;
   }
 
-  write_log("CUTLASS", file, line, "%s", cutlass::cutlassGetStatusString(status));
+  write_log("CUTLASS", file, line, "{}", cutlass::cutlassGetStatusString(status));
   return false;
 }
 
@@ -79,7 +79,7 @@ inline bool driver_check(CUresult result, const char* file, int line) {
   if (cuGetErrorName(result, &name) != CUDA_SUCCESS) {
     name = "unknown";
   }
-  write_log("CUDA", file, line, "driver %s", name);
+  write_log("CUDA", file, line, "driver {}", name);
   return false;
 }
 
@@ -98,7 +98,7 @@ inline bool cupti_check(CUptiResult result, const char* file, int line) {
   if (cuptiGetResultString(result, &text) != CUPTI_SUCCESS) {
     text = "unknown";
   }
-  write_log("CUPTI", file, line, "%s", text);
+  write_log("CUPTI", file, line, "{}", text);
   return false;
 }
 
@@ -113,7 +113,7 @@ inline bool cublas_check(cublasStatus_t status, const char* file, int line) {
     return true;
   }
 
-  write_log("CUBLAS", file, line, "%s", cublasGetStatusString(status));
+  write_log("CUBLAS", file, line, "{}", cublasGetStatusString(status));
   return false;
 }
 
@@ -166,7 +166,7 @@ bool copy_checked(const Source& source, Destination& destination, const char* fi
   static_assert(std::is_same_v<std::remove_cv_t<Element>, std::remove_cv_t<SourceElement>>);
   if (source.size() > destination.size()) {
     write_log(
-      "CUDA", file, line, "copy destination holds %zu of %zu elements",
+      "CUDA", file, line, "copy destination holds {} of {} elements",
       static_cast<std::size_t>(destination.size()), static_cast<std::size_t>(source.size())
     );
     return false;
@@ -208,7 +208,7 @@ inline bool init_cuda() {
   }
 
   set_gpu_arch(device.major, device.minor);
-  HOST_LOG("%s (sm_%d%d)", device.name, device.major, device.minor);
+  HOST_LOG("{} (sm_{}{})", device.name, device.major, device.minor);
   return true;
 }
 
@@ -242,7 +242,7 @@ template <typename Fn> int run_host(int argc, char** argv, Fn&& body) {
 inline void log_image_launch(dim3 grid, dim3 block, std::size_t pixels) {
   const auto threads = static_cast<std::size_t>(grid.x) * grid.y * block.x * block.y;
   HOST_LOG(
-    "Grid %ux%u, block %ux%u, threads %zu, pixels %zu", grid.x, grid.y, block.x, block.y, threads,
+    "Grid {}x{}, block {}x{}, threads {}, pixels {}", grid.x, grid.y, block.x, block.y, threads,
     pixels
   );
 }

@@ -203,7 +203,7 @@ int check_app(const AppArgs& args, Kernel kernel) {
 }
 
 void log_shape(const GemmShape& shape) {
-  HOST_LOG("Benchmark shape: height %u, width %u, k %u", shape.m(), shape.n(), shape.k());
+  HOST_LOG("Benchmark shape: height {}, width {}, k {}", shape.m(), shape.n(), shape.k());
 }
 
 } // namespace

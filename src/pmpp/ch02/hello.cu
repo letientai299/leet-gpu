@@ -27,7 +27,7 @@ int run_hello() {
   }
 
   for (const int value : output) {
-    GPU_LOG("Hello from block %d, thread %d", value / 100, value % 100);
+    GPU_LOG("Hello from block {}, thread {}", value / 100, value % 100);
   }
   return 0;
 }
