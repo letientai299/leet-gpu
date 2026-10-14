@@ -54,7 +54,7 @@ struct ColdTiming {
 
 double infer_timer_step(std::vector<double> samples) {
   // Duration differences reveal quantization, not event overhead.
-  std::sort(samples.begin(), samples.end());
+  std::ranges::sort(samples);
   samples.erase(std::unique(samples.begin(), samples.end()), samples.end());
   double step = std::numeric_limits<double>::infinity();
   for (std::size_t index = 1; index < samples.size(); ++index) {
@@ -466,7 +466,7 @@ NVBENCH_MAIN_CATCH_EXCEPTIONS
 bool has_option(int argc, char** argv, std::initializer_list<std::string_view> options) {
   for (int index = 1; index < argc; ++index) {
     const std::string_view arg = argv[index];
-    if (std::find(options.begin(), options.end(), arg) != options.end()) {
+    if (std::ranges::find(options, arg) != options.end()) {
       return true;
     }
   }

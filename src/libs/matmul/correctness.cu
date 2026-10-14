@@ -33,9 +33,7 @@ bool run_reference(Problem& problem) {
       problem.result.cols() != problem.shape.n()) {
     throw std::invalid_argument("matrix shape mismatch");
   }
-  std::fill(
-    problem.expected.begin(), problem.expected.end(), std::numeric_limits<float>::quiet_NaN()
-  );
+  std::ranges::fill(problem.expected, std::numeric_limits<float>::quiet_NaN());
   using RowMajor = cutlass::layout::RowMajor;
   using Gemm = cutlass::gemm::device::Gemm<float, RowMajor, float, RowMajor, float, RowMajor>;
 
@@ -67,7 +65,7 @@ bool run_kernel(Problem& problem, Kernel kernel) {
     HOST_LOG("Kernel callback is null");
     return false;
   }
-  std::fill(problem.result.begin(), problem.result.end(), std::numeric_limits<float>::quiet_NaN());
+  std::ranges::fill(problem.result, std::numeric_limits<float>::quiet_NaN());
   const KernelInputs inputs(problem, kernel.inputs);
   return on_device(
     inputs.a(), inputs.b(), problem.result,

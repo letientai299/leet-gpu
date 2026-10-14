@@ -110,8 +110,8 @@ void fill_problem(Problem& problem) {
   for (std::size_t index = 0; index < problem.filter.size(); ++index) {
     problem.filter[index] = static_cast<float>(index % 5) * 0.125F - 0.25F;
   }
-  std::fill(problem.expected.begin(), problem.expected.end(), 0.0F);
-  std::fill(problem.result.begin(), problem.result.end(), 0.0F);
+  std::ranges::fill(problem.expected, 0.0F);
+  std::ranges::fill(problem.result, 0.0F);
 }
 
 int check(Problem& problem, Kernel kernel) {
@@ -126,7 +126,7 @@ int check(Problem& problem, Kernel kernel) {
   auto& pool = device_pool();
   // NPP expects reversed filter coefficients.
   auto npp_filter = problem.filter;
-  std::reverse(npp_filter.begin(), npp_filter.end());
+  std::ranges::reverse(npp_filter);
   const DeviceBuffer input{stream, pool, problem.input};
   const DeviceBuffer filter{stream, pool, problem.filter};
   const DeviceBuffer reference_filter{stream, pool, npp_filter};

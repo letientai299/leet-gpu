@@ -29,7 +29,7 @@ public:
   }
 
   void fill(Matrix& matrix) {
-    std::generate(matrix.begin(), matrix.end(), [this] {
+    std::ranges::generate(matrix, [this] {
       return dist_(rng_);
     });
   }

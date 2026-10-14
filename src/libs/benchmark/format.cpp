@@ -99,7 +99,7 @@ const Json* find_value(const Json& summary) {
     return nullptr;
   }
   const auto& data = summary.at("data");
-  const auto found = std::find_if(data.begin(), data.end(), [](const auto& item) {
+  const auto found = std::ranges::find_if(data, [](const auto& item) {
     return item.value("name", "") == "value";
   });
   return found == data.end() ? nullptr : &*found;
@@ -235,7 +235,7 @@ using Rows = std::vector<std::pair<std::string_view, std::string>>;
 
 // Prints the section only when one of its rows has a value.
 void print_block(std::string_view title, std::string_view note, const Rows& rows) {
-  const bool any = std::any_of(rows.begin(), rows.end(), [](const auto& row) {
+  const bool any = std::ranges::any_of(rows, [](const auto& row) {
     return !row.second.empty();
   });
   if (!any) {
@@ -501,7 +501,7 @@ std::string device_name(const Json& root, int id) {
     return {};
   }
   const auto& devices = root.at("devices");
-  const auto found = std::find_if(devices.begin(), devices.end(), [id](const auto& device) {
+  const auto found = std::ranges::find_if(devices, [id](const auto& device) {
     return device.value("id", -1) == id;
   });
   return found == devices.end() ? std::string{} : found->value("name", "");

@@ -34,7 +34,7 @@ public:
 
   /// Returns the cached value, building it from `args` on first use.
   template <typename... Args> T& get(int device, const Key& key, Args&&... args) {
-    const auto found = std::find_if(entries_.begin(), entries_.end(), [&](const auto& entry) {
+    const auto found = std::ranges::find_if(entries_, [&](const auto& entry) {
       return entry.device == device && entry.key == key;
     });
     if (found != entries_.end()) {

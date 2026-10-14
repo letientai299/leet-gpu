@@ -92,7 +92,7 @@ void print_choice_usage(
 
 const KernelChoice*
 find_choice(std::initializer_list<KernelChoice> choices, std::string_view name) {
-  const auto* found = std::find_if(choices.begin(), choices.end(), [name](const auto& choice) {
+  const auto* found = std::ranges::find_if(choices, [name](const auto& choice) {
     return choice.option == name;
   });
   return found == choices.end() ? nullptr : found;

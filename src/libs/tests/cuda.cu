@@ -144,7 +144,7 @@ void check_device(int device) {
     lg::matmul::Problem problem(shape);
     lg::matmul::fill_random(problem);
     require(lg::matmul::check(problem, {.name = "good", .launch = launch_gemm}) == 0);
-    std::fill(problem.a.begin(), problem.a.end(), 0.0F);
+    std::ranges::fill(problem.a, 0.0F);
     require(lg::matmul::check(problem, {.name = "missing", .launch = missing_gemm}) != 0);
   }
   for (const auto shape :
@@ -152,7 +152,7 @@ void check_device(int device) {
     lg::convolution::Problem problem{.shape = shape};
     lg::convolution::fill_problem(problem);
     require(lg::convolution::check(problem, {.name = "good", .launch = launch_2d}) == 0);
-    std::fill(problem.input.begin(), problem.input.end(), 0.0F);
+    std::ranges::fill(problem.input, 0.0F);
     require(lg::convolution::check(problem, {.name = "missing", .launch = missing_2d}) != 0);
     require(lg::convolution::check(problem, {.name = "good", .launch = launch_2d}) == 0);
     require(lg::convolution::check(problem, {.name = "missing", .launch = missing_2d}) != 0);
@@ -163,7 +163,7 @@ void check_device(int device) {
     require(lg::convolution3d::check(problem, {.name = "good", .launch = launch_3d}) == 0);
     require(lg::convolution3d::check(problem, {.name = "good", .launch = launch_3d}, 17) == 0);
     require(lg::convolution3d::check(problem, {.name = "good", .launch = launch_3d}, 1) == 0);
-    std::fill(problem.input.begin(), problem.input.end(), 0.0F);
+    std::ranges::fill(problem.input, 0.0F);
     require(lg::convolution3d::check(problem, {.name = "missing", .launch = missing_3d}) != 0);
     require(lg::convolution3d::check(problem, {.name = "missing", .launch = missing_3d}, 17) != 0);
   }
