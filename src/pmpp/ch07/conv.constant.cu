@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
     {.name = "conv.constant",
      .launch = launch_constant,
      .traffic = conv::constant::traffic,
-     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_constant_kernel, 32, 32>,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_constant_kernel, block_shape()>,
      .filter_setup = conv::constant::setup_filter}
   );
 }

@@ -68,8 +68,8 @@ void launch_matmul_coarse(
 const mm::Kernel kMatmulCoarse{
   .name = "matmul.coarse",
   .launch = launch_matmul_coarse,
-  .resources =
-    lg::benchmark::fixed_resources<mm::GemmShape, matmul_coarse_kernel, kTileWidth, kTileWidth>};
+  .resources = lg::benchmark::
+    fixed_resources<mm::GemmShape, matmul_coarse_kernel, dim3{kTileWidth, kTileWidth}>};
 
 } // namespace
 

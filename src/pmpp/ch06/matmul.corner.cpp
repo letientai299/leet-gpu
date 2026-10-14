@@ -84,8 +84,8 @@ const mm::Kernel kMatmulCorner{
   .name = "matmul.corner",
   .launch = launch_matmul_corner,
   .inputs = {nullptr, column_major},
-  .resources =
-    lg::benchmark::fixed_resources<mm::GemmShape, matmul_corner_kernel, kTileWidth, kTileWidth>};
+  .resources = lg::benchmark::
+    fixed_resources<mm::GemmShape, matmul_corner_kernel, dim3{kTileWidth, kTileWidth}>};
 
 } // namespace
 

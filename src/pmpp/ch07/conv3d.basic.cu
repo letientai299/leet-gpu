@@ -70,6 +70,6 @@ int main(int argc, char** argv) {
     {.name = "conv3d.basic",
      .launch = launch_basic,
      .traffic = conv::basic_traffic,
-     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_basic_kernel, 8, 8, 8>}
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_basic_kernel, block_shape()>}
   );
 }

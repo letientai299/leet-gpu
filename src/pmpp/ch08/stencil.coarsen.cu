@@ -94,8 +94,8 @@ int main(int argc, char** argv) {
   // The harness checks correctness and benchmarks execution.
   return st::run_app(
     argc, argv,
-    {"stencil.coarsen", launch_coarsen, nullptr,
-     // Report resources for the 32x32 thread block.
-     lg::benchmark::fixed_resources<st::Shape, stencil_coarsen, kInputTile, kInputTile>}
+    {.name = "stencil.coarsen",
+     .launch = launch_coarsen,
+     .resources = lg::benchmark::fixed_resources<st::Shape, stencil_coarsen, block_shape()>}
   );
 }

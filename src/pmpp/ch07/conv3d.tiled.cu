@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
     {.name = "conv3d.tiled",
      .launch = launch_tiled,
      .traffic = constant_traffic,
-     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_tiled_kernel, 8, 8, 8>,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_tiled_kernel, block_shape()>,
      .filter_setup = setup_filter}
   );
 }

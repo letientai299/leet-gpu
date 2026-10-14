@@ -97,7 +97,7 @@ void launch_matmul_col(
 cudaError_t matmul_cell_resources(
   const lg::matmul::GemmShape& shape, lg::benchmark::KernelResources& resources
 ) {
-  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_cell_kernel, 16, 16>(
+  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_cell_kernel, dim3{16, 16}>(
     shape, resources
   );
 }
@@ -105,7 +105,7 @@ cudaError_t matmul_cell_resources(
 cudaError_t matmul_row_resources(
   const lg::matmul::GemmShape& shape, lg::benchmark::KernelResources& resources
 ) {
-  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_row_kernel, 256>(
+  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_row_kernel, dim3{256}>(
     shape, resources
   );
 }
@@ -113,7 +113,7 @@ cudaError_t matmul_row_resources(
 cudaError_t matmul_col_resources(
   const lg::matmul::GemmShape& shape, lg::benchmark::KernelResources& resources
 ) {
-  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_col_kernel, 256>(
+  return lg::benchmark::fixed_resources<lg::matmul::GemmShape, matmul_col_kernel, dim3{256}>(
     shape, resources
   );
 }

@@ -59,6 +59,6 @@ int main(int argc, char** argv) {
     {.name = "conv.basic",
      .launch = launch_basic,
      .traffic = conv::basic_traffic,
-     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_basic_kernel, 32, 32>}
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_basic_kernel, block_shape()>}
   );
 }

@@ -235,7 +235,8 @@ int main(int argc, char** argv) try {
         {.name = "convolution2d",
          .launch = launch_2d,
          .traffic = lg::convolution::basic_traffic,
-         .resources = lg::benchmark::fixed_resources<lg::convolution::Shape, convolution, 128>},
+         .resources =
+           lg::benchmark::fixed_resources<lg::convolution::Shape, convolution, dim3{128}>},
         {257, 193, 3}
       );
     }
@@ -245,7 +246,8 @@ int main(int argc, char** argv) try {
         {.name = "convolution3d",
          .launch = launch_3d,
          .traffic = lg::convolution3d::basic_traffic,
-         .resources = lg::benchmark::fixed_resources<lg::convolution3d::Shape, convolution, 128>},
+         .resources =
+           lg::benchmark::fixed_resources<lg::convolution3d::Shape, convolution, dim3{128}>},
         {64, 33, 17, 3}
       );
     }
@@ -255,7 +257,7 @@ int main(int argc, char** argv) try {
         {.name = "stencil",
          .launch = launch_stencil,
          .traffic = lg::stencil::basic_traffic,
-         .resources = lg::benchmark::fixed_resources<lg::stencil::Shape, stencil, 128>},
+         .resources = lg::benchmark::fixed_resources<lg::stencil::Shape, stencil, dim3{128}>},
         {64, 33, 17}
       );
     }
@@ -270,11 +272,11 @@ int main(int argc, char** argv) try {
         {{.name = "baseline",
           .launch = launch_gemm,
           .traffic = lg::matmul::cell_traffic,
-          .resources = lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, 128>},
+          .resources = lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, dim3{128}>},
          {.name = "candidate",
           .launch = launch_gemm,
           .traffic = lg::matmul::cell_traffic,
-          .resources = lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, 128>}}
+          .resources = lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, dim3{128}>}}
       );
     }
     lg::benchmark::add("failure", [mode](nvbench::state& state, nvbench::type_list<>) {

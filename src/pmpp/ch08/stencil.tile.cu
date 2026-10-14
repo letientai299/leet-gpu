@@ -96,7 +96,6 @@ int main(int argc, char** argv) {
     argc, argv,
     {.name = "stencil.tile",
      .launch = launch_tile,
-     .resources =
-       lg::benchmark::fixed_resources<st::Shape, stencil_tile, kInputTile, kInputTile, kInputTile>}
+     .resources = lg::benchmark::fixed_resources<st::Shape, stencil_tile, block_shape()>}
   );
 }

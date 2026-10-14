@@ -82,8 +82,8 @@ const mm::Kernel kMatmulTile{
   .name = "matmul.tile",
   .launch = launch_matmul_tile,
   .traffic = tile_traffic,
-  .resources =
-    lg::benchmark::fixed_resources<mm::GemmShape, matmul_tile_kernel, kTileWidth, kTileWidth>};
+  .resources = lg::benchmark::
+    fixed_resources<mm::GemmShape, matmul_tile_kernel, dim3{kTileWidth, kTileWidth}>};
 
 } // namespace
 

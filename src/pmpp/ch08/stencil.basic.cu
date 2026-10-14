@@ -60,6 +60,6 @@ int main(int argc, char** argv) {
     {.name = "stencil.basic",
      .launch = launch_basic,
      .traffic = st::basic_traffic,
-     .resources = lg::benchmark::fixed_resources<st::Shape, stencil_basic, 8, 8, 8>}
+     .resources = lg::benchmark::fixed_resources<st::Shape, stencil_basic, block_shape()>}
   );
 }

@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
     {.name = "conv.tiled",
      .launch = launch_tiled,
      .traffic = conv::constant::traffic,
-     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_tiled_kernel, 16, 16>,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_tiled_kernel, block_shape()>,
      .filter_setup = conv::constant::setup_filter}
   );
 }

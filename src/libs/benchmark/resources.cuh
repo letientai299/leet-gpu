@@ -86,15 +86,9 @@ inspect_kernel(dim3 block, std::size_t dynamic_shared_bytes, KernelResources& re
 }
 
 /// Adapts a fixed launch configuration to a shape-aware resource callback.
-template <
-  typename Shape,
-  auto DeviceKernel,
-  unsigned BlockX,
-  unsigned BlockY = 1,
-  unsigned BlockZ = 1,
-  std::size_t DynamicSharedBytes = 0>
+template <typename Shape, auto DeviceKernel, dim3 Block, std::size_t DynamicSharedBytes = 0>
 cudaError_t fixed_resources(const Shape&, KernelResources& resources) {
-  return inspect_kernel<DeviceKernel>(dim3{BlockX, BlockY, BlockZ}, DynamicSharedBytes, resources);
+  return inspect_kernel<DeviceKernel>(Block, DynamicSharedBytes, resources);
 }
 
 } // namespace lg::benchmark

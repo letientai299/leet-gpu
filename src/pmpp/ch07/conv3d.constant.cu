@@ -94,7 +94,8 @@ int main(int argc, char** argv) {
     {.name = "conv3d.constant",
      .launch = launch_constant,
      .traffic = constant_traffic,
-     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_constant_kernel, 8, 8, 8>,
+     .resources =
+       lg::benchmark::fixed_resources<conv::Shape, conv3d_constant_kernel, block_shape()>,
      .filter_setup = setup_filter}
   );
 }
