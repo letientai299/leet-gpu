@@ -5,13 +5,14 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <cuda/buffer>
 #include <cuda/devices>
 #include <cuda/memory_pool>
-#include <cuda/std/span>
 #include <cuda/stream>
 #include <cuda_runtime.h>
 #include <fmt/format.h>
 #include <source_location>
+#include <span>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -168,20 +169,15 @@ inline auto& device_pool() {
 // call, but it fails with "invalid argument" on CCCL 3.4.2 + CTK 13.4, so this
 // stays on the runtime API.
 // https://nvidia.github.io/cccl/libcudacxx/extended_api/algorithms/copy_bytes.html
-template <typename Source, typename Destination>
+template <typename Element>
 bool copy_checked(
-  const Source& source,
-  Destination& destination,
+  const cuda::device_buffer<Element>& source,
+  std::type_identity_t<std::span<Element>> destination,
   std::source_location where = std::source_location::current()
 ) {
-  using Element = std::remove_pointer_t<decltype(destination.data())>;
-  using SourceElement = std::remove_pointer_t<decltype(source.data())>;
-  static_assert(std::is_trivially_copyable_v<Element>, "readback needs a trivially copyable type");
-  static_assert(std::is_same_v<std::remove_cv_t<Element>, std::remove_cv_t<SourceElement>>);
   if (source.size() > destination.size()) {
     log_check_failure(
-      "CUDA", where, "copy destination holds {} of {} elements",
-      static_cast<std::size_t>(destination.size()), static_cast<std::size_t>(source.size())
+      "CUDA", where, "copy destination holds {} of {} elements", destination.size(), source.size()
     );
     return false;
   }

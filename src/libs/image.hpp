@@ -5,8 +5,8 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cuda/buffer>
-#include <cuda/std/span>
 #include <memory>
+#include <span>
 
 using ImageByte = unsigned char;
 
@@ -33,7 +33,7 @@ struct Image {
     const auto pixels_count = pixel_count();
     return pixels_count == 0 ? 0 : size / pixels_count;
   }
-  [[nodiscard]] cuda::std::span<ImageByte> bytes() const {
+  [[nodiscard]] std::span<ImageByte> bytes() const {
     return {pixels.get(), size};
   }
 };

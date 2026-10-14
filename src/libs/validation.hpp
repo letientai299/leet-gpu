@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <span>
 #include <stdexcept>
 
 namespace lg {
@@ -70,10 +71,10 @@ struct ErrorStats {
 };
 
 /// Compares `checks` positions picked by `index_of(sample)`.
-template <typename Actual, typename Expected, typename IndexOf>
+template <typename IndexOf>
 bool verify_at(
-  const Actual& actual,
-  const Expected& expected,
+  std::span<const float> actual,
+  std::span<const float> expected,
   std::size_t checks,
   IndexOf index_of,
   const char* name,
@@ -83,7 +84,7 @@ bool verify_at(
   ErrorStats stats;
   for (std::size_t sample = 0; sample < checks; ++sample) {
     const auto index = index_of(sample);
-    stats.add(actual.data()[index], expected.data()[index], atol, rtol);
+    stats.add(actual[index], expected[index], atol, rtol);
   }
   HOST_LOG(
     "{}: mismatches={}/{} nonfinite={}", name, stats.mismatches, stats.count, stats.nonfinite
@@ -99,15 +100,14 @@ bool verify_at(
     const auto index = index_of(stats.first);
     HOST_LOG(
       "First mismatch[{}]: actual={:g} expected={:g} atol={:g} rtol={:g}", index,
-      static_cast<double>(actual.data()[index]), static_cast<double>(expected.data()[index]), atol,
-      rtol
+      static_cast<double>(actual[index]), static_cast<double>(expected[index]), atol, rtol
     );
   }
   return stats.mismatches == 0;
 }
 
-template <typename Actual, typename Expected>
-bool same_size(const Actual& actual, const Expected& expected, const char* name) {
+inline bool
+same_size(std::span<const float> actual, std::span<const float> expected, const char* name) {
   if (actual.size() != expected.size() || actual.size() == 0) {
     HOST_LOG("{} invalid result size: {}/{}", name, actual.size(), expected.size());
     return false;
@@ -115,10 +115,9 @@ bool same_size(const Actual& actual, const Expected& expected, const char* name)
   return true;
 }
 
-template <typename Actual, typename Expected>
-bool verify_values(
-  const Actual& actual,
-  const Expected& expected,
+inline bool verify_values(
+  std::span<const float> actual,
+  std::span<const float> expected,
   const char* name,
   double atol = kDefaultAtol,
   double rtol = kDefaultRtol
@@ -144,9 +143,11 @@ inline std::size_t sample_index(std::size_t sample, std::size_t count, std::size
 
 /// Compares every value when samples is 0. Otherwise requires every value to be
 /// finite, then compares `samples` evenly spaced positions.
-template <typename Actual, typename Expected>
-bool verify_sampled(
-  const Actual& actual, const Expected& expected, std::size_t samples, const char* name
+inline bool verify_sampled(
+  std::span<const float> actual,
+  std::span<const float> expected,
+  std::size_t samples,
+  const char* name
 ) {
   if (samples == 0) {
     return verify_values(actual, expected, name);
@@ -156,7 +157,7 @@ bool verify_sampled(
   }
   const auto count = actual.size();
   for (std::size_t index = 0; index < count; ++index) {
-    if (!std::isfinite(actual.data()[index])) {
+    if (!std::isfinite(actual[index])) {
       HOST_LOG("{} nonfinite output[{}]", name, index);
       return false;
     }
