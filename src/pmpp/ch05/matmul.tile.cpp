@@ -78,12 +78,13 @@ bool tile_traffic(const mm::GemmShape& shape, mm::Traffic& traffic) {
   return true;
 }
 
+constexpr dim3 kBlock{kTileWidth, kTileWidth};
+
 const mm::Kernel kMatmulTile{
   .name = "matmul.tile",
   .launch = launch_matmul_tile,
   .traffic = tile_traffic,
-  .resources = lg::benchmark::
-    fixed_resources<mm::GemmShape, matmul_tile_kernel, dim3{kTileWidth, kTileWidth}>};
+  .resources = lg::benchmark::fixed_resources<mm::GemmShape, matmul_tile_kernel, kBlock>};
 
 } // namespace
 

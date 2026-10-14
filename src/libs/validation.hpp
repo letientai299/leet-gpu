@@ -108,7 +108,7 @@ bool verify_at(
 
 inline bool
 same_size(std::span<const float> actual, std::span<const float> expected, const char* name) {
-  if (actual.size() != expected.size() || actual.size() == 0) {
+  if (actual.size() != expected.size() || actual.empty()) {
     HOST_LOG("{} invalid result size: {}/{}", name, actual.size(), expected.size());
     return false;
   }

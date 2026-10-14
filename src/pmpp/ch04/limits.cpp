@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <exception>
 #include <format>
 #include <iterator>
 #include <optional>
@@ -582,7 +583,7 @@ void print_help() {
 
 } // namespace
 
-int main() {
+int main() try {
   std::setvbuf(stdout, nullptr, _IOLBF, 0);
 
   int driver_version = 0;
@@ -607,4 +608,7 @@ int main() {
   print_peer_access(device_count);
   print_help();
   return device_count == 0 ? 1 : 0;
+} catch (const std::exception& error) {
+  std::fprintf(stderr, "%s\n", error.what());
+  return 1;
 }

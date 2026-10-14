@@ -46,8 +46,9 @@ cudaError_t fill_resources(
       return status;
     }
   }
-  if (block.x == 0 || block.y == 0 || block.z == 0 || block.x > static_cast<unsigned>(max_x) ||
-      block.y > static_cast<unsigned>(max_y) || block.z > static_cast<unsigned>(max_z)) {
+  if (warp_size <= 0 || block.x == 0 || block.y == 0 || block.z == 0 ||
+      block.x > static_cast<unsigned>(max_x) || block.y > static_cast<unsigned>(max_y) ||
+      block.z > static_cast<unsigned>(max_z)) {
     return cudaErrorInvalidConfiguration;
   }
   const auto threads = static_cast<std::size_t>(block.x) * block.y * block.z;
