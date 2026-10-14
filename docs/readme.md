@@ -187,16 +187,21 @@ tools.
 ## Notebooks
 
 [JupyterLab][jupyterlab] uses an isolated [uv][uv] environment under
-`src/notebooks/`. Group notebooks by topic, starting with `stencils/`.
+`src/notebooks/`. No notebooks are required or shipped. Group local notebooks
+by topic within that directory.
 
 ```sh
 mise run nb
 ```
 
-Double-click `stencils/intro.md` to run it directly as a notebook through
-[Jupytext][jupytext]. Saving writes MyST Markdown without creating an `.ipynb`.
-Outputs live in the browser session and are lost when the notebook is reopened.
-Run the cells again to regenerate them.
+Create a Python notebook from the launcher. To use text notebooks, open a MyST
+Markdown file through [Jupytext][jupytext]. Saving a Markdown notebook writes
+MyST Markdown without creating an `.ipynb`. Its outputs live in the browser
+session and are lost when reopened. Run the cells again to regenerate them.
+
+Playground contents are gitignored except for the environment files. To share a
+notebook, add its exact path as a `!` exception at the end of `.gitignore`, then
+add the file to Git. Keep required companion files as explicit exceptions too.
 
 Markdown notebooks open with code inputs collapsed and outputs visible.
 Input visibility stays in the browser; saving does not add per-cell visibility

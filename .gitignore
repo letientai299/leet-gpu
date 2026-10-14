@@ -11,8 +11,16 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 *.egg-info/
-src/notebooks/**/*.ipynb
+*.ipynb
 .ipynb_checkpoints/
+
+# Local notebook playground
+/src/notebooks/**
+!/src/notebooks/**/
+!/src/notebooks/.python-version
+!/src/notebooks/jupytext.toml
+!/src/notebooks/pyproject.toml
+!/src/notebooks/uv.lock
 
 # JupyterLab preferences
 .config/jupyter/lab/user-settings/**
