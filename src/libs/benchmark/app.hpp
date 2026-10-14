@@ -5,9 +5,11 @@
 #include "log.hpp"
 
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdio>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -77,18 +79,38 @@ inline bool parse_app_args(int argc, char** argv, AppArgs& args) {
   return args.bench || args.remaining.size() == 1;
 }
 
+/// Rejects a bad domain at the template argument, not inside `measure`.
+/// `kCheckShape` is compared in full; `kBenchSamples` values are compared at
+/// the bench shape (0 means every value).
+template <typename Domain>
+concept BenchDomain = requires(
+  typename Domain::Problem& problem,
+  const typename Domain::Kernel& kernel,
+  const typename Domain::Shape& shape,
+  typename Domain::Device& device,
+  std::size_t samples,
+  cudaStream_t stream
+) {
+  requires std::constructible_from<typename Domain::Device, const typename Domain::Problem&>;
+  { problem.shape } -> std::convertible_to<typename Domain::Shape>;
+  requires std::copy_constructible<typename Domain::Kernel>;
+  requires std::move_constructible<typename Domain::Problem>;
+  { kernel.name } -> std::convertible_to<std::string_view>;
+  {
+    kernel.resources
+  } -> std::convertible_to<cudaError_t (*)(const typename Domain::Shape&, KernelResources&)>;
+  { device.prepare(kernel) } -> std::same_as<cudaError_t>;
+  device.launch(kernel, stream);
+  { Domain::kCheckShape } -> std::convertible_to<typename Domain::Shape>;
+  { Domain::kBenchSamples } -> std::convertible_to<std::size_t>;
+  { Domain::make_problem(shape) } -> std::same_as<typename Domain::Problem>;
+  { Domain::check(problem, kernel, samples) } -> std::same_as<int>;
+  { Domain::workload(shape, kernel) } -> std::same_as<std::optional<Workload>>;
+  { Domain::label(shape) } -> std::convertible_to<std::string>;
+};
+
 /// Checks then benchmarks one kernel of a fixed-shape domain.
-///
-/// `Domain` supplies:
-/// - `Shape`, `Problem` (with `shape`), `Kernel` (with `name` and `resources`)
-/// - `Device`, built from `(const Problem&)` on the current device, with
-///   `cudaError_t prepare(const Kernel&)` and `void launch(const Kernel&, cudaStream_t)`
-/// - `kCheckShape`, compared in full, and `kBenchSamples`, compared at the
-///   bench shape (0 means every value)
-/// - `Problem make_problem(Shape)`, `int check(Problem&, const Kernel&, std::size_t samples)`,
-///   `std::optional<Workload> workload(const Shape&, const Kernel&)`,
-///   `std::string label(const Shape&)`
-template <typename Domain> class Harness {
+template <BenchDomain Domain> class Harness {
 public:
   using Kernel = typename Domain::Kernel;
   using Problem = typename Domain::Problem;
@@ -126,7 +148,7 @@ private:
   DeviceCache<typename Domain::Device> devices_;
 };
 
-template <typename Domain>
+template <BenchDomain Domain>
 int run_app(
   int argc, char** argv, const typename Domain::Kernel& kernel, typename Domain::Shape bench_shape
 ) {
