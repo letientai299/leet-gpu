@@ -26,6 +26,7 @@ add_cuda_app(pmpp/ch07/conv3d.tiled LIBRARIES lg_convolution3d_nvbench)
 add_cuda_app(pmpp/ch08/stencil.basic LIBRARIES lg_stencil_nvbench)
 add_cuda_app(pmpp/ch08/stencil.tile LIBRARIES lg_stencil_nvbench)
 add_cuda_app(pmpp/ch08/stencil.coarsen LIBRARIES lg_stencil_nvbench)
+add_cuda_app(pmpp/ch08/stencil.register LIBRARIES lg_stencil_nvbench)
 add_cuda_app(
   pmpp/ch05/matmul.tile
   LIBRARIES lg_matmul_kernels lg_matmul_nvbench

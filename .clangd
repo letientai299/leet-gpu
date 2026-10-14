@@ -32,6 +32,10 @@ CompileFlags:
     - --expt-relaxed-constexpr
     - --compress-mode=*
 Diagnostics:
+  # Strict skips slow checks like misc-const-correctness.
+  # https://clangd.llvm.org/config#fastcheckfilter
+  ClangTidy:
+    FastCheckFilter: None
   Includes:
     # threadIdx/blockIdx are builtins injected by clang's CUDA wrapper;
     # never suggest explicitly including the internal header that declares them.

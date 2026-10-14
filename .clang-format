@@ -7,6 +7,8 @@ ColumnLimit: 100
 AllowShortFunctionsOnASingleLine: None
 UseTab: Never
 PointerAlignment: Left # Google/Chromium/Mozilla
+# Moves clang-tidy's `float const` fixes to `const float`.
+QualifierAlignment: Left
 DerivePointerAlignment: false
 BreakAfterOpenBracketFunction: true
 BreakBeforeCloseBracketFunction: true
