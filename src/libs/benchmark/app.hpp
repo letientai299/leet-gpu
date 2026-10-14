@@ -27,7 +27,7 @@ public:
 
   ~DeviceCache() {
     for (auto& entry : entries_) {
-      CUDA_CHECK(cudaSetDevice(entry.device));
+      check_status(cudaSetDevice(entry.device));
       entry.value.reset();
     }
   }
@@ -40,7 +40,7 @@ public:
     if (found != entries_.end()) {
       return *found->value;
     }
-    if (!CUDA_CHECK(cudaSetDevice(device))) {
+    if (!check_status(cudaSetDevice(device))) {
       throw std::runtime_error("CUDA device selection failed");
     }
     entries_.push_back({device, key, std::make_unique<T>(std::forward<Args>(args)...)});
@@ -125,13 +125,13 @@ public:
       return;
     }
     const int device = selected->get_id();
-    if (!CUDA_CHECK(cudaSetDevice(device)) ||
+    if (!check_status(cudaSetDevice(device)) ||
         Domain::check(host_, kernel, Domain::kBenchSamples) != 0) {
       state.skip("benchmark correctness failed");
       return;
     }
     auto& data = devices_.get(device, 0, host_);
-    if (!CUDA_CHECK(data.prepare(kernel))) {
+    if (!check_status(data.prepare(kernel))) {
       state.skip("CUDA kernel setup failed");
       return;
     }

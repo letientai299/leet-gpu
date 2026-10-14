@@ -19,8 +19,8 @@ int run_hello() {
   cuda::device_buffer<int> device_output{default_stream(), device_pool(), count, cuda::no_init};
 
   hello_kernel<<<blocks, threads>>>(device_output.data());
-  if (!CUDA_CHECK(cudaGetLastError()) ||
-      !CUDA_CHECK(
+  if (!check_status(cudaGetLastError()) ||
+      !check_status(
         cudaMemcpy(output, device_output.data(), sizeof(output), cudaMemcpyDeviceToHost)
       )) {
     return 1;

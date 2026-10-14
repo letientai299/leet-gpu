@@ -35,7 +35,7 @@ public:
       CUpti_Profiler_Host_Deinitialize_Params params{
         CUpti_Profiler_Host_Deinitialize_Params_STRUCT_SIZE};
       params.pHostObject = object_;
-      CUPTI_CHECK(cuptiProfilerHostDeinitialize(&params));
+      check_status(cuptiProfilerHostDeinitialize(&params));
     }
   }
   Host(const Host&) = delete;
@@ -47,13 +47,13 @@ public:
     CUpti_Profiler_GetCounterAvailability_Params availability{
       CUpti_Profiler_GetCounterAvailability_Params_STRUCT_SIZE};
     availability.ctx = context;
-    if (!CUPTI_CHECK(cuptiDeviceGetChipName(&chip)) ||
-        !CUPTI_CHECK(cuptiProfilerGetCounterAvailability(&availability))) {
+    if (!check_status(cuptiDeviceGetChipName(&chip)) ||
+        !check_status(cuptiProfilerGetCounterAvailability(&availability))) {
       return false;
     }
     Image counters(availability.counterAvailabilityImageSize);
     availability.pCounterAvailabilityImage = counters.data();
-    if (!CUPTI_CHECK(cuptiProfilerGetCounterAvailability(&availability))) {
+    if (!check_status(cuptiProfilerGetCounterAvailability(&availability))) {
       return false;
     }
 
@@ -61,7 +61,7 @@ public:
     params.profilerType = CUPTI_PROFILER_TYPE_RANGE_PROFILER;
     params.pChipName = chip.pChipName;
     params.pCounterAvailabilityImage = counters.data();
-    if (!CUPTI_CHECK(cuptiProfilerHostInitialize(&params))) {
+    if (!check_status(cuptiProfilerHostInitialize(&params))) {
       return false;
     }
     object_ = params.pHostObject;
@@ -75,8 +75,8 @@ public:
     CUpti_Profiler_Host_GetConfigImageSize_Params size{
       CUpti_Profiler_Host_GetConfigImageSize_Params_STRUCT_SIZE};
     size.pHostObject = object_;
-    if (!CUPTI_CHECK(cuptiProfilerHostConfigAddMetrics(&add)) ||
-        !CUPTI_CHECK(cuptiProfilerHostGetConfigImageSize(&size))) {
+    if (!check_status(cuptiProfilerHostConfigAddMetrics(&add)) ||
+        !check_status(cuptiProfilerHostGetConfigImageSize(&size))) {
       return false;
     }
     config_.resize(size.configImageSize);
@@ -85,7 +85,7 @@ public:
     image.pHostObject = object_;
     image.pConfigImage = config_.data();
     image.configImageSize = config_.size();
-    return CUPTI_CHECK(cuptiProfilerHostGetConfigImage(&image));
+    return check_status(cuptiProfilerHostGetConfigImage(&image));
   }
 
   [[nodiscard]] const Image& config() const {
@@ -97,7 +97,7 @@ public:
       CUpti_RangeProfiler_GetCounterDataInfo_Params_STRUCT_SIZE};
     info.pCounterDataImage = counters.data();
     info.counterDataImageSize = counters.size();
-    if (!CUPTI_CHECK(cuptiRangeProfilerGetCounterDataInfo(&info)) || info.numTotalRanges != 1) {
+    if (!check_status(cuptiRangeProfilerGetCounterDataInfo(&info)) || info.numTotalRanges != 1) {
       return std::nullopt;
     }
     Metrics metrics{kMetric};
@@ -111,7 +111,7 @@ public:
     params.ppMetricNames = metrics.data();
     params.numMetrics = metrics.size();
     params.pMetricValues = &percent;
-    if (!CUPTI_CHECK(cuptiProfilerHostEvaluateToGpuValues(&params))) {
+    if (!check_status(cuptiProfilerHostEvaluateToGpuValues(&params))) {
       return std::nullopt;
     }
     return percent / 100.0;
@@ -130,7 +130,7 @@ const Host* host_for(int device, CUcontext context) {
   }
   static const bool initialized = [] {
     CUpti_Profiler_Initialize_Params params{CUpti_Profiler_Initialize_Params_STRUCT_SIZE};
-    return CUPTI_CHECK(cuptiProfilerInitialize(&params));
+    return check_status(cuptiProfilerInitialize(&params));
   }();
   auto host = std::make_unique<Host>();
   if (!initialized || !host->init(device, context)) {
@@ -152,18 +152,19 @@ bool collect_pass(
   CUpti_RangeProfiler_PushRange_Params push{CUpti_RangeProfiler_PushRange_Params_STRUCT_SIZE};
   push.pRangeProfilerObject = object;
   push.pRangeName = "launch";
-  if (!CUPTI_CHECK(cuptiRangeProfilerStart(&start)) ||
-      !CUPTI_CHECK(cuptiRangeProfilerPushRange(&push))) {
+  if (!check_status(cuptiRangeProfilerStart(&start)) ||
+      !check_status(cuptiRangeProfilerPushRange(&push))) {
     return false;
   }
   launch(stream);
-  const bool launched = CUDA_CHECK(cudaGetLastError()) && CUDA_CHECK(cudaStreamSynchronize(stream));
+  const bool launched =
+    check_status(cudaGetLastError()) && check_status(cudaStreamSynchronize(stream));
   CUpti_RangeProfiler_PopRange_Params pop{CUpti_RangeProfiler_PopRange_Params_STRUCT_SIZE};
   pop.pRangeProfilerObject = object;
   CUpti_RangeProfiler_Stop_Params stop{CUpti_RangeProfiler_Stop_Params_STRUCT_SIZE};
   stop.pRangeProfilerObject = object;
   const bool stopped =
-    CUPTI_CHECK(cuptiRangeProfilerPopRange(&pop)) && CUPTI_CHECK(cuptiRangeProfilerStop(&stop));
+    check_status(cuptiRangeProfilerPopRange(&pop)) && check_status(cuptiRangeProfilerStop(&stop));
   done = stop.isAllPassSubmitted != 0;
   return launched && stopped;
 }
@@ -182,7 +183,7 @@ std::optional<double> collect(
   size.numMetrics = metrics.size();
   size.maxNumOfRanges = 1;
   size.maxNumRangeTreeNodes = 1;
-  if (!CUPTI_CHECK(cuptiRangeProfilerGetCounterDataSize(&size))) {
+  if (!check_status(cuptiRangeProfilerGetCounterDataSize(&size))) {
     return std::nullopt;
   }
   Image counters(size.counterDataSize);
@@ -205,8 +206,8 @@ std::optional<double> collect(
   config.minNestingLevel = 1;
   config.passIndex = 0;
   config.targetNestingLevel = 1;
-  if (!CUPTI_CHECK(cuptiRangeProfilerCounterDataImageInitialize(&image)) ||
-      !CUPTI_CHECK(cuptiRangeProfilerSetConfig(&config))) {
+  if (!check_status(cuptiRangeProfilerCounterDataImageInitialize(&image)) ||
+      !check_status(cuptiRangeProfilerSetConfig(&config))) {
     return std::nullopt;
   }
 
@@ -218,7 +219,7 @@ std::optional<double> collect(
   }
   CUpti_RangeProfiler_DecodeData_Params decode{CUpti_RangeProfiler_DecodeData_Params_STRUCT_SIZE};
   decode.pRangeProfilerObject = object;
-  if (!CUPTI_CHECK(cuptiRangeProfilerDecodeData(&decode))) {
+  if (!check_status(cuptiRangeProfilerDecodeData(&decode))) {
     return std::nullopt;
   }
   return host.evaluate(counters);
@@ -234,7 +235,7 @@ std::optional<double> achieved_occupancy(
     return std::nullopt;
   }
   CUcontext context = nullptr;
-  if (!CUDA_CHECK(cudaSetDevice(device)) || !DRIVER_CHECK(cuCtxGetCurrent(&context))) {
+  if (!check_status(cudaSetDevice(device)) || !check_status(cuCtxGetCurrent(&context))) {
     return std::nullopt;
   }
   const Host* host = host_for(device, context);
@@ -243,13 +244,13 @@ std::optional<double> achieved_occupancy(
   }
   CUpti_RangeProfiler_Enable_Params enable{CUpti_RangeProfiler_Enable_Params_STRUCT_SIZE};
   enable.ctx = context;
-  if (!CUPTI_CHECK(cuptiRangeProfilerEnable(&enable))) {
+  if (!check_status(cuptiRangeProfilerEnable(&enable))) {
     return std::nullopt;
   }
   const auto value = collect(*host, enable.pRangeProfilerObject, stream, launch);
   CUpti_RangeProfiler_Disable_Params disable{CUpti_RangeProfiler_Disable_Params_STRUCT_SIZE};
   disable.pRangeProfilerObject = enable.pRangeProfilerObject;
-  CUPTI_CHECK(cuptiRangeProfilerDisable(&disable));
+  check_status(cuptiRangeProfilerDisable(&disable));
   return value;
 }
 

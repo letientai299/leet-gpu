@@ -61,7 +61,7 @@ void measure(
   const Shape& shape,
   Launch&& launch
 ) {
-  if (!CUDA_CHECK(cudaDeviceSynchronize())) {
+  if (!check_status(cudaDeviceSynchronize())) {
     state.skip("CUDA setup failed");
     return;
   }

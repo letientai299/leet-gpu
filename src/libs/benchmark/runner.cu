@@ -315,7 +315,7 @@ bool add_resources(
   nvbench::state& state, const std::function<cudaError_t(KernelResources&)>& query
 ) {
   KernelResources resources;
-  if (!CUDA_CHECK(query(resources))) {
+  if (!check_status(query(resources))) {
     state.skip("CUDA kernel resource query failed");
     return false;
   }

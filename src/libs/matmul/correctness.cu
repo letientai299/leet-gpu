@@ -20,7 +20,7 @@ bool on_device(const Matrix& a, const Matrix& b, Matrix& output, Operation&& ope
   const DeviceMatrix device_a{stream, pool, a};
   const DeviceMatrix device_b{stream, pool, b};
   DeviceMatrix device_c{stream, pool, output};
-  return operation(device_a, device_b, device_c) && COPY_CHECK(device_c, output);
+  return operation(device_a, device_b, device_c) && copy_checked(device_c, output);
 }
 
 } // namespace
@@ -56,7 +56,7 @@ bool run_reference(Problem& problem) {
       return true;
 #else
       Gemm gemm;
-      return CUTLASS_CHECK(gemm(args));
+      return check_status(gemm(args));
 #endif
     }
   );

@@ -236,7 +236,7 @@ Benchmark& Benchmark::operator=(Benchmark&&) noexcept = default;
 
 void Benchmark::run(nvbench::state& state, Kernel kernel) {
   const auto& device = state.get_device();
-  if (!device || !CUDA_CHECK(cudaSetDevice(device->get_id())) || !impl_->check(kernel)) {
+  if (!device || !check_status(cudaSetDevice(device->get_id())) || !impl_->check(kernel)) {
     state.skip("benchmark correctness failed");
     return;
   }

@@ -80,7 +80,7 @@ bool ImageBytes::upload(const Image& input, std::size_t output_size) {
     cuda::device_buffer<ImageByte>{default_stream(), device_pool(), input.size, cuda::no_init};
   output_ =
     cuda::device_buffer<ImageByte>{default_stream(), device_pool(), output_size_, cuda::no_init};
-  return CUDA_CHECK(
+  return check_status(
     cudaMemcpy(input_.data(), input.pixels.get(), input.size, cudaMemcpyHostToDevice)
   );
 }
@@ -95,7 +95,7 @@ bool ImageBytes::download(Image& output, unsigned width, unsigned height) const 
   output.height = height;
   output.size = output_size_;
   auto destination = output.bytes();
-  return COPY_CHECK(output_, destination);
+  return copy_checked(output_, destination);
 }
 
 int run_image_app(int argc, char** argv, ImageProcessor process) {

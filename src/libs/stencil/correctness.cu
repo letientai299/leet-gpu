@@ -108,7 +108,7 @@ int check(Problem& problem, Kernel kernel, std::size_t samples) {
 
   return LAUNCH_CHECK(
            kernel.launch(input.data(), result.data(), problem.shape, problem.coefficients, nullptr)
-         ) && COPY_CHECK(result, problem.result) &&
+         ) && copy_checked(result, problem.result) &&
              lg::verify_sampled(problem.result, problem.expected, samples, kernel.name)
            ? 0
            : 1;

@@ -33,13 +33,13 @@ Cublas& get_cublas() {
   // A handle binds to one device, and NVBench may run on several.
   static std::vector<std::unique_ptr<Cublas>> by_device = [] {
     int count = 0;
-    if (!CUDA_CHECK(cudaGetDeviceCount(&count))) {
+    if (!check_status(cudaGetDeviceCount(&count))) {
       throw std::runtime_error("CUDA device count failed");
     }
     return std::vector<std::unique_ptr<Cublas>>(static_cast<std::size_t>(count));
   }();
   int device = 0;
-  if (!CUDA_CHECK(cudaGetDevice(&device))) {
+  if (!check_status(cudaGetDevice(&device))) {
     throw std::runtime_error("CUDA device query failed");
   }
   auto& slot = by_device.at(static_cast<std::size_t>(device));
@@ -47,7 +47,7 @@ Cublas& get_cublas() {
     slot = std::make_unique<Cublas>();
     // The host's shared cuBLAS may differ from the build toolkit.
     int version = 0;
-    if (CUBLAS_CHECK(cublasGetVersion(slot->handle.get(), &version))) {
+    if (check_status(cublasGetVersion(slot->handle.get(), &version))) {
       HOST_LOG("cuBLAS {} on device {}", version, device);
     }
   }
@@ -61,8 +61,8 @@ void launch_matmul_cublas(
   auto* const handle = blas.handle.get();
   if (blas.stream != stream) {
     // cublasSetStream drops the user workspace, so attach it again.
-    if (!CUBLAS_CHECK(cublasSetStream(handle, stream)) ||
-        !CUBLAS_CHECK(cublasSetWorkspace(handle, blas.workspace.data(), blas.workspace.size()))) {
+    if (!check_status(cublasSetStream(handle, stream)) ||
+        !check_status(cublasSetWorkspace(handle, blas.workspace.data(), blas.workspace.size()))) {
       throw std::runtime_error("cuBLAS stream setup failed");
     }
     blas.stream = stream;
@@ -74,7 +74,7 @@ void launch_matmul_cublas(
   const float beta = 0;
   // cuBLAS is column-major: row-major C = A B is C^T = B^T A^T, so swap A and B.
   // Throw so NVBench fails the state instead of timing nothing.
-  if (!CUBLAS_CHECK(
+  if (!check_status(
         cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, b, n, a, k, &beta, c, n)
       )) {
     throw std::runtime_error("cuBLAS Sgemm failed");

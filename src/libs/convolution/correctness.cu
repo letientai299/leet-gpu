@@ -16,20 +16,20 @@ bool make_npp_context(NppStreamContext& context) {
   context = {};
   int shared_per_block = 0;
   const bool ok =
-    CUDA_CHECK(cudaGetDevice(&context.nCudaDeviceId)) &&
-    CUDA_CHECK(device_attribute(cudaDevAttrMultiProcessorCount, context.nMultiProcessorCount)) &&
-    CUDA_CHECK(
+    check_status(cudaGetDevice(&context.nCudaDeviceId)) &&
+    check_status(device_attribute(cudaDevAttrMultiProcessorCount, context.nMultiProcessorCount)) &&
+    check_status(
       device_attribute(cudaDevAttrMaxThreadsPerMultiProcessor, context.nMaxThreadsPerMultiProcessor)
     ) &&
-    CUDA_CHECK(device_attribute(cudaDevAttrMaxThreadsPerBlock, context.nMaxThreadsPerBlock)) &&
-    CUDA_CHECK(device_attribute(cudaDevAttrMaxSharedMemoryPerBlock, shared_per_block)) &&
-    CUDA_CHECK(device_attribute(
+    check_status(device_attribute(cudaDevAttrMaxThreadsPerBlock, context.nMaxThreadsPerBlock)) &&
+    check_status(device_attribute(cudaDevAttrMaxSharedMemoryPerBlock, shared_per_block)) &&
+    check_status(device_attribute(
       cudaDevAttrComputeCapabilityMajor, context.nCudaDevAttrComputeCapabilityMajor
     )) &&
-    CUDA_CHECK(device_attribute(
+    check_status(device_attribute(
       cudaDevAttrComputeCapabilityMinor, context.nCudaDevAttrComputeCapabilityMinor
     )) &&
-    CUDA_CHECK(cudaStreamGetFlags(context.hStream, &context.nStreamFlags));
+    check_status(cudaStreamGetFlags(context.hStream, &context.nStreamFlags));
   context.nSharedMemPerBlock = static_cast<std::size_t>(shared_per_block);
   return ok;
 }
@@ -49,8 +49,8 @@ bool run_reference(
   DeviceBuffer padded{default_stream(), device_pool(),
                       static_cast<std::size_t>(padded_width) * padded_height, cuda::no_init};
 
-  if (!CUDA_CHECK(cudaMemset2DAsync(padded.data(), padded_step, 0, padded_step, padded_height)) ||
-      !CUDA_CHECK(cudaMemcpy2DAsync(
+  if (!check_status(cudaMemset2DAsync(padded.data(), padded_step, 0, padded_step, padded_height)) ||
+      !check_status(cudaMemcpy2DAsync(
         padded.data() + source_offset, padded_step, input.data(), input_step, input_step, height,
         cudaMemcpyDeviceToDevice
       ))) {
@@ -62,7 +62,7 @@ bool run_reference(
   // Preserve padding beyond the output ROI.
   // https://docs.nvidia.com/cuda/npp/image_filtering_functions.html
   return make_npp_context(context) &&
-         NPP_CHECK(nppiFilterBorder_32f_C1R_Ctx(
+         check_status(nppiFilterBorder_32f_C1R_Ctx(
            source, static_cast<int>(padded_step), {padded_width, padded_height}, {radius, radius},
            output.data(), static_cast<int>(input_step), {width, height}, filter.data(),
            {filter_width, filter_width}, {radius, radius}, NPP_BORDER_REPLICATE, context
@@ -82,7 +82,7 @@ bool run_kernel(
   }
 
   if (kernel.filter_setup != nullptr &&
-      !CUDA_CHECK(kernel.filter_setup(filter.data(), problem.shape, nullptr))) {
+      !check_status(kernel.filter_setup(filter.data(), problem.shape, nullptr))) {
     return false;
   }
 
@@ -134,11 +134,11 @@ int check(Problem& problem, Kernel kernel) {
   DeviceBuffer result{stream, pool, problem.result};
 
   if (!run_reference(problem.shape, input, reference_filter, expected) ||
-      !COPY_CHECK(expected, problem.expected)) {
+      !copy_checked(expected, problem.expected)) {
     return 1;
   }
-  return run_kernel(problem, kernel, input, filter, result) && COPY_CHECK(result, problem.result) &&
-             verify(problem, kernel)
+  return run_kernel(problem, kernel, input, filter, result) &&
+             copy_checked(result, problem.result) && verify(problem, kernel)
            ? 0
            : 1;
 }

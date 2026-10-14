@@ -14,13 +14,13 @@ bool get_attributes(CUfunction function, cudaFuncAttributes& attributes) {
   int constant = 0;
   int local = 0;
   const bool ok =
-    DRIVER_CHECK(cuFuncGetAttribute(&attributes.numRegs, CU_FUNC_ATTRIBUTE_NUM_REGS, function)) &&
-    DRIVER_CHECK(cuFuncGetAttribute(
+    check_status(cuFuncGetAttribute(&attributes.numRegs, CU_FUNC_ATTRIBUTE_NUM_REGS, function)) &&
+    check_status(cuFuncGetAttribute(
       &attributes.maxThreadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, function
     )) &&
-    DRIVER_CHECK(cuFuncGetAttribute(&shared, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, function)) &&
-    DRIVER_CHECK(cuFuncGetAttribute(&constant, CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES, function)) &&
-    DRIVER_CHECK(cuFuncGetAttribute(&local, CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, function));
+    check_status(cuFuncGetAttribute(&shared, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, function)) &&
+    check_status(cuFuncGetAttribute(&constant, CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES, function)) &&
+    check_status(cuFuncGetAttribute(&local, CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, function));
   attributes.sharedSizeBytes = static_cast<std::size_t>(shared);
   attributes.constSizeBytes = static_cast<std::size_t>(constant);
   attributes.localSizeBytes = static_cast<std::size_t>(local);
@@ -83,12 +83,12 @@ cudaError_t inspect_graph(cudaGraph_t graph, KernelResources& resources) {
     }
     // Library launches go through the driver, so read driver params.
     CUDA_KERNEL_NODE_PARAMS params{};
-    if (!DRIVER_CHECK(cuGraphKernelNodeGetParams(node, &params)) ||
-        (params.func == nullptr && !DRIVER_CHECK(cuKernelGetFunction(&params.func, params.kern)))) {
+    if (!check_status(cuGraphKernelNodeGetParams(node, &params)) ||
+        (params.func == nullptr && !check_status(cuKernelGetFunction(&params.func, params.kern)))) {
       return cudaErrorUnknown;
     }
     const char* name = nullptr;
-    if (!DRIVER_CHECK(cuFuncGetName(&name, params.func))) {
+    if (!check_status(cuFuncGetName(&name, params.func))) {
       name = "unknown";
     }
     HOST_LOG(
@@ -111,7 +111,7 @@ cudaError_t inspect_graph(cudaGraph_t graph, KernelResources& resources) {
     return cudaErrorUnknown;
   }
   const auto occupancy = [&first](int threads, int& blocks) {
-    return DRIVER_CHECK(cuOccupancyMaxActiveBlocksPerMultiprocessor(
+    return check_status(cuOccupancyMaxActiveBlocksPerMultiprocessor(
              &blocks, first.func, threads, first.sharedMemBytes
            ))
              ? cudaSuccess

@@ -88,13 +88,13 @@ int check(Problem& problem, Kernel kernel, std::size_t samples) {
   const DeviceBuffer filter{stream, pool, problem.filter};
   DeviceBuffer result{stream, pool, problem.result};
   if (kernel.filter_setup != nullptr &&
-      !CUDA_CHECK(kernel.filter_setup(filter.data(), problem.shape, nullptr))) {
+      !check_status(kernel.filter_setup(filter.data(), problem.shape, nullptr))) {
     return 1;
   }
 
   return LAUNCH_CHECK(
            kernel.launch(input.data(), filter.data(), result.data(), problem.shape, nullptr)
-         ) && COPY_CHECK(result, problem.result) &&
+         ) && copy_checked(result, problem.result) &&
              lg::verify_sampled(problem.result, problem.expected, samples, kernel.name)
            ? 0
            : 1;

@@ -10,24 +10,35 @@
 #include <cuda/std/span>
 #include <cuda/stream>
 #include <cuda_runtime.h>
+#include <fmt/format.h>
+#include <source_location>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 
-inline bool cuda_check(cudaError_t error, const char* file, int line) {
+template <typename... Args>
+void log_check_failure(
+  const char* kind, std::source_location where, fmt::format_string<Args...> format, Args&&... args
+) {
+  write_log(
+    kind, where.file_name(), static_cast<int>(where.line()), format, std::forward<Args>(args)...
+  );
+}
+
+// Overloaded per status type.
+inline bool
+check_status(cudaError_t error, std::source_location where = std::source_location::current()) {
   if (error == cudaSuccess) {
     return true;
   }
 
-  write_log("CUDA", file, line, "{}: {}", cudaGetErrorName(error), cudaGetErrorString(error));
+  log_check_failure("CUDA", where, "{}: {}", cudaGetErrorName(error), cudaGetErrorString(error));
   return false;
 }
 
-#define CUDA_CHECK(expression) cuda_check((expression), __FILE__, __LINE__)
-
 // Clears stale errors first so a failure belongs to this launch.
 #define LAUNCH_CHECK(launch)                                                                       \
-  (CUDA_CHECK(cudaGetLastError()) && ((launch), CUDA_CHECK(cudaGetLastError())))
+  (check_status(cudaGetLastError()) && ((launch), check_status(cudaGetLastError())))
 
 // cudaGetDeviceProperties fills every field and can take milliseconds.
 // https://developer.nvidia.com/blog/cuda-pro-tip-the-fast-way-to-query-device-properties/
@@ -40,37 +51,38 @@ inline cudaError_t device_attribute(cudaDeviceAttr attribute, int& value) {
 #ifdef LG_HAS_NPP
 #include <nppdefs.h>
 
-inline bool npp_check(NppStatus status, const char* file, int line) {
+inline bool
+check_status(NppStatus status, std::source_location where = std::source_location::current()) {
   if (status == NPP_SUCCESS) {
     return true;
   }
 
-  write_log("NPP", file, line, "status {}", static_cast<int>(status));
+  log_check_failure("NPP", where, "status {}", static_cast<int>(status));
   return false;
 }
 
-#define NPP_CHECK(expression) npp_check((expression), __FILE__, __LINE__)
 #endif
 
 #ifdef LG_HAS_CUTLASS
 #include <cutlass/cutlass.h>
 
-inline bool cutlass_check(cutlass::Status status, const char* file, int line) {
+inline bool
+check_status(cutlass::Status status, std::source_location where = std::source_location::current()) {
   if (status == cutlass::Status::kSuccess) {
     return true;
   }
 
-  write_log("CUTLASS", file, line, "{}", cutlass::cutlassGetStatusString(status));
+  log_check_failure("CUTLASS", where, "{}", cutlass::cutlassGetStatusString(status));
   return false;
 }
 
-#define CUTLASS_CHECK(expression) cutlass_check((expression), __FILE__, __LINE__)
 #endif
 
 #ifdef LG_HAS_CUDA_DRIVER
 #include <cuda.h>
 
-inline bool driver_check(CUresult result, const char* file, int line) {
+inline bool
+check_status(CUresult result, std::source_location where = std::source_location::current()) {
   if (result == CUDA_SUCCESS) {
     return true;
   }
@@ -79,17 +91,17 @@ inline bool driver_check(CUresult result, const char* file, int line) {
   if (cuGetErrorName(result, &name) != CUDA_SUCCESS) {
     name = "unknown";
   }
-  write_log("CUDA", file, line, "driver {}", name);
+  log_check_failure("CUDA", where, "driver {}", name);
   return false;
 }
 
-#define DRIVER_CHECK(expression) driver_check((expression), __FILE__, __LINE__)
 #endif
 
 #ifdef LG_HAS_CUPTI
 #include <cupti_result.h>
 
-inline bool cupti_check(CUptiResult result, const char* file, int line) {
+inline bool
+check_status(CUptiResult result, std::source_location where = std::source_location::current()) {
   if (result == CUPTI_SUCCESS) {
     return true;
   }
@@ -98,37 +110,35 @@ inline bool cupti_check(CUptiResult result, const char* file, int line) {
   if (cuptiGetResultString(result, &text) != CUPTI_SUCCESS) {
     text = "unknown";
   }
-  write_log("CUPTI", file, line, "{}", text);
+  log_check_failure("CUPTI", where, "{}", text);
   return false;
 }
 
-#define CUPTI_CHECK(expression) cupti_check((expression), __FILE__, __LINE__)
 #endif
 
 #ifdef LG_HAS_CUBLAS
 #include <cublas_v2.h>
 
-inline bool cublas_check(cublasStatus_t status, const char* file, int line) {
+inline bool
+check_status(cublasStatus_t status, std::source_location where = std::source_location::current()) {
   if (status == CUBLAS_STATUS_SUCCESS) {
     return true;
   }
 
-  write_log("CUBLAS", file, line, "{}", cublasGetStatusString(status));
+  log_check_failure("CUBLAS", where, "{}", cublasGetStatusString(status));
   return false;
 }
-
-#define CUBLAS_CHECK(expression) cublas_check((expression), __FILE__, __LINE__)
 
 /// Owns a cuBLAS handle bound to the device current at creation.
 class CublasHandle {
 public:
   CublasHandle() {
-    if (!CUBLAS_CHECK(cublasCreate(&handle_))) {
+    if (!check_status(cublasCreate(&handle_))) {
       throw std::runtime_error("cuBLAS handle creation failed");
     }
   }
   ~CublasHandle() {
-    CUBLAS_CHECK(cublasDestroy(handle_));
+    check_status(cublasDestroy(handle_));
   }
   CublasHandle(const CublasHandle&) = delete;
   CublasHandle& operator=(const CublasHandle&) = delete;
@@ -148,7 +158,7 @@ inline cuda::stream_ref default_stream() {
 
 inline auto& device_pool() {
   int device = 0;
-  if (!CUDA_CHECK(cudaGetDevice(&device))) {
+  if (!check_status(cudaGetDevice(&device))) {
     throw std::runtime_error("CUDA device selection failed");
   }
   return cuda::device_default_memory_pool(cuda::devices[device]);
@@ -159,27 +169,29 @@ inline auto& device_pool() {
 // stays on the runtime API.
 // https://nvidia.github.io/cccl/libcudacxx/extended_api/algorithms/copy_bytes.html
 template <typename Source, typename Destination>
-bool copy_checked(const Source& source, Destination& destination, const char* file, int line) {
+bool copy_checked(
+  const Source& source,
+  Destination& destination,
+  std::source_location where = std::source_location::current()
+) {
   using Element = std::remove_pointer_t<decltype(destination.data())>;
   using SourceElement = std::remove_pointer_t<decltype(source.data())>;
   static_assert(std::is_trivially_copyable_v<Element>, "readback needs a trivially copyable type");
   static_assert(std::is_same_v<std::remove_cv_t<Element>, std::remove_cv_t<SourceElement>>);
   if (source.size() > destination.size()) {
-    write_log(
-      "CUDA", file, line, "copy destination holds {} of {} elements",
+    log_check_failure(
+      "CUDA", where, "copy destination holds {} of {} elements",
       static_cast<std::size_t>(destination.size()), static_cast<std::size_t>(source.size())
     );
     return false;
   }
-  return cuda_check(
+  return check_status(
     cudaMemcpy(
       destination.data(), source.data(), source.size() * sizeof(Element), cudaMemcpyDeviceToHost
     ),
-    file, line
+    where
   );
 }
-
-#define COPY_CHECK(source, destination) copy_checked((source), (destination), __FILE__, __LINE__)
 
 inline __host__ __device__ void not_implemented(const char* file, int line) {
 #ifdef __CUDA_ARCH__
@@ -202,8 +214,8 @@ inline bool init_cuda() {
   cudaDeviceProp device{};
   // cudaFree(nullptr) forces primary-context creation before anything queries it.
   // https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html
-  if (!CUDA_CHECK(cudaFree(nullptr)) || !CUDA_CHECK(cudaGetDevice(&device_id)) ||
-      !CUDA_CHECK(cudaGetDeviceProperties(&device, device_id))) {
+  if (!check_status(cudaFree(nullptr)) || !check_status(cudaGetDevice(&device_id)) ||
+      !check_status(cudaGetDeviceProperties(&device, device_id))) {
     return false;
   }
 

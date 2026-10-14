@@ -31,7 +31,7 @@ static bool grayscale_on_gpu(const Image& rgb, Image& gray) {
   log_image_launch(grid, block, rgb.pixel_count());
   grayscale_kernel<<<grid, block>>>(bytes.input(), bytes.output(), rgb.width, rgb.height);
 
-  return CUDA_CHECK(cudaGetLastError()) && bytes.download(gray, rgb.width, rgb.height);
+  return check_status(cudaGetLastError()) && bytes.download(gray, rgb.width, rgb.height);
 }
 
 int main(int argc, char** argv) {

@@ -28,9 +28,9 @@ bool add_on_gpu(const std::vector<float>& a, const std::vector<float>& b, std::v
   cuda::device_buffer<float> device_b{default_stream(), device_pool(), b.size(), cuda::no_init};
   cuda::device_buffer<float> device_c{default_stream(), device_pool(), c.size(), cuda::no_init};
 
-  if (!CUDA_CHECK(cudaMemcpy(device_a.data(), a.data(), bytes, cudaMemcpyHostToDevice)) ||
-      !CUDA_CHECK(cudaMemcpy(device_b.data(), b.data(), bytes, cudaMemcpyHostToDevice)) ||
-      !CUDA_CHECK(cudaMemset(device_c.data(), 0, bytes))) {
+  if (!check_status(cudaMemcpy(device_a.data(), a.data(), bytes, cudaMemcpyHostToDevice)) ||
+      !check_status(cudaMemcpy(device_b.data(), b.data(), bytes, cudaMemcpyHostToDevice)) ||
+      !check_status(cudaMemset(device_c.data(), 0, bytes))) {
     return false;
   }
 
@@ -38,8 +38,8 @@ bool add_on_gpu(const std::vector<float>& a, const std::vector<float>& b, std::v
   const auto blocks = static_cast<unsigned>(cuda::ceil_div(a.size(), threads));
   vec_add_kernel<<<blocks, threads>>>(device_a.data(), device_b.data(), device_c.data(), a.size());
 
-  return CUDA_CHECK(cudaGetLastError()) &&
-         CUDA_CHECK(cudaMemcpy(c.data(), device_c.data(), bytes, cudaMemcpyDeviceToHost));
+  return check_status(cudaGetLastError()) &&
+         check_status(cudaMemcpy(c.data(), device_c.data(), bytes, cudaMemcpyDeviceToHost));
 }
 
 bool verify_output(const std::vector<float>& c, const std::vector<float>& expected) {

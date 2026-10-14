@@ -139,7 +139,7 @@ void missing_stencil(
 }
 
 void check_device(int device) {
-  require(CUDA_CHECK(cudaSetDevice(device)));
+  require(check_status(cudaSetDevice(device)));
   for (const auto shape : {lg::matmul::GemmShape{1, 1, 1}, {17, 9, 13}}) {
     lg::matmul::Problem problem(shape);
     lg::matmul::fill_random(problem);
@@ -276,17 +276,17 @@ int main(int argc, char** argv) try {
     });
     if (mode == "retain") {
       float* buffer = nullptr;
-      require(CUDA_CHECK(cudaMalloc(&buffer, sizeof(float))));
+      require(check_status(cudaMalloc(&buffer, sizeof(float))));
       const int result = lg::benchmark::run_args(argc - 1, argv + 1);
       require(result != 0);
-      require(CUDA_CHECK(cudaMemset(buffer, 0, sizeof(float))));
-      require(CUDA_CHECK(cudaFree(buffer)));
+      require(check_status(cudaMemset(buffer, 0, sizeof(float))));
+      require(check_status(cudaFree(buffer)));
       return 0;
     }
     return lg::benchmark::run_args(argc - 1, argv + 1);
   }
   int devices = 0;
-  require(CUDA_CHECK(cudaGetDeviceCount(&devices)));
+  require(check_status(cudaGetDeviceCount(&devices)));
   for (int device = 0; device < devices; ++device) {
     check_device(device);
   }
