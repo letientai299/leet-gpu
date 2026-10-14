@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <format>
+#include <iterator>
 #include <optional>
 #include <string>
 
@@ -181,29 +183,18 @@ std::string format_number(int value) {
 }
 
 std::string format_bytes(std::size_t value) {
-  std::array<char, 64> output{};
-  std::snprintf(
-    output.data(), output.size(), "%zu bytes (%.2f MiB)", value,
-    static_cast<double>(value) / bytes_per_mib
-  );
-  return output.data();
+  return std::format("{} bytes ({:.2f} MiB)", value, static_cast<double>(value) / bytes_per_mib);
 }
 
 std::string format_version(int version) {
   if (version == 0) {
     return "not installed";
   }
-  std::array<char, 32> output{};
-  std::snprintf(
-    output.data(), output.size(), "%d.%d (%d)", version / 1000, version % 1000 / 10, version
-  );
-  return output.data();
+  return std::format("{}.{} ({})", version / 1000, version % 1000 / 10, version);
 }
 
 std::string format_hex(unsigned int value) {
-  std::array<char, 16> output{};
-  std::snprintf(output.data(), output.size(), "0x%x", value);
-  return output.data();
+  return std::format("0x{:x}", value);
 }
 
 std::string format_clock(int value) {
@@ -237,30 +228,22 @@ std::string format_compute_mode(int mode) {
 }
 
 template <std::size_t Size> std::string format_dims(const int (&values)[Size]) {
-  std::array<char, 64> output{};
   if constexpr (Size == 2) {
-    std::snprintf(output.data(), output.size(), "%d x %d", values[0], values[1]);
+    return std::format("{} x {}", values[0], values[1]);
   } else {
-    std::snprintf(output.data(), output.size(), "%d x %d x %d", values[0], values[1], values[2]);
+    return std::format("{} x {} x {}", values[0], values[1], values[2]);
   }
-  return output.data();
 }
 
 std::string format_uuid(const cudaUUID_t& uuid) {
-  std::array<char, 37> output{};
-  std::snprintf(
-    output.data(), output.size(),
-    "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-    static_cast<unsigned char>(uuid.bytes[0]), static_cast<unsigned char>(uuid.bytes[1]),
-    static_cast<unsigned char>(uuid.bytes[2]), static_cast<unsigned char>(uuid.bytes[3]),
-    static_cast<unsigned char>(uuid.bytes[4]), static_cast<unsigned char>(uuid.bytes[5]),
-    static_cast<unsigned char>(uuid.bytes[6]), static_cast<unsigned char>(uuid.bytes[7]),
-    static_cast<unsigned char>(uuid.bytes[8]), static_cast<unsigned char>(uuid.bytes[9]),
-    static_cast<unsigned char>(uuid.bytes[10]), static_cast<unsigned char>(uuid.bytes[11]),
-    static_cast<unsigned char>(uuid.bytes[12]), static_cast<unsigned char>(uuid.bytes[13]),
-    static_cast<unsigned char>(uuid.bytes[14]), static_cast<unsigned char>(uuid.bytes[15])
-  );
-  return output.data();
+  std::string output;
+  for (std::size_t index = 0; index < std::size(uuid.bytes); ++index) {
+    if (index == 4 || index == 6 || index == 8 || index == 10) {
+      output += '-';
+    }
+    output += std::format("{:02x}", static_cast<unsigned char>(uuid.bytes[index]));
+  }
+  return output;
 }
 
 std::optional<int> query_attr(cudaDeviceAttr attr, int device) {
