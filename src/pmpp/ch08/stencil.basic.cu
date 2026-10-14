@@ -57,7 +57,9 @@ void launch_basic(
 int main(int argc, char** argv) {
   return st::run_app(
     argc, argv,
-    {"stencil.basic", launch_basic, st::basic_traffic,
-     lg::benchmark::fixed_resources<st::Shape, stencil_basic, 8, 8, 8>}
+    {.name = "stencil.basic",
+     .launch = launch_basic,
+     .traffic = st::basic_traffic,
+     .resources = lg::benchmark::fixed_resources<st::Shape, stencil_basic, 8, 8, 8>}
   );
 }

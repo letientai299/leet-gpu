@@ -113,7 +113,10 @@ void launch_tiled(
 int main(int argc, char** argv) {
   return conv::run_app(
     argc, argv,
-    {"conv3d.tiled", launch_tiled, constant_traffic,
-     lg::benchmark::fixed_resources<conv::Shape, conv3d_tiled_kernel, 8, 8, 8>, setup_filter}
+    {.name = "conv3d.tiled",
+     .launch = launch_tiled,
+     .traffic = constant_traffic,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_tiled_kernel, 8, 8, 8>,
+     .filter_setup = setup_filter}
   );
 }

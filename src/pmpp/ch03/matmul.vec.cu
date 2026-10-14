@@ -40,5 +40,7 @@ void launch_matvec(
 
 int main(int argc, char** argv) {
   constexpr unsigned n = 67;
-  return mm::run_check(argc, argv, {"matmul.vec", launch_matvec}, mm::GemmShape(n, 1, n));
+  return mm::run_check(
+    argc, argv, {.name = "matmul.vec", .launch = launch_matvec}, mm::GemmShape(n, 1, n)
+  );
 }

@@ -7,7 +7,7 @@ namespace lg::convolution {
 
 int run_check(int argc, char** argv, Kernel kernel, Shape shape) {
   return run_host(argc, argv, [&] {
-    Problem problem{shape, {}, {}, {}, {}};
+    Problem problem{.shape = shape};
     fill_problem(problem);
     return check(problem, kernel);
   });

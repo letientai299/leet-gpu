@@ -31,9 +31,15 @@ matmul_row_resources(const lg::matmul::GemmShape&, lg::benchmark::KernelResource
 cudaError_t
 matmul_col_resources(const lg::matmul::GemmShape&, lg::benchmark::KernelResources& resources);
 
-inline const lg::matmul::Kernel kMatmulCell{
-  "matmul.cell", launch_matmul_cell, lg::matmul::cell_traffic, {}, matmul_cell_resources};
-inline const lg::matmul::Kernel kMatmulRow{
-  "matmul.row", launch_matmul_row, lg::matmul::cell_traffic, {}, matmul_row_resources};
-inline const lg::matmul::Kernel kMatmulCol{
-  "matmul.col", launch_matmul_col, lg::matmul::cell_traffic, {}, matmul_col_resources};
+inline const lg::matmul::Kernel kMatmulCell{.name = "matmul.cell",
+                                            .launch = launch_matmul_cell,
+                                            .traffic = lg::matmul::cell_traffic,
+                                            .resources = matmul_cell_resources};
+inline const lg::matmul::Kernel kMatmulRow{.name = "matmul.row",
+                                           .launch = launch_matmul_row,
+                                           .traffic = lg::matmul::cell_traffic,
+                                           .resources = matmul_row_resources};
+inline const lg::matmul::Kernel kMatmulCol{.name = "matmul.col",
+                                           .launch = launch_matmul_col,
+                                           .traffic = lg::matmul::cell_traffic,
+                                           .resources = matmul_col_resources};

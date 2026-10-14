@@ -94,7 +94,9 @@ int main(int argc, char** argv) {
   // traffic accounting unset; basic_traffic would miscount these tiled reads.
   return st::run_app(
     argc, argv,
-    {"stencil.tile", launch_tile, nullptr,
-     lg::benchmark::fixed_resources<st::Shape, stencil_tile, kInputTile, kInputTile, kInputTile>}
+    {.name = "stencil.tile",
+     .launch = launch_tile,
+     .resources =
+       lg::benchmark::fixed_resources<st::Shape, stencil_tile, kInputTile, kInputTile, kInputTile>}
   );
 }

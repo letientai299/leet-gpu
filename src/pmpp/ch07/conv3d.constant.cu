@@ -91,7 +91,10 @@ void launch_constant(
 int main(int argc, char** argv) {
   return conv::run_app(
     argc, argv,
-    {"conv3d.constant", launch_constant, constant_traffic,
-     lg::benchmark::fixed_resources<conv::Shape, conv3d_constant_kernel, 8, 8, 8>, setup_filter}
+    {.name = "conv3d.constant",
+     .launch = launch_constant,
+     .traffic = constant_traffic,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv3d_constant_kernel, 8, 8, 8>,
+     .filter_setup = setup_filter}
   );
 }

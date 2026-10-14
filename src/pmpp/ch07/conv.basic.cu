@@ -56,7 +56,9 @@ void launch_basic(
 int main(int argc, char** argv) {
   return conv::run_app(
     argc, argv,
-    {"conv.basic", launch_basic, conv::basic_traffic,
-     lg::benchmark::fixed_resources<conv::Shape, conv_basic_kernel, 32, 32>}
+    {.name = "conv.basic",
+     .launch = launch_basic,
+     .traffic = conv::basic_traffic,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_basic_kernel, 32, 32>}
   );
 }

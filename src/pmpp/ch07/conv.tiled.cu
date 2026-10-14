@@ -79,8 +79,10 @@ int main(int argc, char** argv) {
   return conv::run_app(
     argc, argv,
     // Reports uncached tap traffic.
-    {"conv.tiled", launch_tiled, conv::constant::traffic,
-     lg::benchmark::fixed_resources<conv::Shape, conv_tiled_kernel, 16, 16>,
-     conv::constant::setup_filter}
+    {.name = "conv.tiled",
+     .launch = launch_tiled,
+     .traffic = conv::constant::traffic,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_tiled_kernel, 16, 16>,
+     .filter_setup = conv::constant::setup_filter}
   );
 }

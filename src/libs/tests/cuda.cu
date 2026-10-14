@@ -143,36 +143,36 @@ void check_device(int device) {
   for (const auto shape : {lg::matmul::GemmShape{1, 1, 1}, {17, 9, 13}}) {
     lg::matmul::Problem problem(shape);
     lg::matmul::fill_random(problem);
-    require(lg::matmul::check(problem, {"good", launch_gemm}) == 0);
+    require(lg::matmul::check(problem, {.name = "good", .launch = launch_gemm}) == 0);
     std::fill(problem.a.begin(), problem.a.end(), 0.0F);
-    require(lg::matmul::check(problem, {"missing", missing_gemm}) != 0);
+    require(lg::matmul::check(problem, {.name = "missing", .launch = missing_gemm}) != 0);
   }
   for (const auto shape :
        {lg::convolution::Shape{1, 1, 0}, {2, 3, 3}, {17, 9, 1}, {17, 9, 2}, {17, 9, 3}}) {
-    lg::convolution::Problem problem{shape, {}, {}, {}, {}};
+    lg::convolution::Problem problem{.shape = shape};
     lg::convolution::fill_problem(problem);
-    require(lg::convolution::check(problem, {"good", launch_2d}) == 0);
+    require(lg::convolution::check(problem, {.name = "good", .launch = launch_2d}) == 0);
     std::fill(problem.input.begin(), problem.input.end(), 0.0F);
-    require(lg::convolution::check(problem, {"missing", missing_2d}) != 0);
-    require(lg::convolution::check(problem, {"good", launch_2d}) == 0);
-    require(lg::convolution::check(problem, {"missing", missing_2d}) != 0);
+    require(lg::convolution::check(problem, {.name = "missing", .launch = missing_2d}) != 0);
+    require(lg::convolution::check(problem, {.name = "good", .launch = launch_2d}) == 0);
+    require(lg::convolution::check(problem, {.name = "missing", .launch = missing_2d}) != 0);
   }
   for (const auto shape : {lg::convolution3d::Shape{1, 1, 1, 0}, {2, 3, 4, 3}, {17, 9, 5, 2}}) {
-    lg::convolution3d::Problem problem{shape, {}, {}, {}, {}};
+    lg::convolution3d::Problem problem{.shape = shape};
     lg::convolution3d::fill_problem(problem);
-    require(lg::convolution3d::check(problem, {"good", launch_3d}) == 0);
-    require(lg::convolution3d::check(problem, {"good", launch_3d}, 17) == 0);
-    require(lg::convolution3d::check(problem, {"good", launch_3d}, 1) == 0);
+    require(lg::convolution3d::check(problem, {.name = "good", .launch = launch_3d}) == 0);
+    require(lg::convolution3d::check(problem, {.name = "good", .launch = launch_3d}, 17) == 0);
+    require(lg::convolution3d::check(problem, {.name = "good", .launch = launch_3d}, 1) == 0);
     std::fill(problem.input.begin(), problem.input.end(), 0.0F);
-    require(lg::convolution3d::check(problem, {"missing", missing_3d}) != 0);
-    require(lg::convolution3d::check(problem, {"missing", missing_3d}, 17) != 0);
+    require(lg::convolution3d::check(problem, {.name = "missing", .launch = missing_3d}) != 0);
+    require(lg::convolution3d::check(problem, {.name = "missing", .launch = missing_3d}, 17) != 0);
   }
   for (const auto shape : {lg::stencil::Shape{3, 3, 3}, {17, 9, 5}}) {
-    lg::stencil::Problem problem{shape, {}, {}, {}, {}};
+    lg::stencil::Problem problem{.shape = shape};
     lg::stencil::fill_problem(problem);
-    require(lg::stencil::check(problem, {"good", launch_stencil}) == 0);
-    require(lg::stencil::check(problem, {"good", launch_stencil}, 7) == 0);
-    require(lg::stencil::check(problem, {"missing", missing_stencil}) != 0);
+    require(lg::stencil::check(problem, {.name = "good", .launch = launch_stencil}) == 0);
+    require(lg::stencil::check(problem, {.name = "good", .launch = launch_stencil}, 7) == 0);
+    require(lg::stencil::check(problem, {.name = "missing", .launch = missing_stencil}) != 0);
   }
   lg::benchmark::KernelResources resources;
   require(lg::benchmark::inspect_kernel<gemm>(dim3{128}, 0, resources) == cudaSuccess);
@@ -232,43 +232,49 @@ int main(int argc, char** argv) try {
     if (mode == "conv2d-bench") {
       return lg::convolution::run_app(
         argc - 1, argv + 1,
-        {"convolution2d", launch_2d, lg::convolution::basic_traffic,
-         lg::benchmark::fixed_resources<lg::convolution::Shape, convolution, 128>},
+        {.name = "convolution2d",
+         .launch = launch_2d,
+         .traffic = lg::convolution::basic_traffic,
+         .resources = lg::benchmark::fixed_resources<lg::convolution::Shape, convolution, 128>},
         {257, 193, 3}
       );
     }
     if (mode == "conv3d-bench") {
       return lg::convolution3d::run_app(
         argc - 1, argv + 1,
-        {"convolution3d", launch_3d, lg::convolution3d::basic_traffic,
-         lg::benchmark::fixed_resources<lg::convolution3d::Shape, convolution, 128>},
+        {.name = "convolution3d",
+         .launch = launch_3d,
+         .traffic = lg::convolution3d::basic_traffic,
+         .resources = lg::benchmark::fixed_resources<lg::convolution3d::Shape, convolution, 128>},
         {64, 33, 17, 3}
       );
     }
     if (mode == "stencil-bench") {
       return lg::stencil::run_app(
         argc - 1, argv + 1,
-        {"stencil", launch_stencil, lg::stencil::basic_traffic,
-         lg::benchmark::fixed_resources<lg::stencil::Shape, stencil, 128>},
+        {.name = "stencil",
+         .launch = launch_stencil,
+         .traffic = lg::stencil::basic_traffic,
+         .resources = lg::benchmark::fixed_resources<lg::stencil::Shape, stencil, 128>},
         {64, 33, 17}
       );
     }
     if (mode == "bad-shape") {
-      return lg::matmul::run_bench_app(argc - 1, argv + 1, {{"missing", missing_gemm}});
+      return lg::matmul::run_bench_app(
+        argc - 1, argv + 1, {{.name = "missing", .launch = missing_gemm}}
+      );
     }
     if (mode == "bench") {
       return lg::matmul::run_bench_app(
         argc - 1, argv + 1,
-        {{"baseline",
-          launch_gemm,
-          lg::matmul::cell_traffic,
-          {},
-          lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, 128>},
-         {"candidate",
-          launch_gemm,
-          lg::matmul::cell_traffic,
-          {},
-          lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, 128>}}
+        {{.name = "baseline",
+          .launch = launch_gemm,
+          .traffic = lg::matmul::cell_traffic,
+          .resources = lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, 128>},
+         {.name = "candidate",
+          .launch = launch_gemm,
+          .traffic = lg::matmul::cell_traffic,
+          .resources = lg::benchmark::fixed_resources<lg::matmul::GemmShape, gemm, 128>}}
       );
     }
     lg::benchmark::add("failure", [mode](nvbench::state& state, nvbench::type_list<>) {

@@ -56,8 +56,10 @@ void launch_constant(
 int main(int argc, char** argv) {
   return conv::run_app(
     argc, argv,
-    {"conv.constant", launch_constant, conv::constant::traffic,
-     lg::benchmark::fixed_resources<conv::Shape, conv_constant_kernel, 32, 32>,
-     conv::constant::setup_filter}
+    {.name = "conv.constant",
+     .launch = launch_constant,
+     .traffic = conv::constant::traffic,
+     .resources = lg::benchmark::fixed_resources<conv::Shape, conv_constant_kernel, 32, 32>,
+     .filter_setup = conv::constant::setup_filter}
   );
 }

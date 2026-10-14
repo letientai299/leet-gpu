@@ -77,7 +77,10 @@ tiled_in_resources(const conv::Shape& shape, lg::benchmark::KernelResources& res
 int main(int argc, char** argv) {
   return conv::run_app(
     argc, argv,
-    {"conv.tiled.in", launch_tiled_in, conv::constant::traffic, tiled_in_resources,
-     conv::constant::setup_filter}
+    {.name = "conv.tiled.in",
+     .launch = launch_tiled_in,
+     .traffic = conv::constant::traffic,
+     .resources = tiled_in_resources,
+     .filter_setup = conv::constant::setup_filter}
   );
 }

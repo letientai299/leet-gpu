@@ -45,7 +45,7 @@ struct Domain {
   };
 
   static Problem make_problem(Shape shape) {
-    Problem problem{shape, {}, {}, {}, {}};
+    Problem problem{.shape = shape};
     fill_problem(problem);
     return problem;
   }

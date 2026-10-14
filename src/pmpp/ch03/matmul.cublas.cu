@@ -99,7 +99,7 @@ cublas_resources(const mm::GemmShape& shape, lg::benchmark::KernelResources& res
 }
 
 const mm::Kernel kMatmulCublas{
-  "matmul.cublas", launch_matmul_cublas, nullptr, {}, cublas_resources};
+  .name = "matmul.cublas", .launch = launch_matmul_cublas, .resources = cublas_resources};
 
 } // namespace
 
