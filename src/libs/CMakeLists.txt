@@ -246,6 +246,9 @@ target_link_libraries(
 add_library(lg_matmul_nvbench STATIC matmul/benchmark.cu)
 target_link_libraries(lg_matmul_nvbench PUBLIC lg_matmul lg_benchmark)
 
+add_library(lg_reduction STATIC reduction.cu)
+target_link_libraries(lg_reduction PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL)
+
 if(LG_BUILD_TESTS)
   add_subdirectory(tests)
 endif()

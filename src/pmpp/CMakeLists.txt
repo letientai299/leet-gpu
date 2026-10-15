@@ -58,3 +58,8 @@ set_source_files_properties(
   "${CMAKE_CURRENT_SOURCE_DIR}/ch06/matmul.coarse.cpp"
   PROPERTIES LANGUAGE CUDA
 )
+add_cuda_app(pmpp/ch10/reduce.basic LIBRARIES lg_reduction)
+add_cuda_app(pmpp/ch10/reduce.convergent LIBRARIES lg_reduction)
+add_cuda_app(pmpp/ch10/reduce.shared LIBRARIES lg_reduction)
+add_cuda_app(pmpp/ch10/reduce.hierarchical LIBRARIES lg_reduction)
+add_cuda_app(pmpp/ch10/reduce.coarse LIBRARIES lg_reduction)

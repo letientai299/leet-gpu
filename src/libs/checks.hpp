@@ -225,7 +225,7 @@ inline bool init_host() {
   return init_cuda();
 }
 
-inline bool help_requested(int argc, char** argv) {
+inline bool help_requested(int argc, const char* const* argv) {
   return argc == 2 && std::strcmp(argv[1], "--help") == 0;
 }
 
