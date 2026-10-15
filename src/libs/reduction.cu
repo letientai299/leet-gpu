@@ -14,16 +14,15 @@ namespace lg::reduction {
 namespace {
 
 bool check_case(Kernel kernel, unsigned int length, unsigned int pattern) {
-  const auto problem = make_problem(length, kernel.segment_size, pattern);
+  const auto problem = make_problem(length, kernel.pad_input ? kernel.segment_size : 1, pattern);
   const auto stream = default_stream();
   auto& pool = device_pool();
   // Early chapter kernels overwrite their input.
   cuda::device_buffer<float> input{stream, pool, problem.input};
   std::vector<float> result{0.0F};
   cuda::device_buffer<float> output{stream, pool, result};
-  if (!LAUNCH_CHECK(
-        kernel.launch(input.data(), output.data(), static_cast<unsigned int>(input.size()), nullptr)
-      ) ||
+  const auto n = kernel.pad_input ? static_cast<unsigned int>(input.size()) : length;
+  if (!LAUNCH_CHECK(kernel.launch(input.data(), output.data(), n, nullptr)) ||
       !copy_checked(output, result)) {
     HOST_LOG(
       "{}: N={} pattern={} padded={} launch/readback failed", kernel.name, length, pattern,
@@ -56,6 +55,12 @@ int check(Kernel kernel) {
                            31U,
                            32U,
                            33U,
+                           255U,
+                           256U,
+                           257U,
+                           511U,
+                           512U,
+                           513U,
                            segment - 1,
                            segment,
                            segment + 1,

@@ -28,7 +28,7 @@ sizes through the script's menu.
 - [x] [Chapter 7 — Convolution](./ch07.md)
 - [x] [Chapter 8 — Stencil](./ch08.md)
 - [x] [Chapter 9 — Parallel histogram](./ch09.md)
-- [ ] [Chapter 10 — Reduction](./ch10.md)
+- [x] [Chapter 10 — Reduction](./ch10.md)
 - [ ] [Chapter 11 — Prefix sum (scan)](./ch11.md)
 - [ ] [Chapter 12 — Merge](./ch12.md)
 

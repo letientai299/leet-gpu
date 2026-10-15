@@ -13,6 +13,7 @@ struct Kernel {
   Launch launch;
   unsigned int segment_size;
   unsigned int max_length; // Zero permits multiple blocks.
+  bool pad_input = true;
 };
 
 int run(int argc, const char* const* argv, Kernel kernel);
