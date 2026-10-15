@@ -48,6 +48,9 @@ for file in "$@"; do
   case "$file" in
     *.h | *.hpp | *.cuh)
       source=${file%.*}.cpp
+      if [ ! -f "$source" ]; then
+        source=${file%.*}.cu
+      fi
       if [ -f "$source" ]; then
         files+=("$source$")
       else

@@ -1,5 +1,10 @@
+add_executable(harness_histogram_inputs histogram_inputs.cpp)
+target_link_libraries(harness_histogram_inputs PRIVATE lg_histogram_inputs)
+add_test(NAME harness_histogram_inputs COMMAND harness_histogram_inputs)
+
 add_executable(harness_host host.cpp)
 target_link_libraries(harness_host PRIVATE lg_matmul)
+add_dependencies(harness_host harness_histogram_inputs)
 add_test(NAME harness_host COMMAND harness_host)
 
 add_executable(harness_hardware_metrics hardware_metrics.cu)
@@ -24,6 +29,7 @@ target_link_libraries(
     lg_convolution3d_nvbench
     lg_stencil_nvbench
 )
+add_dependencies(harness_cuda harness_hardware_metrics)
 add_test(NAME harness_cuda COMMAND harness_cuda)
 set_tests_properties(harness_cuda PROPERTIES LABELS gpu)
 add_test(NAME harness_retain COMMAND harness_cuda retain --quiet)

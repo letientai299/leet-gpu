@@ -201,6 +201,18 @@ target_link_libraries(
   PUBLIC lg_convolution3d lg_benchmark
 )
 
+add_library(lg_histogram_inputs STATIC histogram/inputs.cpp)
+target_include_directories(
+  lg_histogram_inputs
+  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+add_library(lg_histogram STATIC histogram.cu)
+target_link_libraries(
+  lg_histogram
+  PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL
+  PRIVATE lg_histogram_inputs lg_benchmark
+)
+
 add_library(lg_stencil STATIC stencil/correctness.cu)
 target_include_directories(lg_stencil PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(lg_stencil PUBLIC lg_runtime lg_cuda_runtime CCCL::CCCL)

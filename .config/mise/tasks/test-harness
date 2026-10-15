@@ -14,7 +14,7 @@ cmake -S "$root" -B "$build_dir" -G Ninja -DLG_BUILD_TESTS=ON
 targets=(harness_host)
 ctest_args=(-LE gpu)
 if [ "${1:-}" = --gpu ]; then
-  targets+=(harness_cuda harness_hardware_metrics)
+  targets+=(harness_cuda)
   ctest_args=()
 fi
 cmake --build "$build_dir" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-4}" --target "${targets[@]}"
