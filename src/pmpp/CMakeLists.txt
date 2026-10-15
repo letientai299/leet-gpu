@@ -31,6 +31,7 @@ add_cuda_app(pmpp/ch09/hist LIBRARIES lg_histogram)
 add_cuda_app(pmpp/ch09/hist.private LIBRARIES lg_histogram)
 add_cuda_app(pmpp/ch09/hist.coarsen.contiguous LIBRARIES lg_histogram)
 add_cuda_app(pmpp/ch09/hist.coarsen.interleaved LIBRARIES lg_histogram)
+add_cuda_app(pmpp/ch09/hist.coarsen.interleaved.v2 LIBRARIES lg_histogram)
 add_cuda_app(
   pmpp/ch05/matmul.tile
   LIBRARIES lg_matmul_kernels lg_matmul_nvbench
