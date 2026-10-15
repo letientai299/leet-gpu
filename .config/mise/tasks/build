@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 #MISE description="Build all apps or one app into ./bin"
+#MISE quiet=true
+#MISE output="interleave"
 set -euo pipefail
 
 task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
@@ -84,7 +86,11 @@ else
       if ! docker exec "$CONTAINER_NAME" true 2>/dev/null || [ "$mount_source" != "$project_root" ]; then
         mise run dc:up
       fi
-      exec docker exec "$CONTAINER_NAME" bash /app/.config/mise/tasks/build ${app:+"$app"}
+      docker_args=(exec)
+      if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then
+        docker_args+=(-t -e "TERM=$TERM")
+      fi
+      exec docker "${docker_args[@]}" "$CONTAINER_NAME" bash /app/.config/mise/tasks/build ${app:+"$app"}
       ;;
     *)
       echo "invalid BUILD_ENV: $build_env" >&2
@@ -132,14 +138,21 @@ if [ -n "$cxx" ] && [ -f "$build_dir/CMakeCache.txt" ] \
   rm -rf "$build_dir/CMakeCache.txt" "$build_dir/CMakeFiles"
 fi
 
-if [ ! -f "$build_dir/CMakeCache.txt" ]; then
+if [ ! -f "$build_dir/CMakeCache.txt" ] \
+  || ! grep -qx 'CMAKE_MESSAGE_LOG_LEVEL:STRING=WARNING' "$build_dir/CMakeCache.txt"; then
+  echo 'Configuring...'
   cmake -S "$root" -B "$build_dir" -G Ninja \
-    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
+    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+    -DCMAKE_MESSAGE_LOG_LEVEL:STRING=WARNING
 fi
 
-if [ -z "$app" ]; then
-  cmake --build "$build_dir" --parallel "$jobs"
-  exit
+build_args=(--build "$build_dir" --parallel "$jobs")
+if [ -n "$app" ]; then
+  build_args+=(--target "$(app_target "$app")")
+fi
+if [ ! -t 1 ] || [ "${TERM:-dumb}" = dumb ]; then
+  printf 'Building %s...\n' "${app:-all apps}"
+  build_args+=(-- --quiet)
 fi
 
-cmake --build "$build_dir" --parallel "$jobs" --target "$(app_target "$app")"
+cmake "${build_args[@]}"
