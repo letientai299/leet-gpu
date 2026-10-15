@@ -15,6 +15,15 @@ using Launch =
 
 using Resources = cudaError_t (*)(lg::benchmark::KernelResources&);
 
-int run(int argc, char** argv, Launch launch, Resources resources);
+// Counters the kernel needs for `length` bytes. The first kBins hold the result.
+using OutputSize = unsigned int (*)(unsigned int length);
+
+inline unsigned int shared_output(unsigned int) {
+  return kBins;
+}
+
+int run(
+  int argc, char** argv, Launch launch, Resources resources, OutputSize output_size = shared_output
+);
 
 } // namespace lg::histogram

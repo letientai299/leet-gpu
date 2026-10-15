@@ -4,10 +4,12 @@
 #include "histogram.hpp"
 #include "histogram/inputs.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cuda/buffer>
 #include <span>
 #include <string>
+#include <vector>
 
 namespace lg::histogram {
 namespace {
@@ -20,20 +22,19 @@ struct Case {
   Counts expected;
 };
 
-bool check(const Case& problem, Launch launch) {
+bool check(const Case& problem, Launch launch, OutputSize output_size) {
   const std::span bytes{problem.input.c_str(), problem.input.size() + 1};
   const auto stream = default_stream();
   auto& pool = device_pool();
   const cuda::device_buffer<char> input{stream, pool, bytes};
-  Counts actual{};
-  cuda::device_buffer<unsigned int> output{stream, pool, actual};
-  if (!LAUNCH_CHECK(launch(
-        input.data(), static_cast<unsigned int>(problem.input.size()), output.data(), nullptr
-      )) ||
-      !copy_checked(output, actual)) {
+  const auto length = static_cast<unsigned int>(problem.input.size());
+  std::vector<unsigned int> counters(output_size(length));
+  cuda::device_buffer<unsigned int> output{stream, pool, counters};
+  if (!LAUNCH_CHECK(launch(input.data(), length, output.data(), nullptr)) ||
+      !copy_checked(output, counters)) {
     return false;
   }
-  if (actual != problem.expected) {
+  if (!std::equal(problem.expected.begin(), problem.expected.end(), counters.begin())) {
     HOST_LOG("{} histogram mismatch", problem.name);
     return false;
   }
@@ -41,7 +42,13 @@ bool check(const Case& problem, Launch launch) {
   return true;
 }
 
-void run_benchmark(nvbench::state& state, Launch launch, Resources resources, const Input& corpus) {
+void run_benchmark(
+  nvbench::state& state,
+  Launch launch,
+  Resources resources,
+  OutputSize output_size,
+  const Input& corpus
+) {
   const auto& device = state.get_device();
   if (!device || !check_status(cudaSetDevice(device->get_id()))) {
     state.skip("CUDA device unavailable");
@@ -51,22 +58,24 @@ void run_benchmark(nvbench::state& state, Launch launch, Resources resources, co
     return;
   }
   const Case problem{"gutenberg-english", read_input(corpus), corpus.bins};
-  if (!check(problem, launch)) {
+  if (!check(problem, launch, output_size)) {
     state.skip("Histogram correctness failed");
     return;
   }
   const auto stream = default_stream();
   auto& pool = device_pool();
   const cuda::device_buffer<char> input{stream, pool, problem.input};
-  Counts actual{};
-  cuda::device_buffer<unsigned int> output{stream, pool, actual};
+  std::vector<unsigned int> counters(output_size(static_cast<unsigned int>(input.size())));
+  cuda::device_buffer<unsigned int> output{stream, pool, counters};
   if (!check_status(cudaDeviceSynchronize())) {
     state.skip("CUDA setup failed");
     return;
   }
   state.add_element_count(problem.input.size(), "Characters");
   const auto execute = [&](cudaStream_t timed_stream) {
-    if (!check_status(cudaMemsetAsync(output.data(), 0, sizeof(Counts), timed_stream))) {
+    if (!check_status(
+          cudaMemsetAsync(output.data(), 0, output.size() * sizeof(unsigned int), timed_stream)
+        )) {
       throw std::runtime_error("Histogram reset failed");
     }
     launch(input.data(), static_cast<unsigned int>(input.size()), output.data(), timed_stream);
@@ -81,14 +90,15 @@ void run_benchmark(nvbench::state& state, Launch launch, Resources resources, co
                                          {input.size(), 2 * sizeof(Counts)},
                                          std::nullopt};
   lg::benchmark::measure<unsigned int>(state, workload, nullptr, length, execute);
-  if (!copy_checked(output, actual) || actual != problem.expected) {
+  if (!copy_checked(output, counters) ||
+      !std::equal(problem.expected.begin(), problem.expected.end(), counters.begin())) {
     state.skip("Histogram result mismatch");
   }
 }
 
 } // namespace
 
-int run(int argc, char** argv, Launch launch, Resources resources) {
+int run(int argc, char** argv, Launch launch, Resources resources, OutputSize output_size) {
   return guarded([&] {
     const auto usage = [&] {
       std::printf("Usage: %s [--bench [NVBench options]]\n", argv[0]);
@@ -115,7 +125,7 @@ int run(int argc, char** argv, Launch launch, Resources resources) {
         "multiple-blocks", std::string(600, 'a') + std::string(13, 'z'), {600, 0, 0, 0, 0, 0, 13}},
     };
     for (const auto& problem : cases) {
-      if (!check(problem, launch)) {
+      if (!check(problem, launch, output_size)) {
         return 1;
       }
     }
@@ -127,7 +137,7 @@ int run(int argc, char** argv, Launch launch, Resources resources) {
     const auto corpus = prepare_input(directory);
     lg::benchmark::add(
       "histogram/gutenberg-english", [&](nvbench::state& state, nvbench::type_list<>) {
-        run_benchmark(state, launch, resources, corpus);
+        run_benchmark(state, launch, resources, output_size, corpus);
       }
     );
     return lg::benchmark::run_args(static_cast<int>(args.remaining.size()), args.remaining.data());
