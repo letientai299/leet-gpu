@@ -26,7 +26,7 @@ sizes through the script's menu.
 ## Part II — Parallel Patterns
 
 - [x] [Chapter 7 — Convolution](./ch07.md)
-- [ ] [Chapter 8 — Stencil](./ch08.md)
+- [x] [Chapter 8 — Stencil](./ch08.md)
 - [ ] [Chapter 9 — Parallel histogram](./ch09.md)
 - [ ] [Chapter 10 — Reduction](./ch10.md)
 - [ ] [Chapter 11 — Prefix sum (scan)](./ch11.md)
