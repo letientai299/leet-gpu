@@ -93,7 +93,12 @@ const char* gpu_arch() {
 
 // https://no-color.org/
 bool use_color(std::FILE* stream) {
-  return std::getenv("NO_COLOR") == nullptr && isatty(fileno(stream)) != 0;
+  if (std::getenv("NO_COLOR") != nullptr) {
+    return false;
+  }
+  // https://force-color.org/ lets tests and pipes opt in.
+  const char* forced = std::getenv("FORCE_COLOR");
+  return (forced != nullptr && *forced != '\0') || isatty(fileno(stream)) != 0;
 }
 
 void write_log_message(const char* kind, const char* file, int line, std::string_view message) {

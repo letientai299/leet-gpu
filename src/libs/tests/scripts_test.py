@@ -45,6 +45,7 @@ APP = """#!/usr/bin/env python3
 import json, os, signal, sys, time
 with open(os.environ['MOCK_LOG'], 'a') as log:
     log.write('app ' + os.environ.get('CUDA_VISIBLE_DEVICES', '') + '\\n')
+    log.write('args ' + ' '.join(sys.argv[1:]) + '\\n')
 if os.environ.get('MOCK_WAIT'):
     def stop(*_):
         with open(os.environ['MOCK_LOG'], 'a') as log: log.write('app stopped\\n')
@@ -52,6 +53,9 @@ if os.environ.get('MOCK_WAIT'):
     signal.signal(signal.SIGTERM, stop)
     while True: time.sleep(0.01)
 time.sleep(float(os.environ.get('MOCK_SLEEP', '0')))
+if '--json' in sys.argv:
+    with open(sys.argv[sys.argv.index('--json') + 1], 'w') as out:
+        json.dump({'benchmarks': [{'name': 'same', 'states': [{'is_skipped': False}]}]}, out)
 print(json.dumps({'args': sys.argv[1:],
                   'locked': os.environ.get('LG_LOCKED_CLOCK_MHZ')}))
 sys.exit(int(os.environ.get('MOCK_EXIT', '0')))
@@ -67,6 +71,36 @@ for path in paths:
     assert value['benchmarks'][0]['name'] == 'comparison'
 print('comparison ran')
 sys.exit(int(os.environ.get('MOCK_EXIT', '0')))
+"""
+
+
+MISE = """#!/bin/sh
+echo "mise $*" >> "$MOCK_LOG"
+"""
+
+
+RENDERER = """#!/usr/bin/env python3
+import json, sys
+for arg in sys.argv[1:]:
+    assert json.load(open(arg.split('=', 1)[1]))['benchmarks']
+print('render ' + ' '.join(sys.argv[1:]))
+"""
+
+SSH = """#!/bin/bash
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[i]}" in
+    mktemp) exec mktemp -d "$MOCK_ROOT/remote-XXXXXX" ;;
+    rm) exec "${args[@]:i}" ;;
+  esac
+done
+bash -c "${!#}"
+"""
+
+RSYNC = """#!/usr/bin/env python3
+import shutil, sys
+source, target = sys.argv[-2:]
+shutil.copy(source, target.split(':', 1)[1])
 """
 
 
@@ -88,11 +122,13 @@ class ScriptTests(unittest.TestCase):
             MISE_PROJECT_ROOT=str(self.root),
             LG_GPU_LOCK_DIR=str(self.root),
             MOCK_LOG=str(self.log),
+            MOCK_ROOT=str(self.root),
             SSH_HOST="local",
         )
         self.executable(self.mock / "nvidia-smi", SMI)
         self.executable(self.mock / "sudo", "#!/bin/sh\nexit 1\n")
         self.executable(self.mock / "uv", UV)
+        self.executable(self.mock / "mise", MISE)
         self.executable(self.root / "bin/test/app", APP)
         script = (
             self.root
@@ -379,6 +415,68 @@ class ScriptTests(unittest.TestCase):
         )
         source.write_text("invalid json")
         self.assertNotEqual(self.run_task("bench-compare", str(source)).returncode, 0)
+
+    def cmp_apps(self):
+        for name in ("other.bench", "third"):
+            self.executable(self.root / "bin/test" / name, APP)
+        self.executable(self.root / "bin/tools/cmp", RENDERER)
+
+    def app_lines(self):
+        return [line for line in self.events().splitlines() if line.startswith("args ")]
+
+    def test_cmp_renders_runs(self):
+        self.cmp_apps()
+        run = self.run_task(
+            "cmp", "test/app", "test/other.bench", "test/third", "--axis", "N=1"
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        events = self.events()
+        for name in ("test/app", "test/other.bench", "test/third", "tools/cmp"):
+            self.assertIn(f"mise run build -- {name}", events)
+        lines = self.app_lines()
+        self.assertEqual(len(lines), 3)
+        for line in lines:
+            self.assertIn("--axis N=1", line)
+            self.assertIn("--json ", line)
+        self.assertIn("--bench", lines[0])
+        self.assertNotIn("--bench", lines[1])
+        words = run.stdout.splitlines()[-1].split()[1:]
+        self.assertEqual(
+            [word.split("=")[0] for word in words], ["app", "other.bench", "third"]
+        )
+        self.assertFalse(Path(words[0].split("=")[1]).parent.exists())
+
+    def test_cmp_rejects_bad_input(self):
+        self.cmp_apps()
+        for args in (
+            ("test/app",),
+            ("test/app", "test/app"),
+            ("test/app", "test/third", "--json", "x"),
+            ("test/app", "test/third", "--bench"),
+        ):
+            with self.subTest(args=args):
+                self.assertEqual(self.run_task("cmp", *args).returncode, 2)
+        self.assertEqual(self.app_lines(), [])
+
+    def test_cmp_remote_target(self):
+        self.cmp_apps()
+        self.executable(self.mock / "ssh", SSH)
+        self.executable(self.mock / "rsync", RSYNC)
+        container = f"leet-gpu-test-{os.getpid()}"
+        self.addCleanup(
+            lambda: [path.unlink() for path in Path("/tmp").glob(f"{container}-*")]
+        )
+        run = self.run_task(
+            "cmp",
+            "test/app",
+            "test/third",
+            SSH_HOST="gpu-host",
+            CONTAINER_NAME=container,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(len(self.app_lines()), 2)
+        self.assertIn("render app=", run.stdout)
+        self.assertEqual(list(self.root.glob("remote-*")), [])
 
     def test_lock_holder_and_timeout(self):
         lock = self.root / "lg-gpu-GPU-1234-abcd.lock"

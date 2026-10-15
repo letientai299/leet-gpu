@@ -84,3 +84,4 @@ include(AddCudaApp)
 
 add_subdirectory(src/libs)
 add_subdirectory(src/pmpp)
+add_subdirectory(src/tools)

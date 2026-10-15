@@ -143,8 +143,31 @@ and `BENCH_CLOCK=off` skips locking entirely. The run resets the clock to the
 driver default afterward; set `BENCH_RESTORE_CLOCK` to a MHz range to restore a
 prior lock instead.
 
-Comparing two kernels by eye does not account for clock drift. Record one run,
-then let NVBench classify the gap:
+Comparing kernels by eye does not account for clock drift. Run the apps on one
+target and print their metrics together:
+
+```sh
+mise cmp src/pmpp/ch09/hist src/pmpp/ch09/hist.private -- --axis N=1
+```
+
+`cmp` takes a baseline and one or more apps. It builds them, runs each through
+`deploy` on `SSH_HOST` with `--bench --json`, then renders the results on the
+target with `tools/cmp`, which takes no GPU lock. Forwarded arguments start with
+`-` and go to every app; `--bench`, `--json`, `--quiet`, and listing flags are
+rejected.
+
+- Each metric prints one line per app. Rows that read the same for every app
+  print once as `all`; an app without a row shows `n/a`.
+- Later apps show a ratio to the baseline. Time, bytes, and rates are green when
+  better and red when worse, unless the gap is under 1% or the runs' combined
+  noise. Other ratios are dim.
+- Apps run one after another, so a changed SM clock prints a note. The ratios
+  then include that change.
+- Runs pair by benchmark and state position. The command fails before printing
+  when state counts or axis values differ.
+
+For an NVBench verdict on two kernels in one saved run, use the hidden
+`bench-compare` task:
 
 ```sh
 mise run bench -- src/pmpp/ch05/matmul.tile --bench --jsonbin .ai/bench/run.json

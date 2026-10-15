@@ -123,25 +123,34 @@ target_include_directories(lg_revision PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 add_dependencies(lg_revision lg_revision_stamp)
 
 add_library(
+  lg_format
+  STATIC
+  benchmark/compare.cpp
+  benchmark/format.cpp
+  benchmark/report.cpp
+)
+target_include_directories(lg_format PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(
+  lg_format
+  SYSTEM
+  PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
+)
+target_link_libraries(lg_format PUBLIC lg_runtime fmt::fmt PRIVATE lg_revision)
+
+add_library(
   lg_benchmark
   STATIC
   benchmark/cache.cu
-  benchmark/format.cpp
   benchmark/profiler.cpp
   benchmark/runner.cu
 )
 target_include_directories(lg_benchmark PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(lg_benchmark PRIVATE LG_HAS_CUDA_DRIVER LG_HAS_CUPTI)
-target_include_directories(
-  lg_benchmark
-  SYSTEM
-  PRIVATE "${CPM_PACKAGE_nlohmann_json_SOURCE_DIR}/include"
-)
 # Shared CUPTI comes from the GPU host's toolkit; static adds about 35 MB per
 # app.
 target_link_libraries(
   lg_benchmark
-  PUBLIC lg_nvbench lg_runtime CCCL::CCCL fmt::fmt
+  PUBLIC lg_format lg_nvbench lg_runtime CCCL::CCCL
   PRIVATE lg_revision CUDA::cuda_driver CUDA::cupti
 )
 

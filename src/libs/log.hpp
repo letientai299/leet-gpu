@@ -8,7 +8,7 @@
 void init_log();
 void set_gpu_arch(int major, int minor);
 const char* gpu_arch();
-/// True when `stream` is a terminal and NO_COLOR is unset.
+/// True when `stream` is a terminal or FORCE_COLOR is set, and NO_COLOR is unset.
 bool use_color(std::FILE* stream);
 
 void write_log_message(const char* kind, const char* file, int line, std::string_view message);

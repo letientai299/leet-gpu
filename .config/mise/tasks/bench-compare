@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Compare two kernels in one NVBench JSON run"
+#MISE hide=true
 #USAGE arg "<run.json>" help="NVBench --jsonbin output"
 #USAGE arg "[baseline]" help="Benchmark name to treat as reference"
 #USAGE arg "[candidate]" help="Benchmark name to compare against it"

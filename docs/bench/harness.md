@@ -24,7 +24,8 @@ mise run bench-compare -- .ai/kernel-bench/run.json baseline candidate
 
 Use the registered benchmark names for `baseline` and `candidate`. The
 comparison requires both kernels in the same run. Keep the JSON and its
-binary sample files together. The task preserves relative sample paths.
+binary sample files together. The task preserves relative sample paths. To
+compare separate apps, use `mise cmp <baseline> <app>...`.
 
 Omit `--jsonbin` for a vertical text report. Host diagnostics, GPU settings,
 the command, and the executable hash go to stderr, leaving `--json stdout`

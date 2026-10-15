@@ -107,17 +107,7 @@ remote=$target
 remote_name=${app//\//-}
 remote_bin=/tmp/${CONTAINER_NAME}-${remote_name}
 
-# Prefer a modern rsync (3.2+) over macOS's bundled openrsync at /usr/bin/rsync:
-# with 3.2+ on both ends, -z negotiates zstd (much better/faster than zlib) and
-# still falls back gracefully to an older remote. brew installs it outside the
-# default PATH order, so resolve it explicitly.
-rsync_bin=$(command -v rsync)
-for candidate in /opt/homebrew/bin/rsync /usr/local/bin/rsync; do
-  [ -x "$candidate" ] && {
-    rsync_bin=$candidate
-    break
-  }
-done
+rsync_bin=$(find_rsync)
 
 # rsync sends only the changed blocks of the recompiled binary (delta, against
 # the previous copy at $remote_bin) and -z compresses them — far less than the

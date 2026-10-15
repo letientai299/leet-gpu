@@ -7,6 +7,10 @@ target_link_libraries(harness_host PRIVATE lg_matmul)
 add_dependencies(harness_host harness_histogram_inputs)
 add_test(NAME harness_host COMMAND harness_host)
 
+add_executable(harness_format format.cpp)
+target_link_libraries(harness_format PRIVATE lg_format)
+add_test(NAME harness_format COMMAND harness_format)
+
 add_executable(harness_hardware_metrics hardware_metrics.cu)
 set_target_properties(
   harness_hardware_metrics

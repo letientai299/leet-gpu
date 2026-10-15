@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+#MISE description="Build, run apps on the GPU target, compare"
+set -euo pipefail
+
+task_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=.config/mise/lib/app.sh
+source "$task_dir/../lib/app.sh"
+# shellcheck source=.config/mise/lib/target.sh
+source "$task_dir/../lib/target.sh"
+
+# mise strips a leading --, so forwarded args are the ones starting with -.
+apps=()
+while [ "$#" -gt 0 ] && [[ "$1" != -* ]]; do
+  app=$(normalize_app "$1")
+  apps+=("$app")
+  shift
+done
+if [ "${#apps[@]}" -lt 2 ]; then
+  echo "usage: mise cmp <baseline> <app>... [-- -flag...]" >&2
+  exit 2
+fi
+if [ "$(printf '%s\n' "${apps[@]}" | sort -u | wc -l)" -ne "${#apps[@]}" ]; then
+  echo "cmp: apps must differ" >&2
+  exit 2
+fi
+# Each run needs its own JSON file, so these flags break the comparison.
+for arg in "$@"; do
+  case "$arg" in
+    --bench | --json | --json=* | --jsonbin | --jsonbin=* | --quiet | -q | --list | -l | --help | -h)
+      echo "cmp: cannot forward $arg" >&2
+      exit 2
+      ;;
+  esac
+done
+
+for app in "${apps[@]}" tools/cmp; do
+  mise run build -- "$app"
+done
+
+target=${SSH_HOST:-local}
+local_dir=
+remote_dir=
+cleanup() {
+  if [ -n "$remote_dir" ]; then
+    # shellcheck disable=SC2029 # The path comes from the remote mktemp.
+    ssh "${ssh_opts[@]}" "$target" rm -rf -- "$remote_dir" || true
+  fi
+  if [ -n "$local_dir" ]; then
+    rm -rf -- "$local_dir"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Results stay on the target, where the renderer reads them.
+if is_local_target "$target"; then
+  local_dir=$(mktemp -d)
+  run_dir=$local_dir
+else
+  : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+  # shellcheck disable=SC2029 # The template expands here on purpose.
+  remote_dir=$(ssh "${ssh_opts[@]}" "$target" mktemp -d "/tmp/${CONTAINER_NAME}-cmp-XXXXXX")
+  run_dir=$remote_dir
+fi
+
+# Short labels unless two apps share a basename.
+labels=()
+for app in "${apps[@]}"; do
+  labels+=("${app##*/}")
+done
+if [ "$(printf '%s\n' "${labels[@]}" | sort -u | wc -l)" -ne "${#apps[@]}" ]; then
+  labels=("${apps[@]}")
+fi
+
+# deploy adds --stopping-criterion for --bench runs; *.bench apps always
+# benchmark and reject a redundant --bench.
+renderer_args=()
+for i in "${!apps[@]}"; do
+  flags=(--json "$run_dir/$i.json")
+  if [[ "${apps[$i]}" != *.bench ]]; then
+    flags=(--bench "${flags[@]}")
+  fi
+  echo "cmp: ${labels[$i]} target=$target" >&2
+  "$task_dir/deploy" "${apps[$i]}" "${flags[@]}" "$@"
+  renderer_args+=("${labels[$i]}=$run_dir/$i.json")
+done
+
+# The renderer needs no GPU, so it skips deploy and its GPU lock.
+if is_local_target "$target"; then
+  bin/tools/cmp "${renderer_args[@]}"
+  exit
+fi
+"$(find_rsync)" -z -e "ssh ${ssh_opts[*]}" bin/tools/cmp "$target:$remote_dir/cmp"
+printf -v remote_command '%q ' "$remote_dir/cmp" "${renderer_args[@]}"
+tty_flag=()
+if [ -t 1 ]; then
+  tty_flag=(-t)
+fi
+# shellcheck disable=SC2029 # The command is escaped by printf %q.
+ssh -o LogLevel=ERROR "${tty_flag[@]+"${tty_flag[@]}"}" "${ssh_opts[@]}" "$target" "$remote_command"

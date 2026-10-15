@@ -47,3 +47,18 @@ clock_unlock() {
   read -r target gpu <<<"$1"
   run_gpu "$target" unlock "$gpu"
 }
+
+# Prefer a modern rsync (3.2+) over macOS's bundled openrsync at /usr/bin/rsync:
+# with 3.2+ on both ends, -z negotiates zstd (much better/faster than zlib) and
+# still falls back gracefully to an older remote. brew installs it outside the
+# default PATH order, so resolve it explicitly.
+find_rsync() {
+  local candidate
+  for candidate in /opt/homebrew/bin/rsync /usr/local/bin/rsync; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+  command -v rsync
+}
