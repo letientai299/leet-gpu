@@ -53,9 +53,15 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# Results stay on the target, where the renderer reads them.
+# Results stay on the target.
+local_dir=$(mktemp -d)
+command_file=$local_dir/run.sh
+printf 'set -euo pipefail\nshift %s\n' "$#" >"$command_file"
+cat >>"$command_file" <<'BATCH'
+child=
+trap 'if [ -n "$child" ]; then kill -TERM "$child" 2>/dev/null || true; wait "$child" || true; fi; exit 143' TERM
+BATCH
 if is_local_target "$target"; then
-  local_dir=$(mktemp -d)
   run_dir=$local_dir
 else
   : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
@@ -81,12 +87,16 @@ for i in "${!apps[@]}"; do
   if [[ "${apps[$i]}" != *.bench ]]; then
     flags=(--bench "${flags[@]}")
   fi
-  echo "cmp: ${labels[$i]} target=$target" >&2
-  "$task_dir/deploy" "${apps[$i]}" "${flags[@]}" "$@"
+  printf 'echo %q >&2\n' "cmp: ${labels[$i]} target=$target" >>"$command_file"
+  CMP_COMMAND_FILE=$command_file "$task_dir/deploy" "${apps[$i]}" "${flags[@]}" "$@"
   renderer_args+=("${labels[$i]}=$run_dir/$i.json")
 done
 
-# The renderer needs no GPU, so it skips deploy and its GPU lock.
+# Forwarded arguments expose explicit throttle thresholds.
+run_gpu "$target" run "${GPU_INDEX:-0}" "${GPU_CLOCK:-auto}" "${GPU_CLOCK_FRACTION:-85}" 0 -- \
+  bash -c "$(cat "$command_file")" cmp "$@"
+
+# Rendering follows GPU cleanup.
 if is_local_target "$target"; then
   bin/tools/cmp "${renderer_args[@]}"
   exit

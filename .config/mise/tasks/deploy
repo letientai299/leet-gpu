@@ -72,6 +72,22 @@ if [ ! -x "$binary" ]; then
   exit 1
 fi
 
+if ! is_local_target "$target"; then
+  : "${CONTAINER_NAME:?not set — copy .env.example to .env}"
+  remote_name=${app//\//-}
+  remote_bin=/tmp/${CONTAINER_NAME}-${remote_name}
+  rsync_bin=$(find_rsync)
+  "$rsync_bin" -z -e "ssh ${ssh_opts[*]}" "$binary" "$target:$remote_bin"
+  binary=$remote_bin
+fi
+
+if [ -n "${CMP_COMMAND_FILE:-}" ]; then
+  printf '%q ' "$binary" "${args[@]+"${args[@]}"}" >>"$CMP_COMMAND_FILE"
+  # shellcheck disable=SC2016 # The batch shell expands these variables.
+  printf '"$@" &\nchild=$!\nwait "$child"\nchild=\n' >>"$CMP_COMMAND_FILE"
+  exit
+fi
+
 # Every run waits for the GPU (gpu.sh holds a per-GPU host lock), and --bench
 # runs lock the SM clock. A lone run unlocks afterward. A dev session
 # (CLOCK_SESSION) keeps the lock, records its key, and unlocks the old target
@@ -96,25 +112,4 @@ if [ -n "${CLOCK_SESSION:-}" ] && [ "$has_bench" = 1 ]; then
 fi
 gpu_args=(run "${GPU_INDEX:-0}" "$clock" "${GPU_CLOCK_FRACTION:-85}" "$keep" --)
 
-if is_local_target "$target"; then
-  run_gpu "$target" "${gpu_args[@]}" "$binary" "${args[@]+"${args[@]}"}"
-  exit
-fi
-
-: "${CONTAINER_NAME:?not set — copy .env.example to .env}"
-
-remote=$target
-remote_name=${app//\//-}
-remote_bin=/tmp/${CONTAINER_NAME}-${remote_name}
-
-rsync_bin=$(find_rsync)
-
-# rsync sends only the changed blocks of the recompiled binary (delta, against
-# the previous copy at $remote_bin) and -z compresses them — far less than the
-# ~1 MB a fresh scp pushes every time. rsync writes a temporary file and renames
-# it into place, so a run of the old binary keeps its inode instead of failing
-# the transfer with ETXTBSY (--inplace would). No --partial: an interrupted
-# transfer would rename a truncated binary into place.
-"$rsync_bin" -z -e "ssh ${ssh_opts[*]}" "$binary" "$remote:$remote_bin"
-
-run_gpu "$target" "${gpu_args[@]}" "$remote_bin" "${args[@]+"${args[@]}"}"
+run_gpu "$target" "${gpu_args[@]}" "$binary" "${args[@]+"${args[@]}"}"
