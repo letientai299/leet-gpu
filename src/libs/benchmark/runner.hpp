@@ -47,10 +47,10 @@ bool add_resources(
 bool describe(nvbench::state& state, const Workload& workload);
 
 /// Adds throughput, utilization, and convergence columns.
-void finish_summaries(nvbench::state& state, const Workload& workload);
+void finish_summaries(nvbench::state& state);
 
-/// Adds achieved occupancy from one profiled `launch`.
-void add_achieved_occupancy(nvbench::state& state, const std::function<void(cudaStream_t)>& launch);
+/// Adds measured hardware counters.
+void add_hardware_metrics(nvbench::state& state, const std::function<void(cudaStream_t)>& launch);
 
 /// Reports resources and workload, then times `launch(stream)` on NVBench's stream.
 template <typename Shape, typename Launch>
@@ -83,8 +83,8 @@ void measure(
   state.exec(nvbench::exec_tag::gpu, [&](nvbench::launch& timed) {
     launch(timed.get_stream());
   });
-  finish_summaries(state, *workload);
-  add_achieved_occupancy(state, [&](cudaStream_t stream) {
+  finish_summaries(state);
+  add_hardware_metrics(state, [&](cudaStream_t stream) {
     launch(stream);
   });
 #endif

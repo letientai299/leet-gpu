@@ -161,12 +161,40 @@ supplies its dependencies per invocation and installs nothing.
 
 [nvbench-compare]: https://github.com/NVIDIA/nvbench/blob/main/docs/nvbench_compare_robust.md
 
-The `Model Bytes` and `Model FLOP/B` columns come from each kernel's traffic
-callback, not from hardware counters. They describe the traffic a cache-less
-machine would move, which is what PMPP ch. 5 reasons about. For measured cache
-and DRAM numbers, profile with [`ncu`][ncu].
+The model section describes algorithmic FLOPs and estimated traffic. The
+utilization section uses [CUPTI][cupti] hardware counters collected in a
+separate replay. Read-only loads over twice the L2 capacity evict cached data
+before each counter pass. [Cache discard][cache-discard] then removes only
+private scratch lines so they cannot contribute dirty writebacks. GPU timing
+remains unprofiled.
+
+DRAM reads, writes, bandwidth, and utilization come from `dram__bytes` counters.
+FP32 work counts executed ADD and MUL instructions plus twice the executed FMA
+instructions; it excludes Tensor Core and transcendental operations. Sustained
+peak rates come from the counter metrics. FP64 uses the same counting rule.
+FP16 reports ADD/MUL/FMA instruction throughput utilization. Tensor reports
+active pipeline cycles. Neither infers FLOPs from types or matrix dimensions.
+Integer reports predicated thread instruction counts and rates, with ALU
+pipeline utilization. This includes address and index arithmetic and does not
+isolate INT32 application work.
+
+Global ATOM, global RED, and shared atomic counts use warp instruction counters.
+L2 ATOM and RED sectors, sector rates, and sustained-peak percentages appear
+separately. Shared atomic utilization measures instruction throughput. These
+percentages measure throughput, not contention latency. An unused `atomicAdd`
+result can compile to RED. Inactive compute meters are omitted.
+L2 and DRAM counters include [traffic from other GPU contexts][ncu-shared].
+Run without concurrent GPU work to attribute that traffic to the app.
+Counter collection failures report unavailable metrics without a modeled
+fallback. Occupancy also shows the compiled kernel's theoretical limit.
+
+For instruction-level analysis, use [`ncu`][ncu]. Profiling under Nsight
+disables the embedded collector because Nsight owns the CUPTI session.
 
 [ncu]: https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html
+[ncu-shared]: https://docs.nvidia.com/nsight-compute/ReleaseNotes/topics/known-issues.html
+[cupti]: https://docs.nvidia.com/cupti/main/main.html#cupti-range-profiling-api
+[cache-discard]: https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#data-movement-and-conversion-instructions-discard
 
 Fix or check C++ and CUDA sources. Python is linted and formatted with ruff:
 

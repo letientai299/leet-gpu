@@ -25,23 +25,6 @@ inline constexpr nvbench::float32_t kThrottleThreshold = 0.75F;
 inline constexpr nvbench::float64_t kTimeoutSeconds = 90.0;
 inline constexpr nvbench::float64_t kWarmupSeconds = 1.0;
 
-void add_rate(
-  nvbench::state& state,
-  std::string tag,
-  const char* name,
-  const char* description,
-  std::size_t work,
-  double seconds
-) {
-  if (!std::isfinite(seconds) || seconds <= 0.0) {
-    return;
-  }
-  auto& summary = state.add_summary(std::move(tag));
-  summary.set_string("name", name);
-  summary.set_string("description", description);
-  summary.set_float64("value", static_cast<double>(work) / seconds / 1.0e9);
-}
-
 struct ColdTiming {
   double walltime = 0.0;
   double noise = std::numeric_limits<double>::infinity();
@@ -78,7 +61,7 @@ double event_timer_step() {
     return found->second;
   }
 
-  nvbench::cuda_stream const stream;
+  const nvbench::cuda_stream stream;
   nvbench::cuda_timer timer;
   std::vector<double> samples;
   samples.reserve(256);
@@ -169,75 +152,6 @@ void add_status(nvbench::state& state, const ColdTiming& timing) {
   summary.set_string("name", "Status");
   summary.set_string("description", "Whether the cold median is stable and clock-valid");
   summary.set_string("value", cold_status(state, timing));
-}
-
-// Non-Tensor Core FP32 FMA results per clock per SM.
-// https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#arithmetic-instructions-throughput-native-arithmetic-instructions
-int fp32_lanes_per_sm(int sm_version) {
-  if (sm_version < 700) {
-    return 0;
-  }
-  return sm_version <= 800 ? 64 : 128;
-}
-
-void add_compute_peak(nvbench::state& state, std::size_t flops, double seconds, double clock_hz) {
-  const auto& device = state.get_device();
-  if (!device.has_value() || !std::isfinite(seconds) || seconds <= 0.0) {
-    return;
-  }
-  const int lanes = fp32_lanes_per_sm(device->get_sm_version());
-  if (lanes == 0) {
-    return;
-  }
-  // NVBench skips clock sampling under --run-once or --profile.
-  if (!std::isfinite(clock_hz) || clock_hz <= 0.0) {
-    return;
-  }
-  // An FMA counts as two FLOPs.
-  const double peak = 2.0 * lanes * device->get_number_of_sms() * clock_hz;
-  auto& peak_summary = state.add_summary("lg/fp32/peak");
-  peak_summary.set_string("name", "FP32 Peak");
-  peak_summary.set_string("description", "FP32 FMA FLOP/s at the measured clock");
-  peak_summary.set_float64("value", peak);
-  auto& summary = state.add_summary("lg/cold/fp32/utilization");
-  summary.set_string("name", "FP32Util");
-  summary.set_string("hint", "percentage");
-  summary.set_string("description", "Cold FLOP/s over FP32 FMA peak at measured clock");
-  summary.set_float64("value", static_cast<double>(flops) / seconds / peak);
-}
-
-// No-reuse bytes = DRAM bytes + bytes served on chip (L1, L2, shared memory).
-// DRAM moves at least the minimum bytes and at most peak × time, which bounds
-// the on-chip share.
-void add_cache_bounds(nvbench::state& state, const Workload& workload, double seconds) {
-  const auto& device = state.get_device();
-  if (!workload.no_reuse || !device.has_value() || !std::isfinite(seconds) || seconds <= 0.0) {
-    return;
-  }
-  const auto minimum =
-    static_cast<double>(workload.minimum.read_bytes + workload.minimum.write_bytes);
-  const auto no_reuse =
-    static_cast<double>(workload.no_reuse->read_bytes + workload.no_reuse->write_bytes);
-  const auto dram_limit = static_cast<double>(device->get_global_memory_bus_bandwidth()) * seconds;
-  const auto add = [&](const char* tag, const char* name, double value) {
-    auto& summary = state.add_summary(tag);
-    summary.set_string("name", name);
-    summary.set_string("hint", "percentage");
-    summary.set_float64("value", std::clamp(value, 0.0, 1.0));
-  };
-  add("lg/cache/served_min", "Cache Served Min", 1.0 - dram_limit / no_reuse);
-  add("lg/cache/served_max", "Cache Served Max", 1.0 - minimum / no_reuse);
-}
-
-void add_dram_peak(nvbench::state& state) {
-  const auto& device = state.get_device();
-  if (!device.has_value()) {
-    return;
-  }
-  auto& summary = state.add_summary("lg/dram/peak");
-  summary.set_string("name", "DRAM Peak");
-  summary.set_string("hint", "byte_rate");
-  summary.set_float64("value", static_cast<double>(device->get_global_memory_bus_bandwidth()));
 }
 
 } // namespace
@@ -346,7 +260,9 @@ void add_traffic(
   nvbench::state& state, const std::string& tag, const char* name, std::size_t bytes, double flops
 ) {
   add_summary(state, tag + "/bytes", name, static_cast<nvbench::int64_t>(bytes), "bytes");
-  add_float(state, tag + "/intensity", "FLOP/B", flops / static_cast<double>(bytes));
+  if (flops > 0) {
+    add_float(state, tag + "/intensity", "FLOP/B", flops / static_cast<double>(bytes));
+  }
 }
 
 } // namespace
@@ -354,7 +270,7 @@ void add_traffic(
 bool describe(nvbench::state& state, const Workload& workload) {
   const auto minimum = total(workload.minimum);
   const auto no_reuse = workload.no_reuse ? total(*workload.no_reuse) : std::nullopt;
-  if (!minimum || (workload.no_reuse && !no_reuse) || workload.flops == 0 ||
+  if (!minimum || (workload.no_reuse && !no_reuse) ||
       workload.flops > static_cast<std::size_t>(std::numeric_limits<nvbench::int64_t>::max())) {
     state.skip("invalid workload size");
     return false;
@@ -366,9 +282,12 @@ bool describe(nvbench::state& state, const Workload& workload) {
     add_summary(state, "lg/shape/" + name, name, value);
   }
   const auto flops = static_cast<double>(workload.flops);
-  add_summary(
-    state, "lg/work/flops", "FLOPs", static_cast<nvbench::int64_t>(workload.flops), "flops"
-  );
+  if (workload.flops > 0) {
+    add_summary(
+      state, "lg/work/flops", "Modeled FLOPs", static_cast<nvbench::int64_t>(workload.flops),
+      "flops"
+    );
+  }
   add_summary(
     state, "lg/work/buffers", "Buffers", static_cast<nvbench::int64_t>(workload.buffer_bytes),
     "bytes"
@@ -377,22 +296,16 @@ bool describe(nvbench::state& state, const Workload& workload) {
   if (no_reuse) {
     add_traffic(state, "lg/traffic/no_reuse", "No-Reuse Bytes", *no_reuse, flops);
   }
-  // NVBench derives GlobalMem BW and BWUtil from these.
-  state.add_global_memory_reads(workload.minimum.read_bytes);
-  state.add_global_memory_writes(workload.minimum.write_bytes);
   return true;
 }
 
-void finish_summaries(nvbench::state& state, const Workload& workload) {
+void finish_summaries(nvbench::state& state) {
   double cold_seconds = 0.0;
-  double batch_seconds = 0.0;
   ColdTiming timing;
   for (auto& summary : state.get_summaries()) {
     const auto& tag = summary.get_tag();
     if (tag == "nv/cold/time/gpu/mean") {
       cold_seconds = summary.get_float64("value");
-    } else if (tag == "nv/batch/time/gpu/mean") {
-      batch_seconds = summary.get_float64("value");
     } else if (tag == "nv/cold/walltime") {
       timing.walltime = summary.get_float64("value");
     } else if (tag == "nv/cold/time/gpu/stdev/relative") {
@@ -410,17 +323,6 @@ void finish_summaries(nvbench::state& state, const Workload& workload) {
     }
   }
 
-  add_rate(
-    state, "lg/cold/gflops", "Cold GFLOPs/s",
-    "Billions of floating-point operations per cold GPU second", workload.flops, cold_seconds
-  );
-  add_rate(
-    state, "lg/batch/gflops", "Batch GFLOPs/s",
-    "Billions of floating-point operations per batch GPU second", workload.flops, batch_seconds
-  );
-  add_compute_peak(state, workload.flops, cold_seconds, timing.clock_hz);
-  add_dram_peak(state);
-  add_cache_bounds(state, workload, cold_seconds);
   add_status(state, timing);
   if (!std::isfinite(cold_seconds) || cold_seconds <= 0 || timing.samples == 0 ||
       (!state.get_run_once() && timing.samples < state.get_min_samples())) {
@@ -430,23 +332,127 @@ void finish_summaries(nvbench::state& state, const Workload& workload) {
   }
 }
 
-void add_achieved_occupancy(
-  nvbench::state& state, const std::function<void(cudaStream_t)>& launch
-) {
+namespace {
+
+void add_compute_metrics(nvbench::state& state, const HardwareMetrics& metrics) {
+  const auto add_compute = [&](std::string_view kind, double count, double rate, double peak) {
+    if (count <= 0 || peak <= 0) {
+      return;
+    }
+    const auto tag = std::string("lg/hardware/") + std::string(kind);
+    const auto* name = kind == "fp32" ? "Measured FP32 FLOPs" : "Measured FP64 FLOPs";
+    add_float(state, tag + "/flops", name, count, "flops");
+    add_float(state, tag + "/rate", "Measured FLOP/s", rate);
+    add_float(state, tag + "/peak", "Sustained Peak", peak);
+    add_float(state, tag + "/utilization", "Measured Utilization", rate / peak, "percentage");
+  };
+  add_compute("fp32", metrics.fp32_flops, metrics.fp32_flops_per_second, metrics.fp32_peak);
+  add_compute("fp64", metrics.fp64_flops, metrics.fp64_flops_per_second, metrics.fp64_peak);
+  const auto add_activity = [&](std::string_view kind, double utilization) {
+    if (utilization > 0) {
+      add_float(
+        state, std::string("lg/hardware/") + std::string(kind) + "/utilization",
+        "Measured Utilization", utilization, "percentage"
+      );
+    }
+  };
+  add_activity("fp16", metrics.fp16_utilization);
+  add_activity("tensor", metrics.tensor_utilization);
+}
+
+void add_integer_metrics(nvbench::state& state, const HardwareMetrics& metrics) {
+  if (metrics.integer_instructions > 0) {
+    add_float(
+      state, "lg/hardware/integer/instructions", "Integer Thread Instructions",
+      metrics.integer_instructions
+    );
+    add_float(
+      state, "lg/hardware/integer/rate", "Integer Thread Instructions/s",
+      metrics.integer_instructions_per_second
+    );
+    add_float(
+      state, "lg/hardware/integer/utilization", "Integer ALU Utilization",
+      metrics.integer_utilization, "percentage"
+    );
+  }
+}
+
+void add_atomic_metrics(nvbench::state& state, const HardwareMetrics& metrics) {
+  if (metrics.global_atomics == 0 && metrics.global_reductions == 0 &&
+      metrics.shared_atomics == 0 && metrics.atomic_sectors == 0 &&
+      metrics.reduction_sectors == 0) {
+    return;
+  }
+  add_float(
+    state, "lg/hardware/atomics/global", "Global ATOM Warp Instructions", metrics.global_atomics
+  );
+  add_float(
+    state, "lg/hardware/atomics/reductions", "Global RED Warp Instructions",
+    metrics.global_reductions
+  );
+  add_float(
+    state, "lg/hardware/atomics/shared", "Shared Atomic Warp Instructions", metrics.shared_atomics
+  );
+  const auto add_atomic =
+    [&](std::string_view kind, double count, double rate, double utilization) {
+      if (count <= 0) {
+        return;
+      }
+      const auto tag = std::string("lg/hardware/") + std::string(kind);
+      const auto* name = kind == "atomics" ? "L2 ATOM Sectors" : "L2 RED Sectors";
+      add_float(state, tag + "/sectors", name, count);
+      add_float(state, tag + "/rate", "L2 Atomic Sectors/s", rate);
+      add_float(state, tag + "/utilization", "L2 Atomic Utilization", utilization, "percentage");
+    };
+  add_atomic(
+    "atomics", metrics.atomic_sectors, metrics.atomic_sectors_per_second, metrics.atomic_utilization
+  );
+  add_atomic(
+    "reductions", metrics.reduction_sectors, metrics.reduction_sectors_per_second,
+    metrics.reduction_utilization
+  );
+  if (metrics.shared_atomics > 0) {
+    add_float(
+      state, "lg/hardware/shared_atomics/utilization", "Shared Atomic Instruction Utilization",
+      metrics.shared_atomic_utilization, "percentage"
+    );
+  }
+}
+
+} // namespace
+
+void add_hardware_metrics(nvbench::state& state, const std::function<void(cudaStream_t)>& launch) {
   const auto& device = state.get_device();
   if (state.is_skipped() || !device.has_value()) {
     return;
   }
-  const auto value =
-    achieved_occupancy(device->get_id(), state.get_cuda_stream().get_stream(), launch);
-  if (!value) {
+  const auto metrics =
+    profile_hardware(device->get_id(), state.get_cuda_stream().get_stream(), launch);
+  if (!metrics) {
+    auto& status = state.add_summary("lg/hardware/status");
+    status.set_string("name", "Hardware Counters");
+    status.set_string("value", "unavailable");
     return;
   }
-  auto& summary = state.add_summary("lg/occupancy/achieved");
-  summary.set_string("name", "Achieved Occupancy");
-  summary.set_string("hint", "percentage");
-  summary.set_string("description", "Active warps per active SM cycle over the SM maximum");
-  summary.set_float64("value", *value);
+  add_float(state, "lg/occupancy/achieved", "Achieved Occupancy", metrics->occupancy, "percentage");
+  add_float(
+    state, "lg/hardware/dram/read_bytes", "Measured DRAM Reads", metrics->dram_read_bytes, "bytes"
+  );
+  add_float(
+    state, "lg/hardware/dram/write_bytes", "Measured DRAM Writes", metrics->dram_write_bytes,
+    "bytes"
+  );
+  add_float(
+    state, "lg/hardware/dram/rate", "Measured DRAM BW", metrics->dram_bytes_per_second, "byte_rate"
+  );
+  add_float(
+    state, "lg/hardware/dram/utilization", "Measured DRAM Utilization", metrics->dram_utilization,
+    "percentage"
+  );
+  add_float(state, "lg/hardware/dram/peak", "DRAM Sustained Peak", metrics->dram_peak, "byte_rate");
+  add_compute_metrics(state, *metrics);
+  add_integer_metrics(state, *metrics);
+  add_atomic_metrics(state, *metrics);
 }
 
 inline int run_impl(int argc, char** argv) try {

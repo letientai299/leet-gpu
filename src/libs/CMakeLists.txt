@@ -125,6 +125,7 @@ add_dependencies(lg_revision lg_revision_stamp)
 add_library(
   lg_benchmark
   STATIC
+  benchmark/cache.cu
   benchmark/format.cpp
   benchmark/profiler.cpp
   benchmark/runner.cu

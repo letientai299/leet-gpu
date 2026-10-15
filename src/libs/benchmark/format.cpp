@@ -210,8 +210,9 @@ private:
   std::set<const Json*> used_;
 };
 
-std::string label_cell(std::string_view label, const char* tint = ansi::dim) {
-  return paint(fmt::format("{:<{}}", label, kLabelWidth), tint);
+std::string
+label_cell(std::string_view label, const char* tint = ansi::dim, int width = kLabelWidth) {
+  return paint(fmt::format("{:<{}}", label, width), tint);
 }
 
 void print_section(std::string_view title, std::string_view note = {}) {
@@ -221,13 +222,13 @@ void print_section(std::string_view title, std::string_view note = {}) {
   );
 }
 
-void print_row(std::string_view label, const std::string& value) {
+void print_row(std::string_view label, const std::string& value, int width = kLabelWidth) {
   if (!value.empty()) {
-    fmt::print("  {} {}\n", label_cell(label), value);
+    fmt::print("  {} {}\n", label_cell(label, ansi::dim, width), value);
   }
 }
 
-using Rows = std::vector<std::pair<std::string_view, std::string>>;
+using Rows = std::vector<std::pair<std::string, std::string>>;
 
 // Prints the section only when one of its rows has a value.
 void print_block(std::string_view title, std::string_view note, const Rows& rows) {
@@ -237,9 +238,15 @@ void print_block(std::string_view title, std::string_view note, const Rows& rows
   if (!any) {
     return;
   }
+  int width = kLabelWidth;
+  for (const auto& [label, value] : rows) {
+    if (!value.empty()) {
+      width = std::max(width, static_cast<int>(label.size()));
+    }
+  }
   print_section(title, note);
   for (const auto& [label, value] : rows) {
-    print_row(label, value);
+    print_row(label, value, width);
   }
 }
 
@@ -273,7 +280,6 @@ std::string problem_row(Summaries& summaries, const Json& state) {
       append(out, axis.value("name", "Axis") + " " + raw_value(axis));
     }
   }
-  append(out, summaries.text("lg/work/flops"));
   append(out, suffixed(summaries.text("lg/work/buffers"), "buffers"));
   return out;
 }
@@ -324,6 +330,9 @@ void print_model(Summaries& summaries) {
       ansi::dim
     )
   );
+  if (const auto flops = summaries.text("lg/work/flops"); !flops.empty()) {
+    fmt::print("  Algorithmic work: {}\n", flops);
+  }
   print_model_row(summaries, "Minimum", "each value once", "lg/traffic/minimum");
   print_model_row(summaries, "No reuse", "every operand from DRAM", "lg/traffic/no_reuse");
 }
@@ -425,35 +434,49 @@ std::string percent(double fraction) {
   return fmt::format("{:.2f}%", fraction * 100.0);
 }
 
+void compute_meters(Summaries& summaries, std::vector<Meter>& meters) {
+  for (const auto& [kind, label] :
+       std::array{std::pair{"fp32", "FP32"}, std::pair{"fp64", "FP64"}, std::pair{"fp16", "FP16"},
+                  std::pair{"tensor", "Tensor"}, std::pair{"integer", "Integer"},
+                  std::pair{"atomics", "Atomics"}, std::pair{"reductions", "Atom RED"},
+                  std::pair{"shared_atomics", "Atom SMEM"}}) {
+    const auto tag = std::string("lg/hardware/") + kind;
+    const auto utilization = summaries.number(tag + "/utilization");
+    if (!utilization) {
+      continue;
+    }
+    const auto rate = summaries.number(tag + "/rate");
+    const auto peak = summaries.number(tag + "/peak");
+    std::string detail;
+    if (rate && peak) {
+      detail = ratio(*rate, *peak, kFlopRate);
+    } else if (std::string_view(kind) == "integer" && rate) {
+      detail = fmt::format("{:.3g} thread inst/s · ALU pipeline", *rate);
+    } else if (rate) {
+      detail = fmt::format("{:.3g} L2 sectors/s", *rate);
+    } else if (std::string_view(kind) == "shared_atomics") {
+      detail = "shared atomic warp instruction throughput";
+    } else if (std::string_view(kind) == "fp16") {
+      detail = "FP16 instruction throughput";
+    } else {
+      detail = "pipeline activity";
+    }
+    meters.push_back({label, bar(*utilization), percent(*utilization), detail, ansi::magenta});
+  }
+}
+
 std::vector<Meter> collect_meters(Summaries& summaries) {
   std::vector<Meter> meters;
-  const auto cache_low = summaries.number("lg/cache/served_min");
-  const auto cache_high = summaries.number("lg/cache/served_max");
-  if (cache_low && cache_high) {
-    meters.push_back(
-      {"Reuse", range_bar(*cache_low, *cache_high),
-       fmt::format("{:.0f}–{:.0f}%", *cache_low * 100.0, *cache_high * 100.0),
-       "of no-reuse bytes served on chip", ansi::green}
-    );
-  }
-  const auto dram_rate = summaries.number("nv/cold/bw/global/bytes_per_second");
-  const auto dram_peak = summaries.number("lg/dram/peak");
-  if (const auto dram = summaries.number("nv/cold/bw/global/utilization")) {
+  const auto dram_rate = summaries.number("lg/hardware/dram/rate");
+  const auto dram_peak = summaries.number("lg/hardware/dram/peak");
+  if (const auto dram = summaries.number("lg/hardware/dram/utilization")) {
     meters.push_back(
       {"DRAM", bar(*dram), percent(*dram),
        dram_rate && dram_peak ? ratio(*dram_rate, *dram_peak, kByteRate) : std::string{},
        ansi::cyan}
     );
   }
-  const auto gflops = summaries.number("lg/cold/gflops");
-  const auto fp32_peak = summaries.number("lg/fp32/peak");
-  if (const auto fp32 = summaries.number("lg/cold/fp32/utilization")) {
-    meters.push_back(
-      {"FP32", bar(*fp32), percent(*fp32),
-       gflops && fp32_peak ? ratio(*gflops * 1.0e9, *fp32_peak, kFlopRate) : std::string{},
-       ansi::magenta}
-    );
-  }
+  compute_meters(summaries, meters);
   const std::string warps = summaries.text("kernel/resources/warps_per_sm");
   const std::string max_warps = summaries.text("kernel/resources/max_warps_per_sm");
   const std::string limit = warps.empty() || max_warps.empty()
@@ -483,7 +506,7 @@ void print_meters(const std::vector<Meter>& meters) {
   if (meters.empty()) {
     return;
   }
-  print_section("utilization", "cold runs, except occupancy");
+  print_section("utilization", "hardware counters, separate cold replay");
   for (const auto& meter : meters) {
     fmt::print(
       "  {} {} {}  {}\n", label_cell(meter.label, meter.tint), paint(meter.bar, meter.tint),
@@ -527,22 +550,22 @@ void print_state(const Json& root, const Json& bench, const Json& state) {
      {"Compiled", compiled_row(summaries)}}
   );
   print_model(summaries);
-  print_block(
-    "measured", "cold: L2 flushed per run · batch: back-to-back",
-    {{"Cold", timing_row(summaries, "nv/cold/time/gpu", "nv/cold/sample_size")},
-     {"Batch", timing_row(summaries, "nv/batch/time/gpu", "nv/batch/sample_size")},
-     {"Host", timing_row(summaries, "nv/cold/time/cpu", {})},
-     {"Clock", clock_row(summaries)},
-     {"Status", status_value(summaries)}}
-  );
+  Rows measured{{"Cold", timing_row(summaries, "nv/cold/time/gpu", "nv/cold/sample_size")},
+                {"Batch", timing_row(summaries, "nv/batch/time/gpu", "nv/batch/sample_size")},
+                {"Host", timing_row(summaries, "nv/cold/time/cpu", {})},
+                {"Clock", clock_row(summaries)},
+                {"Status", status_value(summaries)}};
   summaries.with_prefix("lg/batch/");
   summaries.with_prefix("nv/cold/walltime");
   summaries.with_prefix("nv/batch/walltime");
 
   const auto meters = collect_meters(summaries);
   for (const Json* summary : summaries.rest()) {
-    print_row(summary->value("name", summary->value("tag", "")), format_value(*summary));
+    measured.emplace_back(
+      summary->value("name", summary->value("tag", "")), format_value(*summary)
+    );
   }
+  print_block("measured", "cold: L2 flushed per run · batch: back-to-back", measured);
   print_meters(meters);
 }
 

@@ -194,7 +194,7 @@ void check_timer_status(nvbench::state& state) {
     add("nv/cold/time/gpu/iqr/absolute", 0.8e-6);
     add("lg/cold/timer_step", step);
     state.add_summary("nv/cold/sample_size").set_int64("value", 100);
-    lg::benchmark::finish_summaries(state, lg::benchmark::Workload{{}, 1, 4, {4, 0}, {}});
+    lg::benchmark::finish_summaries(state);
     require(!state.is_skipped());
     for (const auto& summary : state.get_summaries()) {
       if (summary.get_tag() == "lg/cold/status") {
@@ -216,7 +216,7 @@ void check_benchmark_status(nvbench::state& state, std::string_view mode) {
   } else if (mode == "skip") {
     state.skip("injected failure");
   } else {
-    lg::benchmark::finish_summaries(state, lg::benchmark::Workload{{}, 1, 4, {4, 0}, {}});
+    lg::benchmark::finish_summaries(state);
   }
 }
 

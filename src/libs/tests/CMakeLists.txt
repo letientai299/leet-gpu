@@ -2,6 +2,15 @@ add_executable(harness_host host.cpp)
 target_link_libraries(harness_host PRIVATE lg_matmul)
 add_test(NAME harness_host COMMAND harness_host)
 
+add_executable(harness_hardware_metrics hardware_metrics.cu)
+set_target_properties(
+  harness_hardware_metrics
+  PROPERTIES LINKER_LANGUAGE CUDA CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+target_link_libraries(harness_hardware_metrics PRIVATE lg_benchmark)
+add_test(NAME harness_hardware_metrics COMMAND harness_hardware_metrics)
+set_tests_properties(harness_hardware_metrics PROPERTIES LABELS gpu)
+
 add_executable(harness_cuda cuda.cu)
 set_target_properties(
   harness_cuda

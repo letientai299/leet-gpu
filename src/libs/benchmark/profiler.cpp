@@ -1,8 +1,11 @@
 #include "benchmark/profiler.hpp"
 
+#include "benchmark/cache.hpp"
 #include "checks.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cupti_profiler_host.h>
@@ -16,14 +19,77 @@
 namespace lg::benchmark {
 namespace {
 
-// Nsight Compute's Achieved Occupancy, in percent.
-// https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#occupancy-metrics
-constexpr const char* kMetric = "sm__warps_active.avg.pct_of_peak_sustained_active";
-// The metric needs one pass; the cap stops a runaway replay loop.
+// FMA counts as two FLOPs.
+// https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html
+struct Metric {
+  const char* name;
+  double HardwareMetrics::* field;
+  double scale;
+};
+
+constexpr std::array<Metric, 35> kMetricSpecs{{
+  {"sm__warps_active.avg.pct_of_peak_sustained_active", &HardwareMetrics::occupancy, 0.01},
+  {"dram__bytes_read.sum", &HardwareMetrics::dram_read_bytes, 1.0},
+  {"dram__bytes_write.sum", &HardwareMetrics::dram_write_bytes, 1.0},
+  {"dram__bytes.sum.per_second", &HardwareMetrics::dram_bytes_per_second, 1.0},
+  {"dram__bytes.sum.pct_of_peak_sustained_elapsed", &HardwareMetrics::dram_utilization, 0.01},
+  {"dram__bytes.sum.peak_sustained_elapsed.per_second", &HardwareMetrics::dram_peak, 1.0},
+  {"smsp__sass_thread_inst_executed_op_fadd_pred_on.sum", &HardwareMetrics::fp32_flops, 1.0},
+  {"smsp__sass_thread_inst_executed_op_fmul_pred_on.sum", &HardwareMetrics::fp32_flops, 1.0},
+  {"smsp__sass_thread_inst_executed_op_ffma_pred_on.sum", &HardwareMetrics::fp32_flops, 2.0},
+  {"smsp__sass_thread_inst_executed_op_fadd_pred_on.sum.per_second",
+   &HardwareMetrics::fp32_flops_per_second, 1.0},
+  {"smsp__sass_thread_inst_executed_op_fmul_pred_on.sum.per_second",
+   &HardwareMetrics::fp32_flops_per_second, 1.0},
+  {"smsp__sass_thread_inst_executed_op_ffma_pred_on.sum.per_second",
+   &HardwareMetrics::fp32_flops_per_second, 2.0},
+  {"smsp__sass_thread_inst_executed_op_ffma_pred_on.sum.peak_sustained_elapsed.per_second",
+   &HardwareMetrics::fp32_peak, 2.0},
+  {"smsp__sass_thread_inst_executed_op_dadd_pred_on.sum", &HardwareMetrics::fp64_flops, 1.0},
+  {"smsp__sass_thread_inst_executed_op_dmul_pred_on.sum", &HardwareMetrics::fp64_flops, 1.0},
+  {"smsp__sass_thread_inst_executed_op_dfma_pred_on.sum", &HardwareMetrics::fp64_flops, 2.0},
+  {"smsp__sass_thread_inst_executed_op_dadd_pred_on.sum.per_second",
+   &HardwareMetrics::fp64_flops_per_second, 1.0},
+  {"smsp__sass_thread_inst_executed_op_dmul_pred_on.sum.per_second",
+   &HardwareMetrics::fp64_flops_per_second, 1.0},
+  {"smsp__sass_thread_inst_executed_op_dfma_pred_on.sum.per_second",
+   &HardwareMetrics::fp64_flops_per_second, 2.0},
+  {"smsp__sass_thread_inst_executed_op_dfma_pred_on.sum.peak_sustained_elapsed.per_second",
+   &HardwareMetrics::fp64_peak, 2.0},
+  {"smsp__sass_thread_inst_executed_ops_hadd_hmul_hfma_pred_on.avg.pct_of_peak_sustained_elapsed",
+   &HardwareMetrics::fp16_utilization, 0.01},
+  {"sm__pipe_tensor_cycles_active.avg.pct_of_peak_sustained_elapsed",
+   &HardwareMetrics::tensor_utilization, 0.01},
+  {"smsp__sass_thread_inst_executed_op_integer_pred_on.sum", &HardwareMetrics::integer_instructions,
+   1.0},
+  {"smsp__sass_thread_inst_executed_op_integer_pred_on.sum.per_second",
+   &HardwareMetrics::integer_instructions_per_second, 1.0},
+  {"smsp__inst_executed_pipe_alu.avg.pct_of_peak_sustained_elapsed",
+   &HardwareMetrics::integer_utilization, 0.01},
+  {"smsp__sass_inst_executed_op_global_atom.sum", &HardwareMetrics::global_atomics, 1.0},
+  {"smsp__inst_executed_op_global_red.sum", &HardwareMetrics::global_reductions, 1.0},
+  {"smsp__sass_inst_executed_op_shared_atom.sum", &HardwareMetrics::shared_atomics, 1.0},
+  {"smsp__sass_inst_executed_op_shared_atom.avg.pct_of_peak_sustained_elapsed",
+   &HardwareMetrics::shared_atomic_utilization, 0.01},
+  {"lts__t_sectors_op_atom.sum", &HardwareMetrics::atomic_sectors, 1.0},
+  {"lts__t_sectors_op_atom.sum.per_second", &HardwareMetrics::atomic_sectors_per_second, 1.0},
+  {"lts__t_sectors_op_atom.sum.pct_of_peak_sustained_elapsed", &HardwareMetrics::atomic_utilization,
+   0.01},
+  {"lts__t_sectors_op_red.sum", &HardwareMetrics::reduction_sectors, 1.0},
+  {"lts__t_sectors_op_red.sum.per_second", &HardwareMetrics::reduction_sectors_per_second, 1.0},
+  {"lts__t_sectors_op_red.sum.pct_of_peak_sustained_elapsed",
+   &HardwareMetrics::reduction_utilization, 0.01},
+}};
+constexpr auto kMetrics = [] {
+  std::array<const char*, kMetricSpecs.size()> names{};
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    names[i] = kMetricSpecs[i].name;
+  }
+  return names;
+}();
 constexpr int kMaxPasses = 8;
 
 using Image = std::vector<std::uint8_t>;
-using Metrics = std::array<const char*, 1>;
 
 // Range profiler sample: extras/CUPTI/samples/range_profiling.
 // https://docs.nvidia.com/cupti/main/main.html#cupti-range-profiling-api
@@ -47,6 +113,7 @@ public:
     CUpti_Profiler_GetCounterAvailability_Params availability{
       CUpti_Profiler_GetCounterAvailability_Params_STRUCT_SIZE};
     availability.ctx = context;
+    availability.bAllowDeviceLevelCounters = 1;
     if (!check_status(cuptiDeviceGetChipName(&chip)) ||
         !check_status(cuptiProfilerGetCounterAvailability(&availability))) {
       return false;
@@ -66,7 +133,7 @@ public:
     }
     object_ = params.pHostObject;
 
-    Metrics metrics{kMetric};
+    auto metrics = kMetrics;
     CUpti_Profiler_Host_ConfigAddMetrics_Params add{
       CUpti_Profiler_Host_ConfigAddMetrics_Params_STRUCT_SIZE};
     add.pHostObject = object_;
@@ -92,7 +159,7 @@ public:
     return config_;
   }
 
-  [[nodiscard]] std::optional<double> evaluate(const Image& counters) const {
+  [[nodiscard]] std::optional<HardwareMetrics> evaluate(const Image& counters) const {
     CUpti_RangeProfiler_GetCounterDataInfo_Params info{
       CUpti_RangeProfiler_GetCounterDataInfo_Params_STRUCT_SIZE};
     info.pCounterDataImage = counters.data();
@@ -100,8 +167,8 @@ public:
     if (!check_status(cuptiRangeProfilerGetCounterDataInfo(&info)) || info.numTotalRanges != 1) {
       return std::nullopt;
     }
-    Metrics metrics{kMetric};
-    double percent = 0.0;
+    auto metrics = kMetrics;
+    std::array<double, kMetrics.size()> values{};
     CUpti_Profiler_Host_EvaluateToGpuValues_Params params{
       CUpti_Profiler_Host_EvaluateToGpuValues_Params_STRUCT_SIZE};
     params.pHostObject = object_;
@@ -110,11 +177,21 @@ public:
     params.rangeIndex = 0;
     params.ppMetricNames = metrics.data();
     params.numMetrics = metrics.size();
-    params.pMetricValues = &percent;
+    params.pMetricValues = values.data();
     if (!check_status(cuptiProfilerHostEvaluateToGpuValues(&params))) {
       return std::nullopt;
     }
-    return percent / 100.0;
+    if (!std::ranges::all_of(values, [](double value) {
+          return std::isfinite(value) && value >= 0;
+        })) {
+      return std::nullopt;
+    }
+    HardwareMetrics result{};
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      const auto& metric = kMetricSpecs[i];
+      result.*(metric.field) += values[i] * metric.scale;
+    }
+    return result;
   }
 
 private:
@@ -134,7 +211,7 @@ const Host* host_for(int device, CUcontext context) {
   }();
   auto host = std::make_unique<Host>();
   if (!initialized || !host->init(device, context)) {
-    HOST_LOG("Achieved occupancy unavailable on device {}", device);
+    HOST_LOG("Hardware counters unavailable on device {}", device);
     host.reset();
   }
   return hosts.emplace(device, std::move(host)).first->second.get();
@@ -145,8 +222,13 @@ bool collect_pass(
   CUpti_RangeProfiler_Object* object,
   cudaStream_t stream,
   const std::function<void(cudaStream_t)>& launch,
-  bool& done
+  bool& done,
+  ColdCache& cache
 ) {
+  cache.flush(stream);
+  if (!check_status(cudaStreamSynchronize(stream))) {
+    return false;
+  }
   CUpti_RangeProfiler_Start_Params start{CUpti_RangeProfiler_Start_Params_STRUCT_SIZE};
   start.pRangeProfilerObject = object;
   CUpti_RangeProfiler_PushRange_Params push{CUpti_RangeProfiler_PushRange_Params_STRUCT_SIZE};
@@ -169,13 +251,13 @@ bool collect_pass(
   return launched && stopped;
 }
 
-std::optional<double> collect(
+std::optional<HardwareMetrics> collect(
   const Host& host,
   CUpti_RangeProfiler_Object* object,
   cudaStream_t stream,
   const std::function<void(cudaStream_t)>& launch
 ) {
-  Metrics metrics{kMetric};
+  auto metrics = kMetrics;
   CUpti_RangeProfiler_GetCounterDataSize_Params size{
     CUpti_RangeProfiler_GetCounterDataSize_Params_STRUCT_SIZE};
   size.pRangeProfilerObject = object;
@@ -211,9 +293,10 @@ std::optional<double> collect(
     return std::nullopt;
   }
 
+  ColdCache cache;
   bool done = false;
   for (int pass = 0; !done; ++pass) {
-    if (pass == kMaxPasses || !collect_pass(object, stream, launch, done)) {
+    if (pass == kMaxPasses || !collect_pass(object, stream, launch, done, cache)) {
       return std::nullopt;
     }
   }
@@ -227,9 +310,8 @@ std::optional<double> collect(
 
 } // namespace
 
-std::optional<double> achieved_occupancy(
-  int device, cudaStream_t stream, const std::function<void(cudaStream_t)>& launch
-) {
+std::optional<HardwareMetrics>
+profile_hardware(int device, cudaStream_t stream, const std::function<void(cudaStream_t)>& launch) {
   // Nsight tools inject their own CUPTI session, which owns the counters.
   if (std::getenv("CUDA_INJECTION64_PATH") != nullptr) {
     return std::nullopt;
@@ -247,11 +329,19 @@ std::optional<double> achieved_occupancy(
   if (!check_status(cuptiRangeProfilerEnable(&enable))) {
     return std::nullopt;
   }
-  const auto value = collect(*host, enable.pRangeProfilerObject, stream, launch);
-  CUpti_RangeProfiler_Disable_Params disable{CUpti_RangeProfiler_Disable_Params_STRUCT_SIZE};
-  disable.pRangeProfilerObject = enable.pRangeProfilerObject;
-  check_status(cuptiRangeProfilerDisable(&disable));
-  return value;
+  const auto disable = [&] {
+    CUpti_RangeProfiler_Disable_Params params{CUpti_RangeProfiler_Disable_Params_STRUCT_SIZE};
+    params.pRangeProfilerObject = enable.pRangeProfilerObject;
+    check_status(cuptiRangeProfilerDisable(&params));
+  };
+  try {
+    const auto value = collect(*host, enable.pRangeProfilerObject, stream, launch);
+    disable();
+    return value;
+  } catch (...) {
+    disable();
+    throw;
+  }
 }
 
 } // namespace lg::benchmark
